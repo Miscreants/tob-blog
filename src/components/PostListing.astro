@@ -1,6 +1,8 @@
 ---
 import { postTypes } from "../data/directory";
-import { pageHref, type PostSummary } from "../lib/blog";
+import { PAGE_SIZE, type PostSummary } from "../lib/blog";
+import { defaultDir, pad, pageWindow, pagerClass, sortKeys, sortLabels, statusText, type SortKey } from "../lib/listing";
+import PostRow from "./PostRow.astro";
 
 export interface DirRow {
   /** ".." for the parent, otherwise the subfolder name ("/fuzzing"). */
@@ -15,36 +17,63 @@ interface Props {
   posts: PostSummary[];
   /** Folder rows above the posts on a folder page (parent + subfolders). */
   dirs?: DirRow[];
-  /** Current folder path, for relative locations and page links. */
+  /** Current folder path, for relative locations and the client's scope. */
   path?: string;
+  /** Author whose posts these are (author pages), for the client's scope. */
+  author?: string;
   page: number;
   totalPages: number;
-  /** Left side of the status bar, e.g. "2 folders · 13 of 60 posts". */
-  summary: string;
+  /** Posts in this listing across every page. */
+  total: number;
   class?: string;
 }
-const { posts, dirs = [], path, page, totalPages, summary, class: className } = Astro.props;
+const { posts, dirs = [], path, author, page, totalPages, total, class: className } = Astro.props;
 
-// The file listing: type filter, a TYPE / NAME / LOCATION / AUTHOR / MODIFIED
-// table and a status bar with paging. A real <table>; narrow containers drop
-// LOCATION, then AUTHOR, then the open column (container queries on <main>).
+// The file listing: type filter, a sortable TYPE / NAME / LOCATION / AUTHOR /
+// PUBLISHED table, a status bar and numbered pages. A real <table>; narrow
+// containers drop LOCATION, then AUTHOR, then the open column.
 //
-// Interaction (from the board's rail hint "space · preview ↵ open"):
+// The server renders the default view (all types, newest first, page n) so
+// it works without JS. Filtering, sorting and paging past it run on the
+// client against /listing.json, cover the whole folder, and live in the
+// query string (?type=guide&sort=title&order=desc&page=2).
+//
+// Rows (from the board's rail hint "space · preview ↵ open"):
 //   click a row / Space on its title → preview it in the right drawer
 //   Enter or the → button            → open the post
 //   ↑ / ↓ on a title                 → move between rows
 //   Esc                              → close the preview
-// The type filter and sort act on the rows of this page only.
 
-const relative = (location: string) =>
-  path && (location === path || location.startsWith(`${path}/`))
-    ? location.slice(path.length) || `/${location.split("/").pop()}`
-    : `/${location}`;
-const pad = (n: number) => String(n).padStart(2, "0");
-const cell = "py-4 align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-6";
+// Page 1 of this listing; further server pages hang off it as page/<n>/.
+const base = Astro.url.pathname.replace(/page\/\d+\/?$/, "");
+const routeHref = (n: number) => (n <= 1 ? base : `${base}page/${n}/`);
+const subfolders = dirs.filter((d) => d.name !== "..").length;
+const cell = "align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-6";
+const td = `${cell} py-6`;
+const th = `${cell} text-label text-fg-subtle py-2.5 text-left font-normal`;
+const columns: { key: SortKey; label: string; class: string }[] = [
+  { key: "type", label: "Type", class: "w-[6rem] md:w-[6.5rem]" },
+  { key: "title", label: "Name", class: "" },
+  { key: "location", label: "Location", class: "w-[16rem] @max-5xl:hidden" },
+  { key: "author", label: "Author", class: "w-[12.125rem] @max-3xl:hidden" },
+  { key: "date", label: "Published", class: "w-[7.5rem] @max-lg:hidden" },
+];
+const sortOption = (key: SortKey, dir: "asc" | "desc") =>
+  `${sortLabels[key]} · ${key === "date" ? (dir === "desc" ? "newest" : "oldest") : dir === "asc" ? "A–Z" : "Z–A"}`;
 ---
 
-<section aria-label="Posts" data-listing class={className}>
+<section
+  id="posts"
+  aria-label="Posts"
+  data-listing
+  data-base={base}
+  data-path={path}
+  data-author={author}
+  data-page={page}
+  data-per-page={PAGE_SIZE}
+  data-subfolders={subfolders}
+  class={className}
+>
   <div class="flex flex-wrap items-center gap-2 px-6 pb-5 md:px-8">
     <div role="group" aria-label="Filter by type" class="flex flex-wrap gap-2">
       {
@@ -60,27 +89,46 @@ const cell = "py-4 align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-
         ))
       }
     </div>
-    <button
-      type="button"
-      data-sort
-      aria-label="Sort by modified date, newest first. Activate to reverse."
-      class="text-mono-sm text-fg-subtle hover:text-fg ml-auto whitespace-nowrap transition-colors"
-    >
-      sort: modified <span data-sort-glyph aria-hidden="true">↓</span>
-    </button>
+    <label class="text-mono-sm text-fg-subtle relative ml-auto flex items-center gap-1.5 whitespace-nowrap">
+      sort:
+      <select
+        data-sort-select
+        class="text-mono-sm text-fg hover:text-intent appearance-none bg-transparent pr-4 transition-colors focus-visible:outline-offset-2"
+      >
+        {
+          sortKeys.flatMap((k) =>
+            (k === "date" ? (["desc", "asc"] as const) : (["asc", "desc"] as const)).map((d) => (
+              <option value={`${k}:${d}`} selected={k === "date" && d === "desc"}>
+                {sortOption(k, d)}
+              </option>
+            )),
+          )
+        }
+      </select>
+      <span class="pointer-events-none absolute right-0" aria-hidden="true">▾</span>
+    </label>
   </div>
 
   <table class="w-full table-fixed border-collapse">
-    <caption class="sr-only">Posts{path ? ` in /${path}` : ""}, newest first</caption>
+    <caption class="sr-only" data-caption>Posts{path ? ` in /${path}` : ""}, sorted by published, newest first</caption>
     <thead>
       <tr class="border-stroke border-y">
-        <th scope="col" class:list={[cell, "text-label text-fg-subtle w-[6rem] py-2.5 text-left font-normal md:w-[6.5rem]"]}>Type</th>
-        <th scope="col" class:list={[cell, "text-label text-fg-subtle py-2.5 text-left font-normal"]}>Name</th>
-        <th scope="col" class:list={[cell, "text-label text-fg-subtle w-[16rem] py-2.5 text-left font-normal @max-5xl:hidden"]}>Location</th>
-        <th scope="col" class:list={[cell, "text-label text-fg-subtle w-[12.125rem] py-2.5 text-left font-normal @max-3xl:hidden"]}>Author</th>
-        <th scope="col" aria-sort="descending" data-sort-header class:list={[cell, "text-label text-fg-subtle w-[7.5rem] py-2.5 text-left font-normal @max-lg:hidden"]}>
-          Modified <span data-sort-glyph aria-hidden="true">↓</span>
-        </th>
+        {
+          columns.map((c) => (
+            <th scope="col" data-sort-th={c.key} aria-sort={c.key === "date" ? "descending" : undefined} class:list={[th, c.class]}>
+              <button type="button" data-sort-key={c.key} class="group/sort hover:text-fg inline-flex items-center gap-1 uppercase transition-colors">
+                {c.label}
+                <span
+                  data-sort-glyph
+                  aria-hidden="true"
+                  class:list={[c.key === "date" ? "text-fg" : "opacity-0 group-hover/sort:opacity-100"]}
+                >
+                  {defaultDir(c.key) === "desc" ? "↓" : "↑"}
+                </span>
+              </button>
+            </th>
+          ))
+        }
         <th scope="col" class:list={[cell, "w-[3.5rem] py-2.5 @max-md:hidden md:w-[4rem]"]}><span class="sr-only">Open</span></th>
       </tr>
     </thead>
@@ -88,17 +136,17 @@ const cell = "py-4 align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-
       {
         dirs.map((d) => (
           <tr class="border-stroke hover:bg-panel border-b transition-colors" data-dir>
-            <td class:list={[cell, "text-mono-sm text-intent"]}>dir</td>
-            <td class={cell}>
+            <td class:list={[td, "text-mono-sm text-intent"]}>dir</td>
+            <td class={td}>
               <a href={d.href} class="h5 text-fg hover:text-intent block truncate">
                 {d.name}
               </a>
-              <p class="text-body-2xs text-fg-muted mt-1 truncate">{d.description}</p>
+              <p class="text-body-2xs text-fg-muted mt-1.5 max-w-[72ch] text-pretty">{d.description}</p>
             </td>
-            <td class:list={[cell, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]}>{d.location}</td>
-            <td class:list={[cell, "@max-3xl:hidden"]} />
-            <td class:list={[cell, "text-mono-sm text-fg-subtle @max-lg:hidden"]}>{d.date && <time datetime={d.date}>{d.date}</time>}</td>
-            <td class:list={[cell, "@max-md:hidden"]}>
+            <td class:list={[td, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]}>{d.location}</td>
+            <td class:list={[td, "@max-3xl:hidden"]} />
+            <td class:list={[td, "text-mono-sm text-fg-subtle @max-lg:hidden"]}>{d.date && <time datetime={d.date}>{d.date}</time>}</td>
+            <td class:list={[td, "@max-md:hidden"]}>
               <a href={d.href} tabindex="-1" aria-hidden="true" class="border-stroke-strong text-fg-subtle grid size-6 place-items-center border font-mono text-xs">
                 →
               </a>
@@ -106,117 +154,312 @@ const cell = "py-4 align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-
           </tr>
         ))
       }
-      {
-        posts.map((p) => (
-          <tr
-            data-row
-            data-type={p.type}
-            data-date={p.date}
-            data-summary={JSON.stringify(p)}
-            class="group border-stroke hover:bg-panel data-active:bg-panel-muted data-active:shadow-[inset_2px_0_0_var(--color-intent)] cursor-pointer border-b transition-colors"
-          >
-            <td class:list={[cell, "text-mono-sm text-intent"]}>{p.type}</td>
-            <td class={cell}>
-              <a href={p.href} data-row-link class="h5 text-fg hover:text-intent block truncate">
-                {p.title}
-              </a>
-              <p class="text-body-2xs text-fg-muted mt-1 truncate">{p.description}</p>
-            </td>
-            <td class:list={[cell, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]}>{relative(p.location)}</td>
-            <td class:list={[cell, "text-body-2xs text-fg-muted truncate @max-3xl:hidden"]}>{p.authors.join(", ")}</td>
-            <td class:list={[cell, "text-mono-sm text-fg-subtle @max-lg:hidden"]}>
-              <time datetime={p.date}>{p.date}</time>
-            </td>
-            <td class:list={[cell, "@max-md:hidden"]}>
-              <a
-                href={p.href}
-                tabindex="-1"
-                aria-hidden="true"
-                class="border-stroke-strong text-fg-subtle group-data-active:border-intent group-data-active:bg-intent-soft group-data-active:text-intent hover:text-fg grid size-6 place-items-center border font-mono text-xs transition-colors"
-              >
-                →
-              </a>
-            </td>
-          </tr>
-        ))
-      }
+      {posts.map((p) => <PostRow post={p} path={path} />)}
       <tr data-listing-empty hidden={posts.length > 0 || dirs.length > 0}>
-        <td colspan="6" class="text-mono-sm text-fg-subtle px-6 py-10 md:px-8">No posts here yet.</td>
+        <td colspan="6" class="px-6 py-10 md:px-8">
+          <p class="text-mono-sm text-fg-subtle" data-empty-text>No posts here yet.</p>
+          <button type="button" data-filter-reset hidden class="text-mono-sm text-intent mt-3 hover:underline">
+            show all types<span aria-hidden="true"> →</span>
+          </button>
+        </td>
       </tr>
     </tbody>
   </table>
+  <template data-row-template><PostRow path={path} /></template>
 
-  <nav aria-label="Pages" class="border-stroke flex flex-wrap items-center gap-6 border-t px-6 py-4 md:px-8">
-    <p class="text-mono-sm text-fg-subtle">
-      {summary}
-      <span aria-hidden="true"> · </span>page {pad(page)} / {pad(totalPages)}
+  <nav aria-label="Pages" class="border-stroke flex flex-wrap items-center gap-x-6 gap-y-3 border-t px-6 py-4 md:px-8">
+    <p class="text-mono-sm text-fg-subtle" data-listing-summary>
+      {statusText({ folders: subfolders, total, page, perPage: PAGE_SIZE, type: "all" })}
     </p>
-    <span class="ml-auto"></span>
-    {
-      page > 1 ? (
-        <a href={pageHref(path, page - 1)} rel="prev" class="text-mono-sm text-fg hover:text-intent">
-          <span aria-hidden="true">← </span>prev
-        </a>
-      ) : (
-        <span class="text-mono-sm text-fg-subtle" aria-disabled="true">
-          <span aria-hidden="true">← </span>prev
-        </span>
-      )
-    }
-    {
-      page < totalPages ? (
-        <a href={pageHref(path, page + 1)} rel="next" class="text-mono-sm text-fg hover:text-intent">
-          next<span aria-hidden="true"> →</span>
-        </a>
-      ) : (
-        <span class="text-mono-sm text-fg-subtle" aria-disabled="true">
-          next<span aria-hidden="true"> →</span>
-        </span>
-      )
-    }
+    <div class="ml-auto flex flex-wrap items-center gap-1" data-pager>
+      {
+        totalPages > 1 && (
+          <>
+            {page > 1 ? (
+              <a href={routeHref(page - 1)} rel="prev" class={pagerClass.link}>
+                <span aria-hidden="true">← </span>prev
+              </a>
+            ) : (
+              <span class={pagerClass.disabled} aria-disabled="true">
+                <span aria-hidden="true">← </span>prev
+              </span>
+            )}
+            {pageWindow(page, totalPages).map((n) =>
+              n === null ? (
+                <span class={pagerClass.gap} aria-hidden="true">
+                  …
+                </span>
+              ) : (
+                <a
+                  href={routeHref(n)}
+                  aria-current={n === page ? "page" : undefined}
+                  aria-label={`Page ${n}`}
+                  class={n === page ? pagerClass.current : pagerClass.link}
+                >
+                  {pad(n)}
+                </a>
+              ),
+            )}
+            {page < totalPages ? (
+              <a href={routeHref(page + 1)} rel="next" class={pagerClass.link}>
+                next<span aria-hidden="true"> →</span>
+              </a>
+            ) : (
+              <span class={pagerClass.disabled} aria-disabled="true">
+                next<span aria-hidden="true"> →</span>
+              </span>
+            )}
+          </>
+        )
+      }
+    </div>
   </nav>
   <p class="sr-only" role="status" data-listing-status></p>
 </section>
 
 <script>
+  import type { PostSummary } from "../lib/blog";
+  import {
+    defaultDir,
+    defaultState,
+    pad,
+    pageWindow,
+    pagerClass,
+    relativeLocation,
+    sortKeys,
+    sortLabels,
+    statusText,
+    type ListingState,
+    type SortDir,
+    type SortKey,
+  } from "../lib/listing";
+
+  // Fetched once per page view, on the first non-default state.
+  let index: Promise<PostSummary[]> | undefined;
+  const loadIndex = () =>
+    (index ??= fetch("/listing.json").then((r) => {
+      if (!r.ok) throw new Error(`listing.json: ${r.status}`);
+      return r.json();
+    }));
+
+  const within = (loc: string, folder: string) => loc === folder || loc.startsWith(`${folder}/`);
+  const value = (p: PostSummary, key: SortKey) =>
+    key === "title" ? p.title : key === "author" ? (p.authors[0] ?? "") : key === "location" ? p.location : key === "type" ? p.type : p.date;
+
   document.querySelectorAll<HTMLElement>("[data-listing]").forEach((listing) => {
     if (listing.dataset.ready) return;
     listing.dataset.ready = "true";
 
+    const ds = listing.dataset;
+    const base = ds.base!;
+    const path = ds.path;
+    const author = ds.author;
+    const routePage = Number(ds.page) || 1;
+    const perPage = Number(ds.perPage) || 20;
+    const subfolders = Number(ds.subfolders) || 0;
+
     const body = listing.querySelector<HTMLElement>("[data-listing-body]")!;
-    const status = listing.querySelector<HTMLElement>("[data-listing-status]")!;
     const empty = listing.querySelector<HTMLElement>("[data-listing-empty]")!;
+    const emptyText = listing.querySelector<HTMLElement>("[data-empty-text]")!;
+    const reset = listing.querySelector<HTMLButtonElement>("[data-filter-reset]")!;
+    const template = listing.querySelector<HTMLTemplateElement>("[data-row-template]")!;
+    const summary = listing.querySelector<HTMLElement>("[data-listing-summary]")!;
+    const pager = listing.querySelector<HTMLElement>("[data-pager]")!;
+    const status = listing.querySelector<HTMLElement>("[data-listing-status]")!;
+    const caption = listing.querySelector<HTMLElement>("[data-caption]")!;
+    const select = listing.querySelector<HTMLSelectElement>("[data-sort-select]")!;
+    const filters = [...listing.querySelectorAll<HTMLButtonElement>("[data-filter]")];
+    const types = filters.map((b) => b.dataset.filter!);
     const rows = () => [...body.querySelectorAll<HTMLTableRowElement>("[data-row]")];
     const visibleRows = () => rows().filter((r) => !r.hidden);
-    
-    // ---- Type filter ----
-    listing.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const type = btn.dataset.filter!;
-        listing.querySelectorAll("[data-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
-        rows().forEach((r) => (r.hidden = type !== "all" && r.dataset.type !== type));
-        body.querySelectorAll<HTMLElement>("[data-dir]").forEach((r) => (r.hidden = type !== "all"));
-        const n = visibleRows().length;
-        empty.hidden = n > 0 || type === "all";
-        status.textContent = `${n} ${type === "all" ? "posts" : `${type} posts`} on this page`;
-      });
-    });
 
-    // ---- Sort (this page) ----
-    let descending = true;
-    const sortBtn = listing.querySelector<HTMLButtonElement>("[data-sort]")!;
-    sortBtn.addEventListener("click", () => {
-      descending = !descending;
-      rows()
-        .sort((a, b) => (descending ? b.dataset.date!.localeCompare(a.dataset.date!) : a.dataset.date!.localeCompare(b.dataset.date!)))
-        .forEach((r) => body.insertBefore(r, empty));
-      listing.querySelectorAll("[data-sort-glyph]").forEach((g) => (g.textContent = descending ? "↓" : "↑"));
-      listing.querySelector("[data-sort-header]")?.setAttribute("aria-sort", descending ? "descending" : "ascending");
-      sortBtn.setAttribute(
-        "aria-label",
-        `Sort by modified date, ${descending ? "newest" : "oldest"} first. Activate to reverse.`,
+    // ---- URL state ----
+    const parse = (): ListingState => {
+      const q = new URLSearchParams(location.search);
+      const key = sortKeys.includes(q.get("sort") as SortKey) ? (q.get("sort") as SortKey) : "date";
+      const order = q.get("order");
+      return {
+        type: types.includes(q.get("type") ?? "") ? q.get("type")! : "all",
+        key,
+        dir: order === "asc" || order === "desc" ? order : defaultDir(key),
+        page: Math.max(1, Number(q.get("page")) || 1),
+      };
+    };
+    const query = (s: ListingState) => {
+      const q = new URLSearchParams();
+      if (s.type !== "all") q.set("type", s.type);
+      if (s.key !== "date") q.set("sort", s.key);
+      if (s.dir !== defaultDir(s.key)) q.set("order", s.dir);
+      if (s.page > 1) q.set("page", String(s.page));
+      const str = q.toString();
+      return str ? `?${str}` : "";
+    };
+
+    // /page/<n>/ routes are always the default view; page 1 may carry a query.
+    const initial = parse();
+    let state: ListingState = routePage > 1 ? defaultState(routePage) : initial;
+
+    // ---- Controls ----
+    const syncControls = (s: ListingState) => {
+      filters.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filter === s.type)));
+      select.value = `${s.key}:${s.dir}`;
+      listing.querySelectorAll<HTMLElement>("[data-sort-th]").forEach((th) => {
+        const on = th.dataset.sortTh === s.key;
+        const glyph = th.querySelector<HTMLElement>("[data-sort-glyph]")!;
+        if (on) th.setAttribute("aria-sort", s.dir === "asc" ? "ascending" : "descending");
+        else th.removeAttribute("aria-sort");
+        glyph.textContent = (on ? s.dir : defaultDir(th.dataset.sortTh as SortKey)) === "asc" ? "↑" : "↓";
+        glyph.classList.toggle("text-fg", on);
+        glyph.classList.toggle("opacity-0", !on);
+        glyph.classList.toggle("group-hover/sort:opacity-100", !on);
+      });
+      const order = s.key === "date" ? (s.dir === "desc" ? "newest first" : "oldest first") : s.dir === "asc" ? "A to Z" : "Z to A";
+      caption.textContent = `${s.type === "all" ? "Posts" : `*.${s.type} posts`}${path ? ` in /${path}` : ""}, sorted by ${sortLabels[s.key]}, ${order}`;
+    };
+
+    // ---- Rendering ----
+    const field = (row: HTMLElement, name: string) => row.querySelector<HTMLElement>(`[data-field="${name}"]`)!;
+    const makeRow = (p: PostSummary) => {
+      const row = template.content.firstElementChild!.cloneNode(true) as HTMLTableRowElement;
+      row.dataset.type = p.type;
+      row.dataset.summary = JSON.stringify(p);
+      field(row, "type").textContent = p.type;
+      const title = field(row, "title") as HTMLAnchorElement;
+      title.href = p.href;
+      title.textContent = p.title;
+      field(row, "description").textContent = p.description;
+      field(row, "location").textContent = relativeLocation(p.location, path);
+      field(row, "authors").replaceChildren(
+        ...p.authors.map((a) => Object.assign(document.createElement("li"), { className: "truncate", textContent: a })),
       );
+      const time = field(row, "date");
+      time.setAttribute("datetime", p.date);
+      time.textContent = p.date;
+      (field(row, "open") as HTMLAnchorElement).href = p.href;
+      return row;
+    };
+
+    const pagerLink = (n: number, s: ListingState, label: string, extra: Record<string, string> = {}) => {
+      const a = Object.assign(document.createElement("a"), { href: `${base}${query({ ...s, page: n })}`, className: pagerClass.link });
+      a.dataset.page = String(n);
+      Object.entries(extra).forEach(([k, v]) => a.setAttribute(k, v));
+      a.innerHTML = label;
+      return a;
+    };
+    const renderPager = (s: ListingState, total: number) => {
+      const out: HTMLElement[] = [];
+      const disabled = (html: string) => {
+        const span = Object.assign(document.createElement("span"), { className: pagerClass.disabled, innerHTML: html });
+        span.setAttribute("aria-disabled", "true");
+        return span;
+      };
+      const prev = '<span aria-hidden="true">← </span>prev';
+      const next = 'next<span aria-hidden="true"> →</span>';
+      if (total > 1) {
+        out.push(s.page > 1 ? pagerLink(s.page - 1, s, prev, { rel: "prev" }) : disabled(prev));
+        for (const n of pageWindow(s.page, total)) {
+          if (n === null) {
+            const gap = Object.assign(document.createElement("span"), { className: pagerClass.gap, textContent: "…" });
+            gap.setAttribute("aria-hidden", "true");
+            out.push(gap);
+          } else {
+            const a = pagerLink(n, s, pad(n), { "aria-label": `Page ${n}` });
+            if (n === s.page) {
+              a.setAttribute("aria-current", "page");
+              a.className = pagerClass.current;
+            }
+            out.push(a);
+          }
+        }
+        out.push(s.page < total ? pagerLink(s.page + 1, s, next, { rel: "next" }) : disabled(next));
+      }
+      pager.replaceChildren(...out);
+    };
+
+    const render = async (s: ListingState, { push = false, focusPager = false } = {}) => {
+      syncControls(s);
+      let all: PostSummary[];
+      try {
+        all = await loadIndex();
+      } catch {
+        // No index: fall back to the server's page, unfiltered.
+        return;
+      }
+      const scoped = all.filter((p) =>
+        author ? p.authors.includes(author) : path ? [p.location, ...p.alsoIn].some((l) => within(l, path)) : true,
+      );
+      const matching = scoped.filter((p) => s.type === "all" || p.type === s.type);
+      const sign = s.dir === "asc" ? 1 : -1;
+      matching.sort(
+        (a, b) =>
+          sign * value(a, s.key).localeCompare(value(b, s.key), undefined, { sensitivity: "base", numeric: true }) ||
+          b.date.localeCompare(a.date),
+      );
+      const totalPages = Math.max(1, Math.ceil(matching.length / perPage));
+      s = { ...s, page: Math.min(s.page, totalPages) };
+      state = s;
+
+      rows().forEach((r) => r.remove());
+      const slice = matching.slice((s.page - 1) * perPage, s.page * perPage);
+      slice.forEach((p) => body.insertBefore(makeRow(p), empty));
+      const showDirs = s.type === "all" && s.page === 1;
+      body.querySelectorAll<HTMLElement>("[data-dir]").forEach((r) => (r.hidden = !showDirs));
+
+      const leaf = path ? `/${path.split("/").pop()}` : "";
+      empty.hidden = slice.length > 0 || (showDirs && !!body.querySelector("[data-dir]"));
+      emptyText.textContent =
+        s.type === "all" ? "No posts here yet." : `No *.${s.type} posts ${leaf ? `in ${leaf}` : author ? `by ${author}` : "yet"}.`;
+      reset.hidden = s.type === "all";
+
+      const text = statusText({ folders: showDirs ? subfolders : 0, total: matching.length, page: s.page, perPage, type: s.type });
+      summary.textContent = text;
+      status.textContent = `${text}, page ${s.page} of ${totalPages}`;
+      renderPager(s, totalPages);
+
+      if (push) history.pushState(null, "", `${base}${query(s)}`);
+      if (focusPager) {
+        pager.querySelector<HTMLElement>('[aria-current="page"]')?.focus({ preventScroll: true });
+        if (listing.getBoundingClientRect().top < 0) listing.scrollIntoView();
+      }
+    };
+
+    // A new state from a control. On a /page/<n>/ route the folder rows
+    // aren't in the DOM, so restart from page 1 of the listing instead.
+    const change = (next: ListingState, opts: { focusPager?: boolean } = {}) => {
+      if (routePage > 1) {
+        location.assign(`${base}${query(next)}#posts`);
+        return;
+      }
+      render(next, { push: true, ...opts });
+    };
+
+    filters.forEach((btn) => btn.addEventListener("click", () => change({ ...state, type: btn.dataset.filter!, page: 1 })));
+    reset.addEventListener("click", () => {
+      change({ ...state, type: "all", page: 1 });
+      filters[0]?.focus();
     });
+    select.addEventListener("change", () => {
+      const [key, dir] = select.value.split(":") as [SortKey, SortDir];
+      change({ ...state, key, dir, page: 1 });
+    });
+    listing.querySelectorAll<HTMLButtonElement>("[data-sort-key]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.sortKey as SortKey;
+        const dir = key === state.key ? (state.dir === "asc" ? "desc" : "asc") : defaultDir(key);
+        change({ ...state, key, dir, page: 1 });
+      }),
+    );
+    // Only client-rendered page links carry data-page; the server's go to real routes.
+    pager.addEventListener("click", (e) => {
+      const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("a[data-page]");
+      if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      change({ ...state, page: Number(a.dataset.page) }, { focusPager: true });
+    });
+    window.addEventListener("popstate", () => {
+      if (routePage === 1) render(parse());
+    });
+    if (routePage === 1 && query(initial)) render(initial);
 
     // ---- Preview ----
     // The selected row stays marked after the drawer collapses (the rail

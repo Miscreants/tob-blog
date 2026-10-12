@@ -26,17 +26,21 @@ const leaf = folder.split("/").pop();
       </h2>
       <ul class="border-stroke border-t">
         {rows.map(({ post, rel }) => (
-          <li class="border-stroke hover:bg-panel group relative grid grid-cols-[4.5rem_minmax(0,1fr)_1.5rem] gap-x-6 border-b py-4 transition-colors @3xl:grid-cols-[4.5rem_minmax(0,1fr)_7rem_9rem_5.5rem_1.5rem]">
+          <li class="border-stroke hover:bg-panel group relative grid grid-cols-[4.5rem_minmax(0,1fr)_1.5rem] gap-x-6 border-b py-6 transition-colors @3xl:grid-cols-[4.5rem_minmax(0,1fr)_7rem_9rem_5.5rem_1.5rem]">
             <span class="text-mono-sm text-intent">{post.data.type}</span>
             <div class="min-w-0">
-              <a href={postHref(post)} rel={rel === "next" ? "next" : "prev"} class="h5 text-fg block truncate after:absolute after:inset-0">
+              <a href={postHref(post)} rel={rel === "next" ? "next" : "prev"} class="h5 text-fg block text-pretty after:absolute after:inset-0">
                 {rel === "previous" && <span aria-hidden="true">← </span>}
                 {post.data.title}
               </a>
-              <p class="text-body-2xs text-fg-muted mt-1 truncate">{post.data.description}</p>
+              <p class="text-body-2xs text-fg-muted mt-1.5 max-w-[72ch] text-pretty">{post.data.description}</p>
             </div>
             <span class="text-mono-sm text-fg-muted @max-3xl:hidden">{rel}</span>
-            <span class="text-body-2xs text-fg-muted truncate @max-3xl:hidden">{post.data.authors.join(", ")}</span>
+            <ul class="text-body-2xs text-fg-muted flex min-w-0 flex-col gap-1 @max-3xl:hidden">
+              {post.data.authors.map((a) => (
+                <li class="truncate">{a}</li>
+              ))}
+            </ul>
             <time class="text-mono-sm text-fg-subtle @max-3xl:hidden" datetime={isoDate(post.data.date)}>
               {isoDate(post.data.date)}
             </time>

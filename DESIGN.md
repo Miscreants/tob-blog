@@ -43,5 +43,4 @@ The blog is the lab's notebook, not a magazine: posts are files in a directory t
 
 - Indexes (`/tools ↗`, `/languages ↗`, `/programs ↗`) carry a ↗ on the board. Should they link out to trailofbits.com, or stay blog folders as built?
 - Newsletter provider and endpoint (`subscribeAction` in `src/data/site.ts`).
-- The type filter and sort only act on the current page. Full-archive filtering waits for the content import (per-type routes or Pagefind).
 - Production domain is assumed to be `blog.trailofbits.com`, and the URL scheme is folder-based. Redirects from the current `/YYYY/MM/DD/slug/` URLs are needed at import.

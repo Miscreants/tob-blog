@@ -34,7 +34,7 @@ const hasRail = Astro.slots.has("rail");
 ---
 
 <Layout {...seo}>
-  <TopBar />
+  <TopBar rail={hasRail || preview} />
   <SearchDialog />
   <div
     class:list={[

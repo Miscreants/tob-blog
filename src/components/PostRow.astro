@@ -1,0 +1,53 @@
+---
+import type { PostSummary } from "../lib/blog";
+import { relativeLocation } from "../lib/listing";
+
+interface Props {
+  /** Omit to render the blank row PostListing's script clones and fills. */
+  post?: PostSummary;
+  /** Folder being listed, for relative locations. */
+  path?: string;
+}
+const { post, path } = Astro.props;
+
+// One post row of PostListing. The client script fills the same markup
+// through the data-field hooks, so both renders stay identical.
+const td = "align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-6 py-6";
+---
+
+<tr
+  data-row
+  data-type={post?.type}
+  data-summary={post && JSON.stringify(post)}
+  class="group border-stroke hover:bg-panel data-active:bg-panel-muted data-active:shadow-[inset_2px_0_0_var(--color-intent)] cursor-pointer border-b transition-colors"
+>
+  <td class:list={[td, "text-mono-sm text-intent"]} data-field="type">{post?.type}</td>
+  <td class={td}>
+    <a href={post?.href} data-row-link data-field="title" class="h5 text-fg hover:text-intent block text-pretty">
+      {post?.title}
+    </a>
+    <p class="text-body-2xs text-fg-muted mt-1.5 max-w-[72ch] text-pretty" data-field="description">{post?.description}</p>
+  </td>
+  <td class:list={[td, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]} data-field="location">
+    {post && relativeLocation(post.location, path)}
+  </td>
+  <td class:list={[td, "text-body-2xs text-fg-muted @max-3xl:hidden"]}>
+    <ul class="flex flex-col gap-1" data-field="authors">
+      {post?.authors.map((a) => <li class="truncate">{a}</li>)}
+    </ul>
+  </td>
+  <td class:list={[td, "text-mono-sm text-fg-subtle @max-lg:hidden"]}>
+    <time datetime={post?.date} data-field="date">{post?.date}</time>
+  </td>
+  <td class:list={[td, "@max-md:hidden"]}>
+    <a
+      href={post?.href}
+      tabindex="-1"
+      aria-hidden="true"
+      data-field="open"
+      class="border-stroke-strong text-fg-subtle group-data-active:border-intent group-data-active:bg-intent-soft group-data-active:text-intent hover:text-fg grid size-6 place-items-center border font-mono text-xs transition-colors"
+    >
+      →
+    </a>
+  </td>
+</tr>

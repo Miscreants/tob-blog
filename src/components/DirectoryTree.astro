@@ -15,8 +15,9 @@ interface Props {
 const { current, currentIsPage = true, counts, class: className } = Astro.props;
 
 // The left-hand directory: ~/blog → groups (topics / indexes / about) →
-// folders. Every subfolder is rendered, but one shows only while its parent
-// is on the selected path (as on the board) or after "expand all". Guide
+// folders. Every subfolder is rendered; folders on the selected path start
+// open (as on the board), the rest shut. Each folder's fork toggles it, and
+// "expand all" / "collapse all" set every folder at once. Guide
 // lines are computed here, one 16×26 cell per depth,
 // following the Tree/Guide component in Figma:
 //   rail  — an ancestor still has children further down
@@ -65,8 +66,7 @@ const selectedKeys = current
   : ["~"];
 const onPath = (n: Node) => selectedKeys.includes(n.key);
 const isSelected = (n: Node) => n.key === selectedKeys[selectedKeys.length - 1];
-// Root and groups are always open; folders open along the selected path.
-// Closed ones still render their subtree, hidden until "expand all".
+// Root and groups are always open; folders start open along the selected path.
 const isClosed = (n: Node) => n.kind === "folder" && !onPath(n) && n.children.length > 0;
 
 type Cell = TreeRow["cells"][number];
@@ -103,7 +103,7 @@ const buildRow = (n: Node, ancestors: Node[]): TreeRow => {
   const kids = n.children;
   cells.push(
     kids.length
-      ? { kind: "fork", left: { on: onPath(n) }, down: { on: onPath(n) && !isSelected(n) }, closed: isClosed(n) }
+      ? { kind: "fork", left: { on: onPath(n) }, down: { on: onPath(n) && !isSelected(n) } }
       : { kind: "dash", on: isSelected(n) },
   );
   // The root has no parent column; its own fork starts at the edge.
@@ -117,7 +117,6 @@ const buildRow = (n: Node, ancestors: Node[]): TreeRow => {
     selected: isSelected(n),
     onPath: onPath(n),
     current: isSelected(n) ? (currentIsPage || n.kind === "root" ? "page" : "location") : undefined,
-    nested: n.kind === "folder" && ancestors.filter((a) => a.kind === "folder").length > 0,
     closed: isClosed(n),
     cells,
     children: kids.map((k) => buildRow(k, chain)),
@@ -156,39 +155,70 @@ const tree = buildRow(root, []);
   </div>
 </aside>
 
-<!-- Restore the saved expand/collapse choice before paint so the tree doesn't jump. -->
+<!-- Restore saved folder states before paint so the tree doesn't jump. -->
 <script is:inline>
   (() => {
     const tree = document.getElementById("directory");
+    if (!tree) return;
     let mode = null;
+    let saved = {};
     try {
       mode = localStorage.getItem("tree-mode");
+      saved = JSON.parse(localStorage.getItem("tree-open") || "{}") || {};
     } catch {}
-    if (!tree || (mode !== "collapsed" && mode !== "expanded")) return;
-    tree.dataset.mode = mode;
+    tree.querySelectorAll("[data-folder]").forEach((li) => {
+      const s = saved[li.dataset.folder];
+      const open =
+        typeof s === "boolean" ? s : mode === "expanded" ? true : mode === "collapsed" ? false : li.dataset.state === "open";
+      li.dataset.state = open ? "open" : "shut";
+      li.querySelector(":scope > div [data-folder-toggle]")?.setAttribute("aria-expanded", String(open));
+    });
     const btn = tree.querySelector("[data-tree-mode-toggle]");
-    if (btn) btn.textContent = mode === "collapsed" ? "expand all" : "collapse all";
+    if (btn && mode === "collapsed") btn.textContent = "expand all";
   })();
 </script>
 
 <script>
+  // Saved state: "tree-mode" is the last expand/collapse all; "tree-open"
+  // holds per-folder choices made since, by path. Both last until changed.
+  const read = (): Record<string, boolean> => {
+    try {
+      return JSON.parse(localStorage.getItem("tree-open") || "{}") || {};
+    } catch {
+      return {};
+    }
+  };
+  const write = (key: string, value: string | null) => {
+    try {
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    } catch {}
+  };
+  const setFolder = (li: HTMLElement, open: boolean) => {
+    li.dataset.state = open ? "open" : "shut";
+    li.querySelector(":scope > div [data-folder-toggle]")?.setAttribute("aria-expanded", String(open));
+  };
+
   document.querySelectorAll<HTMLElement>("[data-tree]").forEach((tree) => {
     if (tree.dataset.ready) return;
     tree.dataset.ready = "true";
 
-    // The tree starts open along the selected path (or in the saved mode,
-    // restored by the inline script above). The button then flips
-    // between "collapse all" (top-level folders only) and "expand all"
-    // (every folder and subfolder); DirectoryTreeBranch's CSS reads data-mode.
+    tree.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest("[data-folder-toggle]");
+      const li = btn?.closest<HTMLElement>("[data-folder]");
+      if (!li) return;
+      const open = li.dataset.state !== "open";
+      setFolder(li, open);
+      write("tree-open", JSON.stringify({ ...read(), [li.dataset.folder!]: open }));
+    });
+
     const modeToggle = tree.querySelector<HTMLButtonElement>("[data-tree-mode-toggle]");
     modeToggle?.addEventListener("click", () => {
-      const next = tree.dataset.mode === "collapsed" ? "expanded" : "collapsed";
-      tree.dataset.mode = next;
-      modeToggle.textContent = next === "collapsed" ? "expand all" : "collapse all";
-      // Kept until the visitor flips it again.
-      try {
-        localStorage.setItem("tree-mode", next);
-      } catch {}
+      const expand = modeToggle.textContent!.trim() === "expand all";
+      tree.querySelectorAll<HTMLElement>("[data-folder]").forEach((li) => setFolder(li, expand));
+      modeToggle.textContent = expand ? "collapse all" : "expand all";
+      write("tree-mode", expand ? "expanded" : "collapsed");
+      write("tree-open", null);
     });
 
     // Drawer below lg.

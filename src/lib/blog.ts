@@ -50,7 +50,8 @@ export const folders: Map<string, FolderNode> = (() => {
 /** True when `path` is `folder` or sits under it. */
 const within = (path: string, folder: string) => path === folder || path.startsWith(`${folder}/`);
 
-export const sortKey = (p: Post) => (p.data.updated ?? p.data.date).getTime();
+// Listings are ordered and dated by publication, not last update.
+export const sortKey = (p: Post) => p.data.date.getTime();
 
 /** Published posts, newest first. Unknown folder paths fail the build. */
 export async function getPosts(): Promise<Post[]> {
@@ -135,9 +136,41 @@ export interface PostSummary {
   alsoIn: string[];
   authors: string[];
   date: string;
+  related: RelatedLink[];
 }
 
-export const summarize = (p: Post): PostSummary => ({
+export interface RelatedLink {
+  href: string;
+  file: string;
+  title: string;
+  type: string;
+  date: string;
+}
+
+/** Up to `limit` posts sharing folders with `post`: an exact shared folder
+ *  counts most, then the same top-level topic or a shared author. Ties go to
+ *  the newest. */
+export function relatedPosts(post: Post, all: Post[], limit = 3): Post[] {
+  const paths = (p: Post) => [p.data.location, ...p.data.alsoIn];
+  const roots = (p: Post) => new Set(paths(p).map((f) => f.split("/")[0]));
+  const mine = new Set(paths(post));
+  const myRoots = roots(post);
+  return all
+    .filter((c) => c.id !== post.id)
+    .map((c) => {
+      const shared = paths(c).filter((f) => mine.has(f)).length;
+      const sameRoot = [...roots(c)].some((r) => myRoots.has(r));
+      const sameAuthor = c.data.authors.some((a) => post.data.authors.includes(a));
+      return { c, score: shared * 3 + (c.data.location === post.data.location ? 1 : 0) + (sameRoot ? 1 : 0) + (sameAuthor ? 1 : 0) };
+    })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score || sortKey(b.c) - sortKey(a.c))
+    .slice(0, limit)
+    .map((r) => r.c);
+}
+
+/** Row summaries; `all` (every published post) feeds the related links. */
+export const summarize = (all: Post[]) => (p: Post): PostSummary => ({
   id: p.id,
   href: postHref(p),
   file: fileName(p),
@@ -147,5 +180,12 @@ export const summarize = (p: Post): PostSummary => ({
   location: p.data.location,
   alsoIn: p.data.alsoIn,
   authors: p.data.authors,
-  date: isoDate(p.data.updated ?? p.data.date),
+  date: isoDate(p.data.date),
+  related: relatedPosts(p, all).map((r) => ({
+    href: postHref(r),
+    file: fileName(r),
+    title: r.data.title,
+    type: r.data.type,
+    date: isoDate(r.data.date),
+  })),
 });

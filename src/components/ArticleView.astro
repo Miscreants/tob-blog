@@ -10,16 +10,49 @@ interface Props {
   post: Post;
   previous?: Post;
   next?: Post;
+  /** h2/h3 headings, for the inline contents below xl. */
+  headings?: { depth: number; slug: string; text: string }[];
 }
-const { post, previous, next } = Astro.props;
+const { post, previous, next, headings = [] } = Astro.props;
 
 // The article column: header, body, Explain with AI, more in this folder.
 // 1000px measure inside 80px gutters at the board width. Below xl, where the
-// rail is hidden, subscribe follows the article.
+// rail is hidden, subscribe follows the article and the rail's "On this
+// page" folds into a disclosure under the header.
 ---
 
 <article class="mx-auto w-full max-w-[72.5rem] px-6 pt-12 pb-16 md:px-12 2xl:px-20">
   <ArticleHeader post={post} />
+  {
+    headings.length > 1 && (
+      <details class="group border-stroke-strong bg-panel mt-10 border xl:hidden">
+        <summary class="text-label text-fg-subtle hover:text-fg flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 transition-colors [&::-webkit-details-marker]:hidden">
+          On this page
+          <span class="text-mono-xs tabular-nums">({headings.length})</span>
+          <span aria-hidden="true" class="ml-auto transition-transform group-open:rotate-180">
+            ▾
+          </span>
+        </summary>
+        <nav aria-label="On this page" class="border-stroke border-t px-5 py-3">
+          <ol>
+            {headings.map((h) => (
+              <li>
+                <a
+                  href={`#${h.slug}`}
+                  class:list={[
+                    "text-mono-sm text-fg-muted hover:text-intent block py-1.5 transition-colors",
+                    h.depth === 3 && "pl-4",
+                  ]}
+                >
+                  {h.text}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </details>
+    )
+  }
   <ArticleBody class="mt-12">
     <slot />
   </ArticleBody>

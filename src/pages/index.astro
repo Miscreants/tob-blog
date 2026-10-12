@@ -15,9 +15,9 @@ const { items, total } = paginate(posts, 1);
     title="The Trail of Bits Blog"
     lede={site.description}
     featured={posts.filter((p) => p.data.featured)}
-    posts={items.map(summarize)}
+    posts={items.map(summarize(posts))}
     page={1}
     totalPages={total}
-    summary={`${posts.length} posts`}
+    total={posts.length}
   />
 </BlogShell>

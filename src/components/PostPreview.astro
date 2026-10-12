@@ -1,4 +1,5 @@
 ---
+import { Icon } from "astro-icon/components";
 import Button from "./Button.astro";
 
 interface Props {
@@ -10,11 +11,14 @@ const { class: className } = Astro.props;
 //
 // xl+: a column in the shell. Closed, it is the board's 40px strip — a ⇤
 // handle and a vertical hint; open, it widens to the 440px panel. The handle
-// and "⇥ close" toggle it. Collapsing keeps the selected row, so the strip
+// and the × button toggle it. Collapsing keeps the selected row, so the strip
 // turns red with "space · preview ↵ open" (board: Folder View) and reopening
 // shows that post again. With nothing selected the panel shows an empty state.
 // Below xl: no strip; selecting a row slides the same panel in over the
 // content from the right.
+//
+// At xl the open drawer can be resized from its left edge (drag, or arrow
+// keys on the handle; double-click resets). The width is remembered.
 //
 // Rows are selected by PostListing (`preview:open`); closing announces
 // `preview:closed` so the listing can return focus to the row.
@@ -27,15 +31,31 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
   data-preview
   data-state="closed"
   class:list={[
-    "bg-panel border-stroke group/preview z-30 overflow-hidden border-l",
+    // overflow-clip, not hidden: hidden makes this a scroll container, which
+    // breaks the sticky panel inside.
+    "bg-panel border-stroke group/preview z-30 overflow-clip border-l",
     // Drawer over the content below xl.
     "max-xl:top-topbar max-xl:shadow-popover max-xl:fixed max-xl:right-0 max-xl:bottom-0 max-xl:w-[min(var(--spacing-rail),92vw)] max-xl:translate-x-full max-xl:data-[state=open]:translate-x-0",
     // Column that widens in place from xl.
-    "xl:w-rail-collapsed xl:data-[state=open]:w-[clamp(20rem,26vw,var(--spacing-rail))]",
-    "transition-[width,translate] duration-default-quarter ease-[var(--cubic-default)] motion-reduce:transition-none",
+    "xl:w-rail-collapsed xl:relative xl:data-[state=open]:w-(--preview-w,clamp(20rem,26vw,var(--spacing-rail)))",
+    "transition-[width,translate] duration-default-quarter ease-[var(--cubic-default)] motion-reduce:transition-none data-resizing:transition-none",
     className,
   ]}
 >
+  <div
+    role="separator"
+    tabindex="0"
+    aria-orientation="vertical"
+    aria-controls="post-preview"
+    aria-label="Resize preview"
+    data-preview-resize
+    class="group/resize absolute inset-y-0 left-0 z-10 hidden w-2 cursor-col-resize touch-none outline-none xl:group-data-[state=open]/preview:block"
+  >
+    <span
+      class="bg-intent absolute inset-y-0 left-0 w-0.5 opacity-0 transition-opacity group-hover/resize:opacity-100 group-focus-visible/resize:opacity-100 group-data-resizing/preview:opacity-100"
+    ></span>
+  </div>
+
   <div class="xl:top-topbar xl:sticky">
     <!-- Closed strip (xl only). -->
     <div class="flex flex-col items-center gap-4 py-4 max-xl:hidden group-data-[state=open]/preview:hidden">
@@ -63,7 +83,7 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
     <!-- Open panel. Fixed width so it never reflows while the drawer animates. -->
     <div
       id="post-preview-panel"
-      class="invisible flex max-h-[calc(100dvh-var(--spacing-topbar))] w-[min(var(--spacing-rail),92vw)] flex-col gap-5 overflow-y-auto px-8 py-10 group-data-[state=open]/preview:visible xl:w-[clamp(20rem,26vw,var(--spacing-rail))]"
+      class="invisible flex max-h-[calc(100dvh-var(--spacing-topbar))] w-[min(var(--spacing-rail),92vw)] flex-col gap-5 overflow-y-auto px-8 pt-6 pb-10 group-data-[state=open]/preview:visible xl:w-(--preview-w,clamp(20rem,26vw,var(--spacing-rail)))"
     >
       <div class="flex items-center gap-2">
         <h2 class="text-label text-fg-subtle">Preview</h2>
@@ -73,9 +93,10 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
           data-preview-close
           aria-expanded="true"
           aria-controls="post-preview-panel"
-          class="text-mono-xs border-stroke-strong text-fg-muted hover:text-fg flex items-center gap-1.5 border px-2 py-[0.1875rem] text-[0.6875rem]"
+          class="border-stroke-strong text-fg-muted hover:text-fg hover:border-fg-subtle grid size-7 place-items-center border transition-colors"
         >
-          <span aria-hidden="true" class="text-xs">⇥</span> close
+          <Icon name="lucide:x" class="size-4" aria-hidden="true" />
+          <span class="sr-only">Close preview</span>
         </button>
       </div>
 
@@ -109,6 +130,11 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
           <Button href="#" label="Open post ↵" withArrow={false} data-preview-open />
           <Button label="Copy link" variant="secondary" withArrow={false} data-preview-copy />
         </div>
+
+        <section aria-labelledby="preview-related-heading" class="flex flex-col pt-3" data-field-row="related">
+          <h4 id="preview-related-heading" class="text-label text-fg-subtle pb-3">Related</h4>
+          <ul class="border-stroke border-t" data-field="related"></ul>
+        </section>
       </div>
     </div>
   </div>
@@ -125,6 +151,7 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
     alsoIn: string[];
     authors: string[];
     date: string;
+    related: { href: string; file: string; title: string; type: string; date: string }[];
   };
 
   const panel = document.querySelector<HTMLElement>("[data-preview]");
@@ -172,6 +199,29 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
         }),
       );
       panel.querySelector<HTMLElement>('[data-field-row="alsoIn"]')!.hidden = s.alsoIn.length === 0;
+      field("related").replaceChildren(
+        ...s.related.map((r) => {
+          const li = document.createElement("li");
+          li.className = "border-stroke hover:bg-panel-muted relative grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 border-b py-3 transition-colors";
+          const type = document.createElement("span");
+          type.className = "text-mono-xs text-intent pt-0.5";
+          type.textContent = r.type;
+          const body = document.createElement("div");
+          body.className = "flex min-w-0 flex-col gap-1";
+          const a = document.createElement("a");
+          a.href = r.href;
+          a.className = "text-body-xs text-fg hover:text-intent after:absolute after:inset-0";
+          a.textContent = r.title;
+          const time = document.createElement("time");
+          time.className = "text-mono-xs text-fg-subtle";
+          time.dateTime = r.date;
+          time.textContent = r.date;
+          body.append(a, time);
+          li.append(type, body);
+          return li;
+        }),
+      );
+      panel.querySelector<HTMLElement>('[data-field-row="related"]')!.hidden = s.related.length === 0;
       open.href = s.href;
       open.setAttribute("aria-label", `Open post: ${s.title}`);
       copy.dataset.url = new URL(s.href, location.origin).href;
@@ -191,6 +241,64 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
     // Leaving the overlay width with the drawer open would strand it off-grid.
     wide.addEventListener("change", () => {
       if (!wide.matches) setOpen(false);
+    });
+
+    // ---- Resize (xl) ----
+    const handle = panel.querySelector<HTMLElement>("[data-preview-resize]")!;
+    const MIN = 320;
+    const max = () => Math.max(MIN, Math.min(768, Math.round(innerWidth * 0.5)));
+    const clampW = (w: number) => Math.round(Math.min(max(), Math.max(MIN, w)));
+    const setWidth = (w: number | null, save = true) => {
+      if (w === null) panel.style.removeProperty("--preview-w");
+      else panel.style.setProperty("--preview-w", `${clampW(w)}px`);
+      const now = Math.round(panel.getBoundingClientRect().width);
+      handle.setAttribute("aria-valuemin", String(MIN));
+      handle.setAttribute("aria-valuemax", String(max()));
+      handle.setAttribute("aria-valuenow", String(w === null ? now : clampW(w)));
+      if (!save) return;
+      try {
+        if (w === null) localStorage.removeItem("preview-width");
+        else localStorage.setItem("preview-width", String(clampW(w)));
+      } catch {}
+    };
+    try {
+      const saved = Number(localStorage.getItem("preview-width"));
+      if (saved) setWidth(saved, false);
+    } catch {}
+
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      panel.setAttribute("data-resizing", "");
+      const right = panel.getBoundingClientRect().right;
+      const move = (ev: PointerEvent) => setWidth(right - ev.clientX, false);
+      const end = (ev: PointerEvent) => {
+        handle.removeEventListener("pointermove", move);
+        panel.removeAttribute("data-resizing");
+        setWidth(right - ev.clientX);
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", end, { once: true });
+      handle.addEventListener("pointercancel", end, { once: true });
+    });
+    handle.addEventListener("dblclick", () => setWidth(null));
+    // Report the live width when a keyboard user lands on the handle.
+    handle.addEventListener("focus", () => handle.setAttribute("aria-valuenow", String(Math.round(panel.getBoundingClientRect().width))));
+    handle.addEventListener("keydown", (e) => {
+      const current = panel.getBoundingClientRect().width;
+      const step = e.shiftKey ? 64 : 16;
+      const next =
+        e.key === "ArrowLeft" ? current + step
+        : e.key === "ArrowRight" ? current - step
+        : e.key === "Home" ? MIN
+        : e.key === "End" ? max()
+        : null;
+      if (next === null) return;
+      e.preventDefault();
+      panel.setAttribute("data-resizing", "");
+      setWidth(next);
+      requestAnimationFrame(() => panel.removeAttribute("data-resizing"));
     });
 
     copy.addEventListener("click", async () => {

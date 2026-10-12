@@ -4,71 +4,88 @@ import ThemeSwitch from "./ThemeSwitch.astro";
 import { topLinks } from "../data/site";
 
 interface Props {
+  /** The shell's tree column is narrower at xl when a right rail shows. */
+  rail?: boolean;
   class?: string;
 }
-const { class: className } = Astro.props;
+const { rail = false, class: className } = Astro.props;
 
-// The 56px top bar: brand path, search trigger centered between two spacers,
-// mono links and the theme switch. Below lg a Directory button opens the tree
-// drawer (DirectoryTree owns that behavior); below md the links fold away.
+// The 56px top bar. From lg it shares BlogShell's columns (keep the two
+// templates in sync): the brand sits over the directory, and the search box
+// starts on the content's left edge, in line with the page title. Below lg it
+// is one row: Directory button (opens the tree drawer, owned by
+// DirectoryTree), brand, centered search; below md the links fold away.
 ---
 
 <header
   class:list={[
     "bg-canvas border-stroke h-topbar sticky top-0 z-40 flex items-center gap-4 border-b px-4 md:gap-6 md:px-6",
+    "lg:grid lg:grid-cols-[clamp(15rem,22vw,var(--spacing-tree))_minmax(0,1fr)] lg:gap-0 lg:px-0",
+    rail && "xl:grid-cols-[clamp(15rem,20vw,var(--spacing-tree))_minmax(0,1fr)]",
     className,
   ]}
 >
-  <button
-    type="button"
-    data-tree-toggle
-    aria-expanded="false"
-    aria-controls="directory"
-    class="text-fg-muted hover:text-fg -ml-1 grid size-8 place-items-center lg:hidden"
-  >
-    <Icon name="lucide:folder-tree" class="size-[1.125rem]" aria-hidden="true" />
-    <span class="sr-only">Directory</span>
-  </button>
+  <div class="flex min-w-0 items-center gap-4 max-lg:contents lg:px-6">
+    <button
+      type="button"
+      data-tree-toggle
+      aria-expanded="false"
+      aria-controls="directory"
+      class="text-fg-muted hover:text-fg -ml-1 grid size-8 place-items-center lg:hidden"
+    >
+      <Icon name="lucide:folder-tree" class="size-[1.125rem]" aria-hidden="true" />
+      <span class="sr-only">Directory</span>
+    </button>
 
-  <a href="/" class="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
-    <span class="text-fg text-[0.9375rem] font-semibold">Trail of Bits</span>
-    <span class="text-mono-md text-fg-subtle" aria-hidden="true">/</span>
-    <span class="text-mono-md text-fg-muted">blog</span>
-  </a>
+    <a href="/" class="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
+      <span class="text-fg text-[0.9375rem] font-semibold">Trail of Bits</span>
+      <span class="text-mono-md text-fg-subtle" aria-hidden="true">/</span>
+      <span class="text-mono-md text-fg-muted">blog</span>
+    </a>
 
-  <div class="min-w-0 flex-1" aria-hidden="true"></div>
+    <div class="min-w-0 flex-1 lg:hidden" aria-hidden="true"></div>
+  </div>
 
-  <button
-    type="button"
-    data-search-open
-    aria-haspopup="dialog"
-    class="bg-panel border-stroke-strong text-fg-subtle hover:border-fg-subtle flex h-9 shrink-0 items-center gap-2 border pr-2.5 pl-3 transition-colors sm:w-[min(27.5rem,40vw)]"
-  >
-    <Icon name="lucide:search" class="size-3.5 sm:hidden" aria-hidden="true" />
-    <span class="max-sm:sr-only flex-1 truncate text-left text-[0.8125rem]">Search posts, folders and authors</span>
-    <kbd class="border-stroke-strong text-fg-muted max-sm:hidden border px-1.5 py-0.5 font-mono text-[0.6875rem] leading-none">⌘K</kbd>
-  </button>
-
-  <div class="min-w-0 flex-1" aria-hidden="true"></div>
-
-  <nav aria-label="Blog" class="max-md:hidden">
-    <ul class="flex items-center gap-6">
-      {
-        topLinks.map((l) => (
-          <li>
-            <a
-              href={l.href}
-              class="text-mono-sm text-fg-muted hover:text-fg whitespace-nowrap transition-colors"
-              {...(l.external ? { rel: "noopener" } : {})}
-            >
-              {l.label}
-              {l.external && <span aria-hidden="true"> ↗</span>}
-            </a>
-          </li>
-        ))
+  <div class="flex min-w-0 items-center gap-6 max-lg:contents lg:pr-6 lg:pl-8">
+    <button
+      type="button"
+      data-search-open
+      aria-haspopup="dialog"
+      aria-keyshortcuts="Meta+K Control+K /"
+      class="bg-panel border-stroke-strong text-fg-subtle hover:border-fg-subtle flex h-10 min-w-0 shrink items-center gap-2.5 border pr-2 pl-3.5 transition-colors sm:w-[26rem] lg:w-[32rem]"
+    >
+      <Icon name="lucide:search" class="size-4 shrink-0 sm:hidden" aria-hidden="true" />
+      <span class="max-sm:sr-only flex-1 truncate text-left text-[0.875rem]">Search posts, folders and authors</span>
+      <kbd class="border-stroke-strong text-fg-muted max-sm:hidden inline-flex h-6 shrink-0 items-center border px-1.5 font-mono text-[0.75rem]" data-search-kbd>⌘K</kbd>
+    </button>
+    <!-- Ctrl K off Apple platforms; runs inline so the label never flashes. -->
+    <script is:inline>
+      if (!/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
+        document.querySelectorAll("[data-search-kbd]").forEach((k) => (k.textContent = "Ctrl K"));
       }
-    </ul>
-  </nav>
+    </script>
 
-  <ThemeSwitch class="shrink-0" />
+    <div class="min-w-0 flex-1" aria-hidden="true"></div>
+
+    <nav aria-label="Blog" class="max-md:hidden">
+      <ul class="flex items-center gap-6">
+        {
+          topLinks.map((l) => (
+            <li>
+              <a
+                href={l.href}
+                class="text-mono-sm text-fg-muted hover:text-fg whitespace-nowrap transition-colors"
+                {...(l.external ? { rel: "noopener" } : {})}
+              >
+                {l.label}
+                {l.external && <span aria-hidden="true"> ↗</span>}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <ThemeSwitch class="shrink-0" />
+  </div>
 </header>

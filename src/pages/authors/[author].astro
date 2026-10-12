@@ -18,6 +18,7 @@ export const getStaticPaths = (async () => {
 }) satisfies GetStaticPaths;
 
 const { name, posts } = Astro.props;
+const all = await getPosts();
 const count = `${posts.length} post${posts.length === 1 ? "" : "s"}`;
 ---
 
@@ -25,9 +26,10 @@ const count = `${posts.length} post${posts.length === 1 ? "" : "s"}`;
   <ListingView
     meta={["author", count]}
     title={name}
-    posts={posts.map(summarize)}
+    posts={posts.map(summarize(all))}
     page={1}
     totalPages={1}
-    summary={count}
+    author={name}
+    total={posts.length}
   />
 </BlogShell>

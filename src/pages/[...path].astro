@@ -106,11 +106,11 @@ if (props.view === "folder") {
     meta: props.page > 1 ? [...meta, `page ${props.page}`] : meta,
     title: node.title,
     lede: node.blurb,
-    posts: items.map(summarize),
+    posts: items.map(summarize(posts)),
     dirs,
     page: props.page,
     totalPages: total,
-    summary: [...(sub ? [plural(sub, "folder")] : []), `${items.length} of ${plural(inFolder.length, "post")}`].join(" · "),
+    total: inFolder.length,
   };
 }
 
@@ -156,7 +156,12 @@ const schema =
       folder={props.post.data.location}
       folderIsPage={false}
     >
-      <ArticleView post={props.post} previous={props.older} next={props.newer}>
+      <ArticleView
+        post={props.post}
+        previous={props.older}
+        next={props.newer}
+        headings={article.headings.filter((h) => h.depth === 2 || h.depth === 3)}
+      >
         <article.Content />
       </ArticleView>
       <ArticleRail

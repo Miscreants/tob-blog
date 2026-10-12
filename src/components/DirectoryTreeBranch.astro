@@ -7,7 +7,7 @@ type Seg = { on: boolean };
 type Cell =
   | { kind: "rail"; top: Seg; bottom: Seg }
   | { kind: "tee" | "elbow"; top: Seg; branch: Seg; bottom: Seg }
-  | { kind: "fork"; left: Seg; down: Seg; closed?: boolean }
+  | { kind: "fork"; left: Seg; down: Seg }
   | { kind: "dash"; on: boolean }
   | { kind: "dot" }
   | { kind: "blank" };
@@ -22,9 +22,7 @@ export interface TreeRow {
   selected: boolean;
   onPath: boolean;
   current?: "page" | "location";
-  /** A subfolder (depth ≥ 2 folder) — hidden by "collapse all". */
-  nested: boolean;
-  /** A folder off the selected path; its subtree waits for "expand all". */
+  /** A folder off the selected path: it starts shut. */
   closed: boolean;
   cells: Cell[];
   children: TreeRow[];
@@ -36,9 +34,20 @@ interface Props {
 const { row } = Astro.props;
 
 const seg = (on: boolean) => (on ? "bg-intent" : "bg-stroke-strong");
+// The last cell is the row's own: a dash for leaves, a fork for parents. A
+// folder's fork is also its open/shut button.
+const lead = row.cells.slice(0, -1);
+const own = row.cells[row.cells.length - 1];
+const toggleable = row.kind === "folder" && row.children.length > 0;
+const subtreeId = `tree-${row.key.replaceAll("/", "--")}`;
 ---
 
-<li data-tree-row={row.kind} data-nested={row.nested ? "" : undefined} class="tree-row">
+<li
+  data-tree-row={row.kind}
+  data-folder={toggleable ? row.key : undefined}
+  data-state={toggleable ? (row.closed ? "shut" : "open") : undefined}
+  class="tree-row"
+>
   <div
     class:list={[
       "flex h-[1.625rem] items-center pr-5",
@@ -47,7 +56,7 @@ const seg = (on: boolean) => (on ? "bg-intent" : "bg-stroke-strong");
   >
     <span class="flex shrink-0" aria-hidden="true">
       {
-        row.cells.map((c) => (
+        lead.map((c) => (
           <span class="relative h-[1.625rem] w-4" data-guide={c.kind}>
             {c.kind === "rail" && (
               <>
@@ -64,27 +73,46 @@ const seg = (on: boolean) => (on ? "bg-intent" : "bg-stroke-strong");
                 )}
               </>
             )}
-            {c.kind === "fork" && !c.closed && (
-              <>
-                <span class:list={["absolute top-[0.8125rem] left-0 h-px w-[0.5625rem]", seg(c.left.on)]} />
-                <span data-fork-down class:list={["absolute top-[0.8125rem] left-2 h-[0.8125rem] w-px", seg(c.down.on)]} />
-              </>
-            )}
-            {c.kind === "fork" && c.closed && (
-              <>
-                <span data-fork-closed class="bg-stroke-strong absolute top-[0.8125rem] left-0 h-px w-3" />
-                <span data-fork-open>
-                  <span class="bg-stroke-strong absolute top-[0.8125rem] left-0 h-px w-[0.5625rem]" />
-                  <span class="bg-stroke-strong absolute top-[0.8125rem] left-2 h-[0.8125rem] w-px" />
-                </span>
-              </>
-            )}
-            {c.kind === "dash" && <span class:list={["absolute top-[0.8125rem] left-0 h-px w-3", seg(c.on)]} />}
             {c.kind === "dot" && <span class="bg-fg-subtle absolute top-3 left-[0.4375rem] size-[3px]" />}
           </span>
         ))
       }
+      {
+        own.kind === "dash" && (
+          <span class="relative h-[1.625rem] w-4" data-guide="dash">
+            <span class:list={["absolute top-[0.8125rem] left-0 h-px w-3", seg(own.on)]} />
+          </span>
+        )
+      }
+      {
+        own.kind === "fork" && !toggleable && (
+          <span class="relative h-[1.625rem] w-4" data-guide="fork">
+            <span class:list={["absolute top-[0.8125rem] left-0 h-px w-[0.5625rem]", seg(own.left.on)]} />
+            <span class:list={["absolute top-[0.8125rem] left-2 h-[0.8125rem] w-px", seg(own.down.on)]} />
+          </span>
+        )
+      }
     </span>
+    {
+      own.kind === "fork" && toggleable && (
+        <button
+          type="button"
+          data-folder-toggle
+          aria-expanded={row.closed ? "false" : "true"}
+          aria-controls={subtreeId}
+          aria-label={`${row.label} subfolders`}
+          class="hover:bg-stroke relative h-[1.625rem] w-4 shrink-0 cursor-pointer transition-colors"
+        >
+          <span aria-hidden="true">
+            <span data-fork-shut class:list={["absolute top-[0.8125rem] left-0 h-px w-3", seg(own.left.on)]} />
+            <span data-fork-open>
+              <span class:list={["absolute top-[0.8125rem] left-0 h-px w-[0.5625rem]", seg(own.left.on)]} />
+              <span class:list={["absolute top-[0.8125rem] left-2 h-[0.8125rem] w-px", seg(own.down.on)]} />
+            </span>
+          </span>
+        </button>
+      )
+    }
     <span class="w-1.5 shrink-0" aria-hidden="true"></span>
     {
       row.kind === "group" ? (
@@ -94,7 +122,8 @@ const seg = (on: boolean) => (on ? "bg-intent" : "bg-stroke-strong");
           href={row.href}
           aria-current={row.current}
           class:list={[
-            "text-mono-md min-w-0 flex-1 truncate leading-4 transition-colors",
+            // relative: clips the sr-only count, which otherwise overflows the tree.
+            "text-mono-md relative min-w-0 flex-1 truncate leading-4 transition-colors",
             row.selected ? "text-intent font-medium" : row.onPath ? "text-fg" : "text-fg-muted hover:text-fg",
           ]}
         >
@@ -117,7 +146,7 @@ const seg = (on: boolean) => (on ? "bg-intent" : "bg-stroke-strong");
   </div>
   {
     row.children.length > 0 && (
-      <ul data-subtree-closed={row.closed ? "" : undefined}>
+      <ul id={toggleable ? subtreeId : undefined}>
         {row.children.map((child) => (
           <Astro.self row={child} />
         ))}
@@ -127,18 +156,11 @@ const seg = (on: boolean) => (on ? "bg-intent" : "bg-stroke-strong");
 </li>
 
 <style is:global>
-  /* Folders off the selected path stay shut (a dash) until "expand all". */
-  [data-tree]:not([data-mode="expanded"]) [data-subtree-closed],
-  [data-tree]:not([data-mode="expanded"]) [data-fork-open],
-  [data-tree][data-mode="expanded"] [data-fork-closed] {
-    display: none;
-  }
-  /* "collapse all": drop subfolder rows and turn their parents' forks into
-     plain dashes. */
-  [data-tree][data-mode="collapsed"] [data-nested] {
-    display: none;
-  }
-  [data-tree][data-mode="collapsed"] [data-tree-row="folder"]:not([data-nested]) > div [data-fork-down] {
+  /* Each folder opens and shuts on its own; DirectoryTree's scripts set
+     data-state ("expand all" / "collapse all" set every folder at once). */
+  [data-state="shut"] > ul,
+  [data-state="shut"] > div [data-fork-open],
+  [data-state="open"] > div [data-fork-shut] {
     display: none;
   }
 </style>

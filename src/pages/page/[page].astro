@@ -21,9 +21,9 @@ const { items, total } = paginate(posts, page);
     meta={["index", `page ${page}`]}
     title="The Trail of Bits Blog"
     lede={site.description}
-    posts={items.map(summarize)}
+    posts={items.map(summarize(posts))}
     page={page}
     totalPages={total}
-    summary={`${posts.length} posts`}
+    total={posts.length}
   />
 </BlogShell>

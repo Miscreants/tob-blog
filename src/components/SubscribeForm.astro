@@ -10,58 +10,61 @@ interface Props {
 }
 const { layout = "bar", id, class: className } = Astro.props;
 
-// Newsletter sign-up + social row. The endpoint is site.subscribeAction; until
-// a provider is chosen the form validates in the browser and posts nowhere.
+// Two groups: "Subscribe" (heading, line and the form) and "Find us" (social
+// links). The endpoint is site.subscribeAction; until a provider is chosen the
+// form validates in the browser and posts nowhere.
 const inputId = `${id ?? "subscribe"}-${layout}-email`;
+const bar = layout === "bar";
 ---
 
 <section
   id={id}
   aria-labelledby={`${inputId}-heading`}
   class:list={[
-    layout === "bar"
-      ? "border-stroke flex flex-col gap-6 border-t px-6 pt-7 pb-8 md:px-8 @4xl:flex-row @4xl:items-center @4xl:gap-8"
-      : "flex flex-col gap-3 pt-6",
+    bar
+      ? "border-stroke flex flex-col gap-8 border-t px-6 pt-7 pb-8 md:px-8 @4xl:flex-row @4xl:items-end @4xl:justify-between @4xl:gap-12"
+      : "flex flex-col gap-6 pt-6",
     className,
   ]}
 >
-  <div class:list={["flex flex-col gap-1.5", layout === "bar" && "@4xl:min-w-[16rem] @4xl:flex-1"]}>
-    <h2 id={`${inputId}-heading`} class="text-label text-fg-subtle">Subscribe</h2>
-    <p class="text-body-xs text-fg-muted">New posts from the research team, straight to your inbox.</p>
+  <div class:list={["flex flex-col gap-3", bar && "@4xl:w-[30rem] @4xl:shrink-0"]}>
+    <div class="flex flex-col gap-1.5">
+      <h2 id={`${inputId}-heading`} class="text-label text-fg-subtle">Subscribe</h2>
+      <p class="text-body-xs text-fg-muted">New posts from the research team, straight to your inbox.</p>
+    </div>
+
+    <form method="post" action={subscribeAction || undefined} class="flex w-full">
+      <label for={inputId} class="sr-only">Email address</label>
+      <input
+        id={inputId}
+        name="email"
+        type="email"
+        required
+        autocomplete="email"
+        placeholder="your@email.com"
+        class="text-mono-sm bg-canvas border-stroke-strong placeholder:text-fg-subtle h-[2.375rem] min-w-0 flex-1 border-y border-l px-3 focus-visible:-outline-offset-1"
+      />
+      <button
+        type="submit"
+        class="text-mono-sm bg-panel-muted border-stroke-strong text-fg hover:border-fg-subtle h-[2.375rem] shrink-0 border px-3.5 font-medium transition-colors"
+      >
+        Subscribe <span aria-hidden="true">→</span>
+      </button>
+    </form>
   </div>
 
-  <form
-    method="post"
-    action={subscribeAction || undefined}
-    class:list={["flex", layout === "bar" ? "w-full @4xl:w-[26.25rem] @4xl:shrink-0" : "w-full"]}
-  >
-    <label for={inputId} class="sr-only">Email address</label>
-    <input
-      id={inputId}
-      name="email"
-      type="email"
-      required
-      autocomplete="email"
-      placeholder="your@email.com"
-      class="text-mono-sm bg-canvas border-stroke-strong placeholder:text-fg-subtle h-[2.375rem] min-w-0 flex-1 border-y border-l px-3 focus-visible:-outline-offset-1"
-    />
-    <button
-      type="submit"
-      class="text-mono-sm bg-panel-muted border-stroke-strong text-fg hover:border-fg-subtle h-[2.375rem] shrink-0 border px-3.5 font-medium transition-colors"
-    >
-      Subscribe <span aria-hidden="true">→</span>
-    </button>
-  </form>
-
-  <ul class="flex flex-wrap gap-x-4 gap-y-1" aria-label="Follow Trail of Bits">
-    {
-      socialLinks.map((s) => (
-        <li>
-          <a href={s.href} rel="noopener" class="text-mono-sm text-fg-subtle hover:text-fg transition-colors">
-            {s.label}
-          </a>
-        </li>
-      ))
-    }
-  </ul>
+  <nav aria-labelledby={`${inputId}-find`} class:list={["flex flex-col gap-3", bar && "@4xl:items-end"]}>
+    <h2 id={`${inputId}-find`} class="text-label text-fg-subtle">Find us</h2>
+    <ul class="flex flex-wrap gap-x-4 gap-y-1">
+      {
+        socialLinks.map((s) => (
+          <li>
+            <a href={s.href} rel="noopener" class="text-mono-sm text-fg-subtle hover:text-fg transition-colors">
+              {s.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
 </section>
