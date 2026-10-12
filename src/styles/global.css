@@ -196,21 +196,24 @@
   color-scheme: light;
 }
 
+/* Dark matches trailofbits.com's `.dark` palette (new-website global.css):
+   canvas → canvas, panel → surface-tint, panel-muted → surface, fg ramp →
+   ink / ink-muted / ink-soft, stroke → line, intent → accent. */
 [data-theme="dark"],
 [data-theme="brand"] {
-  --color-canvas: #0d0d0d;
-  --color-panel: #121212;
-  --color-panel-muted: #1a1a1a;
-  --color-fg: #ededed;
-  --color-fg-muted: #a3a3a3;
-  --color-fg-subtle: #878787;           /* board #6b6b6b, lifted for AA */
-  --color-fg-on-intent: #0d0d0d;
-  --color-intent: #ff2b2b;              /* board #fd1919, lifted for AA on raised */
-  --color-intent-hover: #ff5c5c;
-  --color-intent-soft: #2a0f0f;
-  --color-stroke: #232323;
-  --color-stroke-strong: #343434;
-  --color-focus: #ff2b2b;
+  --color-canvas: #0f1011;
+  --color-panel: #16171a;
+  --color-panel-muted: #1d1f23;
+  --color-fg: #ededee;
+  --color-fg-muted: #b4b6bb;
+  --color-fg-subtle: #9a9da3;
+  --color-fg-on-intent: #0f1011;
+  --color-intent: #ff4b40;
+  --color-intent-hover: #ff7a71;
+  --color-intent-soft: #311818;
+  --color-stroke: #3a3d45;
+  --color-stroke-strong: #4d515b;
+  --color-focus: #ff4b40;
   --color-error: #ff5c5c;
   --color-success: #a8c69a;
   --color-warning: #e2b574;
