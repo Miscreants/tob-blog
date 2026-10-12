@@ -1,22 +1,13 @@
 ---
-// Custom 404. Cloudflare Pages and Netlify both serve this automatically for
-// unknown static routes. `noindex` keeps it out of search results.
-import Layout from "@layouts/Layout.astro";
-import Button from "@components/Button.astro";
+// Custom 404, inside the blog shell so the tree and search stay reachable.
+import BlogShell from "../layouts/BlogShell.astro";
+import ListingHeader from "../components/ListingHeader.astro";
+import Button from "../components/Button.astro";
 ---
 
-<Layout title="Page not found — 404" noindex>
-  <main id="main">
-    <section class="section-gutter section-padding-lg">
-      <div class="container-large flex flex-col items-start gap-6">
-        <p class="text-body-sm text-fg-muted uppercase tracking-wide">Error 404</p>
-        <h1 class="h1">This page wandered off.</h1>
-        <p class="text-body-lg text-fg-muted max-w-prose">
-          The page you're looking for doesn't exist or may have moved. Check the URL,
-          or head back to safe ground.
-        </p>
-        <Button href="/" withArrow>Back to home</Button>
-      </div>
-    </section>
-  </main>
-</Layout>
+<BlogShell title="Not found — The Trail of Bits Blog" noindex>
+  <ListingHeader meta={["404"]} title="No such file or directory" lede="The post or folder you asked for isn't in the tree. It may have moved — try the directory or search." />
+  <div class="px-6 pb-16 md:px-8">
+    <Button href="/" label="cd ~/blog" withArrow={false} />
+  </div>
+</BlogShell>

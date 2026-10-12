@@ -1,5 +1,30 @@
 import { defineCollection, z } from "astro:content";
 import { glob } from "astro/loaders";
+import { postTypes } from "./data/directory";
+
+// Blog posts. The file name is the slug; the URL is /<location>/<slug>/.
+// `location` and `alsoIn` are folder paths from src/data/directory.ts —
+// lib/blog.ts fails the build on a path that isn't in the tree.
+const posts = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/posts" }),
+  schema: z.object({
+    title: z.string(),
+    /** One or two sentences: row excerpt, preview summary and meta description. */
+    description: z.string(),
+    type: z.enum(postTypes),
+    /** Primary folder, e.g. "fuzzing-testing/fuzzing". */
+    location: z.string(),
+    /** Cross-listings, shown as chips. */
+    alsoIn: z.array(z.string()).default([]),
+    authors: z.array(z.string()).min(1),
+    date: z.coerce.date(),
+    /** Last meaningful edit; the listing sorts on this when present. */
+    updated: z.coerce.date().optional(),
+    /** Pinned to the Featured strip on the blog home. */
+    featured: z.boolean().default(false),
+    draft: z.boolean().default(false),
+  }),
+});
 
 const faq = defineCollection({
   loader: glob({ pattern: "**/*.md", base: "./src/content/faq" }),
@@ -22,10 +47,7 @@ const announcements = defineCollection({
   }),
 });
 
-// Components showcase — each MDX file documents one component, frontmatter
-// drives the index page and routing. The body is rendered as the detail page
-// content (props tables, mechanism, gotchas). MDX (vs plain MD) is what lets
-// docs `import` and render live previews of the component itself.
+// Component showcase docs (dev-only /components route).
 const components = defineCollection({
   loader: glob({ pattern: "**/*.mdx", base: "./src/content/components" }),
   schema: z.object({
@@ -39,4 +61,4 @@ const components = defineCollection({
   }),
 });
 
-export const collections = { faq, announcements, components };
+export const collections = { posts, faq, announcements, components };

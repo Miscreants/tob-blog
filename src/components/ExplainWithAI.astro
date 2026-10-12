@@ -1,0 +1,148 @@
+---
+import Button from "./Button.astro";
+import type { Post } from "../lib/blog";
+
+interface Props {
+  post: Post;
+  class?: string;
+}
+const { post, class: className } = Astro.props;
+const { title, description, date } = post.data;
+
+// "/ Explain with AI": three ready-made prompts in a terminal-style window
+// (overview / go deeper / quiz me), Copy prompt and Open in ChatGPT. Prompts
+// are templated from the post's frontmatter; a post can override them later
+// by adding fields to the schema. Simple ARIA tabs — no animation, so the
+// starter's GSAP Tabs would be weight without benefit here.
+const month = date.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+const source = `the Trail of Bits blog post "${title}" (blog.trailofbits.com, ${month})`;
+const prompts = [
+  {
+    id: "overview",
+    label: "overview",
+    text: `You are an expert in software security. Explain ${source} in plain language. Summary: ${description} Cover: what problem it addresses, how the approach works, and when a team should care. Be specific and avoid jargon.`,
+  },
+  {
+    id: "deeper",
+    label: "go deeper",
+    text: `You are a senior security engineer. Walk me through the technical details of ${source}. Explain the mechanisms involved, the trade-offs, and how it compares with the usual alternatives. Assume I write code but am new to this area.`,
+  },
+  {
+    id: "quiz",
+    label: "quiz me",
+    text: `Quiz me on ${source}. Ask five questions, one at a time, that check I understood the key ideas. Wait for my answer before giving feedback and moving on.`,
+  },
+];
+const fileSlug = post.id.split("-").slice(0, 2).join("-");
+const chatUrl = (q: string) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`;
+---
+
+<section
+  aria-labelledby="explain-heading"
+  data-explain
+  class:list={["border-stroke-strong flex flex-col gap-4 border-t pt-7", className]}
+>
+  <h2 id="explain-heading" class="text-label text-fg-subtle">/ Explain with AI</h2>
+  <p class="text-body-sm text-fg-muted">
+    Get a plain-language walkthrough of this post. Copy the prompt into ChatGPT or any AI assistant, or open it in ChatGPT directly.
+  </p>
+
+  <div class="bg-panel border-stroke-strong border">
+    <div class="bg-panel-muted border-stroke-strong flex items-stretch border-b pr-3.5">
+      <div role="tablist" aria-label="Prompt" class="flex">
+        {
+          prompts.map((p, i) => (
+            <button
+              type="button"
+              role="tab"
+              id={`explain-tab-${p.id}`}
+              aria-controls={`explain-panel-${p.id}`}
+              aria-selected={i === 0 ? "true" : "false"}
+              tabindex={i === 0 ? 0 : -1}
+              class="text-mono-xs text-fg-subtle border-stroke-strong aria-selected:bg-panel aria-selected:text-fg aria-selected:shadow-[inset_0_2px_0_var(--color-intent)] border-r px-3.5 py-2 aria-selected:font-medium"
+            >
+              {p.label}
+            </button>
+          ))
+        }
+      </div>
+      <span class="text-fg-subtle ml-auto self-center truncate pl-3 font-mono text-[0.6875rem] max-sm:hidden" aria-hidden="true">
+        explain-{fileSlug}.prompt
+      </span>
+    </div>
+    {
+      prompts.map((p, i) => (
+        <div
+          role="tabpanel"
+          id={`explain-panel-${p.id}`}
+          aria-labelledby={`explain-tab-${p.id}`}
+          hidden={i !== 0}
+          data-prompt={p.text}
+          data-chat-url={chatUrl(p.text)}
+          class="flex gap-3.5 pt-[1.125rem] pr-[1.375rem] pb-5 pl-5"
+        >
+          <span class="text-mono-md text-intent" aria-hidden="true">$</span>
+          <p class="text-mono-md text-fg">{p.text}</p>
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="flex flex-wrap gap-2 pt-1">
+    <Button label="Copy prompt" withArrow={false} data-explain-copy />
+    <Button
+      href={chatUrl(prompts[0].text)}
+      target="_blank"
+      label="Open in ChatGPT ↗"
+      variant="secondary"
+      withArrow={false}
+      data-explain-open
+    />
+  </div>
+  <p class="text-body-2xs text-fg-subtle">
+    Tip: after the overview, switch to “quiz me” to check you’ve got the key ideas before trying them on your own code.
+  </p>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-explain]").forEach((root) => {
+    if (root.dataset.ready) return;
+    root.dataset.ready = "true";
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const panels = [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
+    const copy = root.querySelector<HTMLButtonElement>("[data-explain-copy]")!;
+    const open = root.querySelector<HTMLAnchorElement>("[data-explain-open]")!;
+    const current = () => panels.find((p) => !p.hidden)!;
+
+    const select = (tab: HTMLButtonElement) => {
+      tabs.forEach((t) => {
+        const on = t === tab;
+        t.setAttribute("aria-selected", String(on));
+        t.tabIndex = on ? 0 : -1;
+      });
+      panels.forEach((p) => (p.hidden = p.id !== tab.getAttribute("aria-controls")));
+      open.href = current().dataset.chatUrl!;
+    };
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (e) => {
+        const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+        const edge = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+        if (!step && edge < 0) return;
+        e.preventDefault();
+        const next = tabs[edge >= 0 ? edge : (i + step + tabs.length) % tabs.length];
+        select(next);
+        next.focus();
+      });
+    });
+
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(current().dataset.prompt!);
+        copy.textContent = "Copied";
+        setTimeout(() => (copy.textContent = "Copy prompt"), 1500);
+      } catch {}
+    });
+  });
+</script>

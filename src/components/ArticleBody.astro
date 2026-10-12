@@ -1,0 +1,33 @@
+---
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+// Wraps a rendered post body in the board's prose rhythm (prose-blog in
+// global.css) and wires the copy buttons rehype-code-frame puts on each code
+// block.
+---
+
+<div data-article-body class:list={["prose-blog", className]}>
+  <slot />
+</div>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("[data-code-copy]").forEach((btn) => {
+    if (btn.dataset.ready) return;
+    btn.dataset.ready = "true";
+    btn.addEventListener("click", async () => {
+      const code = btn.closest("[data-code-frame]")?.querySelector("pre")?.textContent ?? "";
+      try {
+        await navigator.clipboard.writeText(code);
+        btn.setAttribute("data-copied", "");
+        btn.setAttribute("aria-label", "Copied");
+        setTimeout(() => {
+          btn.removeAttribute("data-copied");
+          btn.setAttribute("aria-label", "Copy code");
+        }, 1500);
+      } catch {}
+    });
+  });
+</script>

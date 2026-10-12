@@ -1,0 +1,117 @@
+---
+import TableOfContents from "./TableOfContents.astro";
+import SubscribeForm from "./SubscribeForm.astro";
+import Button from "./Button.astro";
+import { authorHref, initials, type Post } from "../lib/blog";
+import { site } from "../data/site";
+
+interface Props {
+  post: Post;
+  headings: { depth: number; slug: string; text: string }[];
+  class?: string;
+}
+const { post, headings, class: className } = Astro.props;
+
+// The article's right rail (xl+): On this page (the starter TOC, restyled to
+// the board's per-item rules), author card(s), share links and subscribe.
+// Below xl it is not rendered; the article column carries subscribe itself.
+const url = new URL(Astro.url.pathname, site.url).href;
+const text = encodeURIComponent(post.data.title);
+const share = [
+  { label: "X", href: `https://x.com/intent/post?url=${encodeURIComponent(url)}&text=${text}` },
+  { label: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` },
+  { label: "Hacker News", href: `https://news.ycombinator.com/submitlink?u=${encodeURIComponent(url)}&t=${text}` },
+];
+---
+
+<aside
+  aria-label="About this post"
+  data-article-rail
+  class:list={["bg-panel border-stroke w-[clamp(20rem,24vw,var(--spacing-rail))] border-l max-xl:hidden", className]}
+>
+  <div class="sticky top-topbar flex max-h-[calc(100dvh-var(--spacing-topbar))] flex-col gap-3.5 overflow-y-auto px-8 py-10">
+    {headings.length > 0 && <TableOfContents headings={headings} selector="[data-article-body]" title="On this page" stickyOffset={0} class="rail-toc" />}
+
+    <h2 class="text-label text-fg-subtle mt-2">{post.data.authors.length > 1 ? "Authors" : "Author"}</h2>
+    <ul class="flex flex-col gap-2">
+      {
+        post.data.authors.map((a) => (
+          <li class="bg-panel-muted border-stroke-strong flex items-center gap-3.5 border p-4">
+            <span class="bg-canvas border-stroke-strong text-mono-md text-fg-muted grid size-12 shrink-0 place-items-center border" aria-hidden="true">
+              {initials(a)}
+            </span>
+            <div class="flex min-w-0 flex-col gap-1">
+              <p class="h6 text-fg truncate">{a}</p>
+              <a href={authorHref(a)} class="text-mono-sm text-intent hover:underline">
+                All posts by this author<span aria-hidden="true"> →</span>
+                <span class="sr-only"> ({a})</span>
+              </a>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+
+    <h2 class="text-label text-fg-subtle mt-4">Share</h2>
+    <ul class="flex flex-wrap gap-2">
+      <li>
+        <Button label="Copy link" variant="secondary" size="sm" withArrow={false} class="h-[2.125rem]" data-share-copy={url} />
+      </li>
+      {
+        share.map((s) => (
+          <li>
+            <Button href={s.href} target="_blank" label={s.label} variant="secondary" size="sm" withArrow={false} class="h-[2.125rem]" />
+          </li>
+        ))
+      }
+    </ul>
+
+    <SubscribeForm layout="stacked" />
+  </div>
+</aside>
+
+<style is:global>
+  /* The starter TOC, drawn the board's way: mono 12, a hairline per item,
+     2px accent on the current one, no outer rail. */
+  .rail-toc.toc {
+    position: static;
+  }
+  .rail-toc .toc__title {
+    font-family: var(--font-mono);
+    font-weight: 400;
+    letter-spacing: 0.07em;
+    margin-bottom: 0.875rem;
+  }
+  .rail-toc [data-toc-list] {
+    border-left: 0;
+  }
+  .rail-toc [data-toc-link] {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    padding: 0.4375rem 0 0.4375rem 0.875rem;
+    margin-left: 0;
+    border-left: 1px solid var(--color-stroke);
+  }
+  .rail-toc [data-toc-link][aria-current="true"] {
+    border-left: 2px solid var(--color-intent);
+    padding-left: calc(0.875rem - 1px);
+  }
+  .rail-toc [data-toc-item][data-toc-level="3"] [data-toc-link] {
+    padding-left: 1.75rem;
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("[data-share-copy]").forEach((btn) => {
+    if (btn.dataset.ready) return;
+    btn.dataset.ready = "true";
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.shareCopy!);
+        btn.textContent = "Copied";
+        setTimeout(() => (btn.textContent = "Copy link"), 1500);
+      } catch {}
+    });
+  });
+</script>

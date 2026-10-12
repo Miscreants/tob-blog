@@ -1,0 +1,53 @@
+---
+// The directory app shell every blog page sits in: top bar, directory tree,
+// main column, an optional right rail, footer. Pages pass Layout's SEO props
+// straight through and say which folder the tree should select.
+//
+// Right rail: pages with a `rail` slot (articles) render it; listing pages get
+// the preview rail instead (`preview`).
+import Layout from "./Layout.astro";
+import TopBar from "../components/TopBar.astro";
+import SearchDialog from "../components/SearchDialog.astro";
+import DirectoryTree from "../components/DirectoryTree.astro";
+import PostPreview from "../components/PostPreview.astro";
+import BlogFooter from "../components/BlogFooter.astro";
+import { folderCounts, getPosts } from "../lib/blog";
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+  ogType?: "website" | "article";
+  noindex?: boolean;
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  /** Folder the tree selects; omit for ~/blog. */
+  folder?: string;
+  /** False on an article: the folder is its location, not the page. */
+  folderIsPage?: boolean;
+  /** Show the listing preview rail. */
+  preview?: boolean;
+}
+const { folder, folderIsPage = true, preview = false, ...seo } = Astro.props;
+
+const counts = folderCounts(await getPosts());
+const hasRail = Astro.slots.has("rail");
+---
+
+<Layout {...seo}>
+  <TopBar />
+  <SearchDialog />
+  <div
+    class:list={[
+      "grid min-h-[calc(100dvh-var(--spacing-topbar))] grid-cols-1",
+      "lg:grid-cols-[clamp(15rem,22vw,var(--spacing-tree))_minmax(0,1fr)]",
+      (hasRail || preview) && "xl:grid-cols-[clamp(15rem,20vw,var(--spacing-tree))_minmax(0,1fr)_auto]",
+    ]}
+  >
+    <DirectoryTree current={folder} currentIsPage={folderIsPage} counts={counts} />
+    <main id="main" class="cq min-w-0" tabindex="-1">
+      <slot />
+    </main>
+    {hasRail ? <slot name="rail" /> : preview && <PostPreview />}
+  </div>
+  <BlogFooter />
+</Layout>

@@ -1,0 +1,33 @@
+---
+import type { GetStaticPaths } from "astro";
+import BlogShell from "../../layouts/BlogShell.astro";
+import ListingView from "../../components/ListingView.astro";
+import { authorSlug, getPosts, summarize } from "../../lib/blog";
+import { site } from "../../data/site";
+
+// "All posts by this author" — the author card's target. Not on the board;
+// it reuses the listing view with the author as the title. One page per
+// author until someone passes PAGE_SIZE posts.
+export const getStaticPaths = (async () => {
+  const posts = await getPosts();
+  const names = [...new Set(posts.flatMap((p) => p.data.authors))];
+  return names.map((name) => ({
+    params: { author: authorSlug(name) },
+    props: { name, posts: posts.filter((p) => p.data.authors.includes(name)) },
+  }));
+}) satisfies GetStaticPaths;
+
+const { name, posts } = Astro.props;
+const count = `${posts.length} post${posts.length === 1 ? "" : "s"}`;
+---
+
+<BlogShell title={`${name} — ${site.name}`} description={`Posts by ${name} on ${site.name}.`} preview>
+  <ListingView
+    meta={["author", count]}
+    title={name}
+    posts={posts.map(summarize)}
+    page={1}
+    totalPages={1}
+    summary={count}
+  />
+</BlogShell>

@@ -1,0 +1,204 @@
+---
+import Button from "./Button.astro";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+// The right-hand preview drawer on listing pages.
+//
+// xl+: a column in the shell. Closed, it is the board's 40px strip — a ⇤
+// handle and a vertical hint; open, it widens to the 440px panel. The handle
+// and "⇥ close" toggle it. Collapsing keeps the selected row, so the strip
+// turns red with "space · preview ↵ open" (board: Folder View) and reopening
+// shows that post again. With nothing selected the panel shows an empty state.
+// Below xl: no strip; selecting a row slides the same panel in over the
+// content from the right.
+//
+// Rows are selected by PostListing (`preview:open`); closing announces
+// `preview:closed` so the listing can return focus to the row.
+const meta = ["Author", "Published", "Type", "Location"] as const;
+---
+
+<aside
+  id="post-preview"
+  aria-label="Post preview"
+  data-preview
+  data-state="closed"
+  class:list={[
+    "bg-panel border-stroke group/preview z-30 overflow-hidden border-l",
+    // Drawer over the content below xl.
+    "max-xl:top-topbar max-xl:shadow-popover max-xl:fixed max-xl:right-0 max-xl:bottom-0 max-xl:w-[min(var(--spacing-rail),92vw)] max-xl:translate-x-full max-xl:data-[state=open]:translate-x-0",
+    // Column that widens in place from xl.
+    "xl:w-rail-collapsed xl:data-[state=open]:w-[clamp(20rem,26vw,var(--spacing-rail))]",
+    "transition-[width,translate] duration-default-quarter ease-[var(--cubic-default)] motion-reduce:transition-none",
+    className,
+  ]}
+>
+  <div class="xl:top-topbar xl:sticky">
+    <!-- Closed strip (xl only). -->
+    <div class="flex flex-col items-center gap-4 py-4 max-xl:hidden group-data-[state=open]/preview:hidden">
+      <button
+        type="button"
+        data-preview-toggle
+        aria-expanded="false"
+        aria-controls="post-preview-panel"
+        class="border-stroke-strong text-fg-subtle hover:text-fg hover:border-fg-subtle group-data-selected/preview:border-intent group-data-selected/preview:bg-intent-soft group-data-selected/preview:text-intent grid size-6 place-items-center border font-mono text-xs transition-colors"
+      >
+        <span aria-hidden="true">⇤</span>
+        <span class="sr-only">Open preview</span>
+      </button>
+      <p class="text-label text-fg-subtle [writing-mode:vertical-rl]" aria-hidden="true">
+        Preview
+        <span class="group-data-selected/preview:hidden">
+          · <span class="tracking-normal normal-case">select a post</span>
+        </span>
+        <span class="text-intent hidden tracking-normal normal-case group-data-selected/preview:inline">
+          <span class="mx-1">●</span> space · preview <span class="mx-1">↵</span> open
+        </span>
+      </p>
+    </div>
+
+    <!-- Open panel. Fixed width so it never reflows while the drawer animates. -->
+    <div
+      id="post-preview-panel"
+      class="invisible flex max-h-[calc(100dvh-var(--spacing-topbar))] w-[min(var(--spacing-rail),92vw)] flex-col gap-5 overflow-y-auto px-8 py-10 group-data-[state=open]/preview:visible xl:w-[clamp(20rem,26vw,var(--spacing-rail))]"
+    >
+      <div class="flex items-center gap-2">
+        <h2 class="text-label text-fg-subtle">Preview</h2>
+        <span class="text-fg-subtle ml-auto font-mono text-[0.6875rem]" aria-hidden="true">esc</span>
+        <button
+          type="button"
+          data-preview-close
+          aria-expanded="true"
+          aria-controls="post-preview-panel"
+          class="text-mono-xs border-stroke-strong text-fg-muted hover:text-fg flex items-center gap-1.5 border px-2 py-[0.1875rem] text-[0.6875rem]"
+        >
+          <span aria-hidden="true" class="text-xs">⇥</span> close
+        </button>
+      </div>
+
+      <p data-preview-empty class="text-body-sm text-fg-muted group-data-selected/preview:hidden">
+        Select a post in the listing to preview it here. Click a row, or press <kbd class="font-mono text-xs">Space</kbd> on its title.
+      </p>
+
+      <div class="hidden flex-col gap-5 group-data-selected/preview:flex">
+        <p class="text-mono-sm text-intent break-all" data-field="file"></p>
+        <h3 class="h3 text-fg" data-field="title" aria-live="polite"></h3>
+        <p class="text-body-sm text-fg-muted" data-field="description"></p>
+
+        <dl class="border-stroke flex flex-col gap-3 border-y py-4">
+          {
+            meta.map((label) => (
+              <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-4">
+                <dt class="text-label text-fg-subtle pt-0.5">{label}</dt>
+                <dd class="text-body-2xs text-fg" data-field={label.toLowerCase()} />
+              </div>
+            ))
+          }
+          <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-4" data-field-row="alsoIn">
+            <dt class="text-label text-fg-subtle pt-0.5">Also in</dt>
+            <dd>
+              <ul class="flex flex-wrap gap-1.5" data-field="alsoIn"></ul>
+            </dd>
+          </div>
+        </dl>
+
+        <div class="flex gap-2">
+          <Button href="#" label="Open post ↵" withArrow={false} data-preview-open />
+          <Button label="Copy link" variant="secondary" withArrow={false} data-preview-copy />
+        </div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<script>
+  type Summary = {
+    href: string;
+    file: string;
+    title: string;
+    description: string;
+    type: string;
+    location: string;
+    alsoIn: string[];
+    authors: string[];
+    date: string;
+  };
+
+  const panel = document.querySelector<HTMLElement>("[data-preview]");
+  if (panel && !panel.dataset.ready) {
+    panel.dataset.ready = "true";
+    const field = (name: string) => panel.querySelector<HTMLElement>(`[data-field="${name}"]`)!;
+    const toggle = panel.querySelector<HTMLButtonElement>("[data-preview-toggle]")!;
+    const closeBtn = panel.querySelector<HTMLButtonElement>("[data-preview-close]")!;
+    const open = panel.querySelector<HTMLAnchorElement>("[data-preview-open]")!;
+    const copy = panel.querySelector<HTMLButtonElement>("[data-preview-copy]")!;
+    const wide = matchMedia("(min-width: 80rem)");
+    const chip =
+      "text-mono-xs border-stroke-strong text-fg-muted hover:text-fg inline-block border px-2 py-[0.1875rem] whitespace-nowrap";
+
+    const isOpen = () => panel.dataset.state === "open";
+
+    const setOpen = (next: boolean, { focusPanel = false } = {}) => {
+      if (next === isOpen()) return;
+      panel.dataset.state = next ? "open" : "closed";
+      toggle.setAttribute("aria-expanded", String(next));
+      if (next && (focusPanel || !wide.matches)) {
+        // As an overlay it covers the listing, so focus moves into it.
+        closeBtn.focus({ preventScroll: true });
+      }
+      if (!next) document.dispatchEvent(new CustomEvent("preview:closed"));
+    };
+
+    const fill = (s: Summary) => {
+      field("file").textContent = s.file;
+      field("title").textContent = s.title;
+      field("description").textContent = s.description;
+      field("author").textContent = s.authors.join(", ");
+      field("published").textContent = s.date;
+      field("type").textContent = s.type;
+      field("location").textContent = `~/blog/${s.location}`;
+      field("alsoIn").replaceChildren(
+        ...s.alsoIn.map((p) => {
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = `/${p}/`;
+          a.className = chip;
+          a.textContent = `/${p}`;
+          li.append(a);
+          return li;
+        }),
+      );
+      panel.querySelector<HTMLElement>('[data-field-row="alsoIn"]')!.hidden = s.alsoIn.length === 0;
+      open.href = s.href;
+      open.setAttribute("aria-label", `Open post: ${s.title}`);
+      copy.dataset.url = new URL(s.href, location.origin).href;
+      panel.setAttribute("data-selected", "");
+    };
+
+    document.addEventListener("preview:open", (e) => {
+      fill((e as CustomEvent<Summary>).detail);
+      setOpen(true);
+    });
+
+    toggle.addEventListener("click", () => setOpen(true, { focusPanel: true }));
+    closeBtn.addEventListener("click", () => setOpen(false));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isOpen()) setOpen(false);
+    });
+    // Leaving the overlay width with the drawer open would strand it off-grid.
+    wide.addEventListener("change", () => {
+      if (!wide.matches) setOpen(false);
+    });
+
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(copy.dataset.url ?? location.href);
+        copy.textContent = "Copied";
+        setTimeout(() => (copy.textContent = "Copy link"), 1500);
+      } catch {}
+    });
+  }
+</script>

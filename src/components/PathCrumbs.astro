@@ -1,0 +1,53 @@
+---
+import { folderHref, lineage } from "../lib/blog";
+
+interface Props {
+  /** Folder path; omit for the blog root. */
+  path?: string;
+  /** Trailing file name on an article, e.g. "gosentry….release". */
+  file?: string;
+  /** Dot-separated notes after the path ("index", "60 posts"). */
+  meta?: string[];
+  class?: string;
+}
+const { path, file, meta = [], class: className } = Astro.props;
+
+// The shell-style breadcrumb: "~/blog/fuzzing-testing/fuzzing" in red, each
+// segment a link up the tree, then the file name or notes in grey.
+const segments = [
+  { label: "~/blog", href: folderHref() },
+  ...(path ? lineage(path).map((f) => ({ label: `/${f.slug}`, href: folderHref(f.path) })) : []),
+];
+---
+
+<nav aria-label="Breadcrumb" class:list={["text-mono-sm min-w-0", className]}>
+  <ol class="flex flex-wrap items-baseline">
+    {
+      segments.map((s, i) => {
+        const last = i === segments.length - 1 && !file;
+        return (
+          <li class="text-intent">
+            <a href={s.href} aria-current={last ? "page" : undefined} class="hover:underline">
+              {s.label}
+            </a>
+          </li>
+        );
+      })
+    }
+    {
+      file && (
+        <li class="text-fg-subtle break-all" aria-current="page">
+          /{file}
+        </li>
+      )
+    }
+    {
+      meta.map((m) => (
+        <li class="text-fg-subtle whitespace-pre">
+          <span aria-hidden="true"> · </span>
+          {m}
+        </li>
+      ))
+    }
+  </ol>
+</nav>

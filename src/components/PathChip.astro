@@ -1,0 +1,23 @@
+---
+import { folderHref } from "../lib/blog";
+
+interface Props {
+  /** Folder path without the leading slash, e.g. "languages/go". */
+  path: string;
+  class?: string;
+}
+const { path, class: className } = Astro.props;
+
+// A folder reference as a square mono chip ("/languages/go"), linking to the
+// folder. Used for cross-listings on cards, the preview and the article meta.
+---
+
+<a
+  href={folderHref(path)}
+  class:list={[
+    "text-mono-xs border-stroke-strong text-fg-muted hover:text-fg hover:border-fg-subtle inline-block border px-2 py-[0.1875rem] whitespace-nowrap transition-colors",
+    className,
+  ]}
+>
+  /{path}
+</a>

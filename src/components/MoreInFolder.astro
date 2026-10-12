@@ -1,0 +1,51 @@
+---
+import { isoDate, postHref, type Post } from "../lib/blog";
+
+interface Props {
+  folder: string;
+  previous?: Post;
+  next?: Post;
+  class?: string;
+}
+const { folder, previous, next, class: className } = Astro.props;
+
+// "More in /fuzzing": the older and newer neighbors inside the post's
+// folder, as two listing-style rows.
+const rows = [
+  previous && { post: previous, rel: "previous" as const },
+  next && { post: next, rel: "next" as const },
+].filter(Boolean) as { post: Post; rel: "previous" | "next" }[];
+const leaf = folder.split("/").pop();
+---
+
+{
+  rows.length > 0 && (
+    <nav aria-labelledby="more-heading" class:list={["flex flex-col", className]}>
+      <h2 id="more-heading" class="text-label text-fg-subtle pb-3">
+        More in /{leaf}
+      </h2>
+      <ul class="border-stroke border-t">
+        {rows.map(({ post, rel }) => (
+          <li class="border-stroke hover:bg-panel group relative grid grid-cols-[4.5rem_minmax(0,1fr)_1.5rem] gap-x-6 border-b py-4 transition-colors @3xl:grid-cols-[4.5rem_minmax(0,1fr)_7rem_9rem_5.5rem_1.5rem]">
+            <span class="text-mono-sm text-intent">{post.data.type}</span>
+            <div class="min-w-0">
+              <a href={postHref(post)} rel={rel === "next" ? "next" : "prev"} class="h5 text-fg block truncate after:absolute after:inset-0">
+                {rel === "previous" && <span aria-hidden="true">← </span>}
+                {post.data.title}
+              </a>
+              <p class="text-body-2xs text-fg-muted mt-1 truncate">{post.data.description}</p>
+            </div>
+            <span class="text-mono-sm text-fg-muted @max-3xl:hidden">{rel}</span>
+            <span class="text-body-2xs text-fg-muted truncate @max-3xl:hidden">{post.data.authors.join(", ")}</span>
+            <time class="text-mono-sm text-fg-subtle @max-3xl:hidden" datetime={isoDate(post.data.date)}>
+              {isoDate(post.data.date)}
+            </time>
+            <span class="border-stroke-strong text-fg-subtle group-hover:text-fg grid size-6 place-items-center border font-mono text-xs" aria-hidden="true">
+              →
+            </span>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}

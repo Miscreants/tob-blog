@@ -1,0 +1,262 @@
+---
+import { postTypes } from "../data/directory";
+import { pageHref, type PostSummary } from "../lib/blog";
+
+export interface DirRow {
+  /** ".." for the parent, otherwise the subfolder name ("/fuzzing"). */
+  name: string;
+  href: string;
+  description: string;
+  location: string;
+  date?: string;
+}
+
+interface Props {
+  posts: PostSummary[];
+  /** Folder rows above the posts on a folder page (parent + subfolders). */
+  dirs?: DirRow[];
+  /** Current folder path, for relative locations and page links. */
+  path?: string;
+  page: number;
+  totalPages: number;
+  /** Left side of the status bar, e.g. "2 folders · 13 of 60 posts". */
+  summary: string;
+  class?: string;
+}
+const { posts, dirs = [], path, page, totalPages, summary, class: className } = Astro.props;
+
+// The file listing: type filter, a TYPE / NAME / LOCATION / AUTHOR / MODIFIED
+// table and a status bar with paging. A real <table>; narrow containers drop
+// LOCATION, then AUTHOR, then the open column (container queries on <main>).
+//
+// Interaction (from the board's rail hint "space · preview ↵ open"):
+//   click a row / Space on its title → preview it in the right drawer
+//   Enter or the → button            → open the post
+//   ↑ / ↓ on a title                 → move between rows
+//   Esc                              → close the preview
+// The type filter and sort act on the rows of this page only.
+
+const relative = (location: string) =>
+  path && (location === path || location.startsWith(`${path}/`))
+    ? location.slice(path.length) || `/${location.split("/").pop()}`
+    : `/${location}`;
+const pad = (n: number) => String(n).padStart(2, "0");
+const cell = "py-4 align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-6";
+---
+
+<section aria-label="Posts" data-listing class={className}>
+  <div class="flex flex-wrap items-center gap-2 px-6 pb-5 md:px-8">
+    <div role="group" aria-label="Filter by type" class="flex flex-wrap gap-2">
+      {
+        ["all", ...postTypes].map((t) => (
+          <button
+            type="button"
+            data-filter={t}
+            aria-pressed={t === "all" ? "true" : "false"}
+            class="text-mono-sm border-stroke-strong text-fg-muted hover:text-fg aria-pressed:bg-intent-soft aria-pressed:border-intent aria-pressed:text-intent border px-3 py-1.5 transition-colors"
+          >
+            {t === "all" ? "all" : `*.${t}`}
+          </button>
+        ))
+      }
+    </div>
+    <button
+      type="button"
+      data-sort
+      aria-label="Sort by modified date, newest first. Activate to reverse."
+      class="text-mono-sm text-fg-subtle hover:text-fg ml-auto whitespace-nowrap transition-colors"
+    >
+      sort: modified <span data-sort-glyph aria-hidden="true">↓</span>
+    </button>
+  </div>
+
+  <table class="w-full table-fixed border-collapse">
+    <caption class="sr-only">Posts{path ? ` in /${path}` : ""}, newest first</caption>
+    <thead>
+      <tr class="border-stroke border-y">
+        <th scope="col" class:list={[cell, "text-label text-fg-subtle w-[6rem] py-2.5 text-left font-normal md:w-[6.5rem]"]}>Type</th>
+        <th scope="col" class:list={[cell, "text-label text-fg-subtle py-2.5 text-left font-normal"]}>Name</th>
+        <th scope="col" class:list={[cell, "text-label text-fg-subtle w-[16rem] py-2.5 text-left font-normal @max-5xl:hidden"]}>Location</th>
+        <th scope="col" class:list={[cell, "text-label text-fg-subtle w-[12.125rem] py-2.5 text-left font-normal @max-3xl:hidden"]}>Author</th>
+        <th scope="col" aria-sort="descending" data-sort-header class:list={[cell, "text-label text-fg-subtle w-[7.5rem] py-2.5 text-left font-normal @max-lg:hidden"]}>
+          Modified <span data-sort-glyph aria-hidden="true">↓</span>
+        </th>
+        <th scope="col" class:list={[cell, "w-[3.5rem] py-2.5 @max-md:hidden md:w-[4rem]"]}><span class="sr-only">Open</span></th>
+      </tr>
+    </thead>
+    <tbody data-listing-body>
+      {
+        dirs.map((d) => (
+          <tr class="border-stroke hover:bg-panel border-b transition-colors" data-dir>
+            <td class:list={[cell, "text-mono-sm text-intent"]}>dir</td>
+            <td class={cell}>
+              <a href={d.href} class="h5 text-fg hover:text-intent block truncate">
+                {d.name}
+              </a>
+              <p class="text-body-2xs text-fg-muted mt-1 truncate">{d.description}</p>
+            </td>
+            <td class:list={[cell, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]}>{d.location}</td>
+            <td class:list={[cell, "@max-3xl:hidden"]} />
+            <td class:list={[cell, "text-mono-sm text-fg-subtle @max-lg:hidden"]}>{d.date && <time datetime={d.date}>{d.date}</time>}</td>
+            <td class:list={[cell, "@max-md:hidden"]}>
+              <a href={d.href} tabindex="-1" aria-hidden="true" class="border-stroke-strong text-fg-subtle grid size-6 place-items-center border font-mono text-xs">
+                →
+              </a>
+            </td>
+          </tr>
+        ))
+      }
+      {
+        posts.map((p) => (
+          <tr
+            data-row
+            data-type={p.type}
+            data-date={p.date}
+            data-summary={JSON.stringify(p)}
+            class="group border-stroke hover:bg-panel data-active:bg-panel-muted data-active:shadow-[inset_2px_0_0_var(--color-intent)] cursor-pointer border-b transition-colors"
+          >
+            <td class:list={[cell, "text-mono-sm text-intent"]}>{p.type}</td>
+            <td class={cell}>
+              <a href={p.href} data-row-link class="h5 text-fg hover:text-intent block truncate">
+                {p.title}
+              </a>
+              <p class="text-body-2xs text-fg-muted mt-1 truncate">{p.description}</p>
+            </td>
+            <td class:list={[cell, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]}>{relative(p.location)}</td>
+            <td class:list={[cell, "text-body-2xs text-fg-muted truncate @max-3xl:hidden"]}>{p.authors.join(", ")}</td>
+            <td class:list={[cell, "text-mono-sm text-fg-subtle @max-lg:hidden"]}>
+              <time datetime={p.date}>{p.date}</time>
+            </td>
+            <td class:list={[cell, "@max-md:hidden"]}>
+              <a
+                href={p.href}
+                tabindex="-1"
+                aria-hidden="true"
+                class="border-stroke-strong text-fg-subtle group-data-active:border-intent group-data-active:bg-intent-soft group-data-active:text-intent hover:text-fg grid size-6 place-items-center border font-mono text-xs transition-colors"
+              >
+                →
+              </a>
+            </td>
+          </tr>
+        ))
+      }
+      <tr data-listing-empty hidden={posts.length > 0 || dirs.length > 0}>
+        <td colspan="6" class="text-mono-sm text-fg-subtle px-6 py-10 md:px-8">No posts here yet.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <nav aria-label="Pages" class="border-stroke flex flex-wrap items-center gap-6 border-t px-6 py-4 md:px-8">
+    <p class="text-mono-sm text-fg-subtle">
+      {summary}
+      <span aria-hidden="true"> · </span>page {pad(page)} / {pad(totalPages)}
+    </p>
+    <span class="ml-auto"></span>
+    {
+      page > 1 ? (
+        <a href={pageHref(path, page - 1)} rel="prev" class="text-mono-sm text-fg hover:text-intent">
+          <span aria-hidden="true">← </span>prev
+        </a>
+      ) : (
+        <span class="text-mono-sm text-fg-subtle" aria-disabled="true">
+          <span aria-hidden="true">← </span>prev
+        </span>
+      )
+    }
+    {
+      page < totalPages ? (
+        <a href={pageHref(path, page + 1)} rel="next" class="text-mono-sm text-fg hover:text-intent">
+          next<span aria-hidden="true"> →</span>
+        </a>
+      ) : (
+        <span class="text-mono-sm text-fg-subtle" aria-disabled="true">
+          next<span aria-hidden="true"> →</span>
+        </span>
+      )
+    }
+  </nav>
+  <p class="sr-only" role="status" data-listing-status></p>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-listing]").forEach((listing) => {
+    if (listing.dataset.ready) return;
+    listing.dataset.ready = "true";
+
+    const body = listing.querySelector<HTMLElement>("[data-listing-body]")!;
+    const status = listing.querySelector<HTMLElement>("[data-listing-status]")!;
+    const empty = listing.querySelector<HTMLElement>("[data-listing-empty]")!;
+    const rows = () => [...body.querySelectorAll<HTMLTableRowElement>("[data-row]")];
+    const visibleRows = () => rows().filter((r) => !r.hidden);
+    
+    // ---- Type filter ----
+    listing.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const type = btn.dataset.filter!;
+        listing.querySelectorAll("[data-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        rows().forEach((r) => (r.hidden = type !== "all" && r.dataset.type !== type));
+        body.querySelectorAll<HTMLElement>("[data-dir]").forEach((r) => (r.hidden = type !== "all"));
+        const n = visibleRows().length;
+        empty.hidden = n > 0 || type === "all";
+        status.textContent = `${n} ${type === "all" ? "posts" : `${type} posts`} on this page`;
+      });
+    });
+
+    // ---- Sort (this page) ----
+    let descending = true;
+    const sortBtn = listing.querySelector<HTMLButtonElement>("[data-sort]")!;
+    sortBtn.addEventListener("click", () => {
+      descending = !descending;
+      rows()
+        .sort((a, b) => (descending ? b.dataset.date!.localeCompare(a.dataset.date!) : a.dataset.date!.localeCompare(b.dataset.date!)))
+        .forEach((r) => body.insertBefore(r, empty));
+      listing.querySelectorAll("[data-sort-glyph]").forEach((g) => (g.textContent = descending ? "↓" : "↑"));
+      listing.querySelector("[data-sort-header]")?.setAttribute("aria-sort", descending ? "descending" : "ascending");
+      sortBtn.setAttribute(
+        "aria-label",
+        `Sort by modified date, ${descending ? "newest" : "oldest"} first. Activate to reverse.`,
+      );
+    });
+
+    // ---- Preview ----
+    // The selected row stays marked after the drawer collapses (the rail
+    // turns red); a new selection replaces it.
+    const setActive = (row: HTMLTableRowElement | null) => {
+      rows().forEach((r) => r.toggleAttribute("data-active", r === row));
+    };
+    const preview = (row: HTMLTableRowElement) => {
+      setActive(row);
+      document.dispatchEvent(new CustomEvent("preview:open", { detail: JSON.parse(row.dataset.summary!) }));
+    };
+    document.addEventListener("preview:closed", () => {
+      body.querySelector<HTMLTableRowElement>("[data-active]")?.querySelector<HTMLElement>("[data-row-link]")?.focus({ preventScroll: true });
+    });
+
+    body.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const row = target.closest<HTMLTableRowElement>("[data-row]");
+      if (!row || target.closest("a")) return;
+      preview(row);
+    });
+
+    body.addEventListener("keydown", (e) => {
+      const link = (e.target as HTMLElement).closest<HTMLAnchorElement>("[data-row-link]");
+      const row = link?.closest<HTMLTableRowElement>("[data-row]");
+      if (!link || !row) return;
+      if (e.key === " ") {
+        e.preventDefault();
+        preview(row);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        const list = visibleRows();
+        const next = list[list.indexOf(row) + (e.key === "ArrowDown" ? 1 : -1)];
+        if (!next) return;
+        e.preventDefault();
+        next.querySelector<HTMLElement>("[data-row-link]")?.focus();
+        // Selection follows the arrows; the drawer only refills if it's open.
+        if (!row.hasAttribute("data-active")) return;
+        if (document.querySelector('[data-preview][data-state="open"]')) preview(next);
+        else setActive(next);
+      }
+    });
+  });
+</script>

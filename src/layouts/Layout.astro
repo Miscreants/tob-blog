@@ -1,20 +1,12 @@
 ---
-// A layout is a reusable wrapper for your pages.
-// Anything you put between <Layout>...</Layout> in a page lands in <slot />.
-//
-// Props are declared via an interface and read from Astro.props.
-// One variable font per role (§10.2). --font-heading / --font-sans / --font-mono
-// in global.css name these families, so all three must actually be loaded —
-// otherwise the stack silently falls through to system-ui/Menlo and renders
-// differently on machines that happen to have the font installed locally.
-import "@fontsource-variable/archivo";
-import "@fontsource-variable/inter";
-import "@fontsource-variable/jetbrains-mono";
+// Document shell: <head>, SEO, fonts, theme bootstrap. Page chrome (top bar,
+// directory tree, rails) lives in BlogShell, which wraps this.
 import "../styles/global.css";
-import { getCollection, render } from "astro:content";
-import Nav from "../components/NavMorph.astro";
-import AnnouncementBanner from "../components/AnnouncementBanner.astro";
+import geistUrl from "../assets/fonts/Geist-Variable.woff2?url";
+import geistMonoUrl from "../assets/fonts/GeistMono-Variable.woff2?url";
+import lecturisUrl from "../assets/fonts/FHLecturis-Regular.woff2?url";
 import Seo from "../components/Seo.astro";
+
 interface Props {
   title?: string;
   /** Meta description for SEO + social cards. */
@@ -27,17 +19,15 @@ interface Props {
   noindex?: boolean;
   /** JSON-LD structured data graph(s). See src/lib/schema.ts. */
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
-  /** Theme attribute applied at the document root — flips tokens for the whole page (nav included). */
+  /** Server-rendered theme; the inline script replaces it before paint. */
   theme?: "light" | "dark" | "brand";
   /** Frontmatter object, present when this layout is used from a Markdown/MDX page. */
   frontmatter?: { title?: string; theme?: "light" | "dark" | "brand"; description?: string };
 }
 
-// MDX/Markdown pages with `layout:` pass their frontmatter under `frontmatter`,
-// while `.astro` pages pass props flat. Fall back so both work.
 const fm = Astro.props.frontmatter ?? {};
 const {
-  title = fm.title ?? "Astro Playground",
+  title = fm.title ?? "The Trail of Bits Blog",
   description = fm.description,
   image,
   ogType,
@@ -46,28 +36,6 @@ const {
   theme = fm.theme ?? "light",
 } = Astro.props;
 const gtagId = import.meta.env.PUBLIC_GTAG_ID;
-
-// Pick the currently-active announcement, if any.
-// Filters by enabled flag and schedule window. Highest priority wins;
-// ties broken by most recent startsAt. Evaluated at build time.
-const now = new Date();
-const active = (await getCollection("announcements"))
-  .filter((a) => a.data.enabled)
-  .filter((a) => !a.data.startsAt || a.data.startsAt <= now)
-  .filter((a) => !a.data.endsAt || a.data.endsAt >= now)
-  .sort((a, b) => {
-    if (a.data.priority !== b.data.priority)
-      return b.data.priority - a.data.priority;
-    const aStart = a.data.startsAt?.getTime() ?? 0;
-    const bStart = b.data.startsAt?.getTime() ?? 0;
-    return bStart - aStart;
-  });
-
-const announcement = active[0];
-const AnnouncementContent = announcement
-  ? (await render(announcement)).Content
-  : null;
-
 ---
 
 <html lang="en" data-theme={theme}>
@@ -75,6 +43,27 @@ const AnnouncementContent = announcement
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
+    <!-- Saved choice wins, else the OS preference. Blocking on purpose: it
+         must set data-theme before the first paint or dark visitors flash white. -->
+    <script is:inline>
+      (() => {
+        let saved = null;
+        try {
+          saved = localStorage.getItem("theme");
+        } catch {}
+        const theme =
+          saved === "light" || saved === "dark"
+            ? saved
+            : matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <link rel="preload" href={geistUrl} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={geistMonoUrl} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={lecturisUrl} as="font" type="font/woff2" crossorigin />
+    <link rel="alternate" type="application/rss+xml" title="The Trail of Bits Blog" href="/rss.xml" />
     <Seo title={title} description={description} ogType={ogType} image={image} noindex={noindex} jsonLd={jsonLd} />
 
     {gtagId && (
@@ -92,22 +81,10 @@ const AnnouncementContent = announcement
   <body>
     <a
       href="#main"
-      class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-intent focus:text-fg-on-intent focus:rounded-sm"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-intent focus:text-fg-on-intent"
     >
       Skip to main content
     </a>
-    <Nav>
-      {announcement && AnnouncementContent && (
-        <AnnouncementBanner
-          slot="announcement"
-          href={announcement.data.href}
-          dismissible={announcement.data.dismissible}
-          class="bg-intent text-fg-on-intent text-sm"
-        >
-          <AnnouncementContent />
-        </AnnouncementBanner>
-      )}
-    </Nav>
     <slot />
   </body>
 </html>

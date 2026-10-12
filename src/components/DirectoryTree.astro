@@ -1,0 +1,209 @@
+---
+import { directory } from "../data/directory";
+import { folders, folderHref, lineage } from "../lib/blog";
+import DirectoryTreeBranch, { type TreeRow } from "./DirectoryTreeBranch.astro";
+
+interface Props {
+  /** Selected folder path; omit for the blog root. */
+  current?: string;
+  /** True on the folder's own page (aria-current="page"); false when the
+   *  folder is only the location of the article being read. */
+  currentIsPage?: boolean;
+  counts: Record<string, number>;
+  class?: string;
+}
+const { current, currentIsPage = true, counts, class: className } = Astro.props;
+
+// The left-hand directory: ~/blog → groups (topics / indexes / about) →
+// folders. Every subfolder is rendered, but one shows only while its parent
+// is on the selected path (as on the board) or after "expand all". Guide
+// lines are computed here, one 16×26 cell per depth,
+// following the Tree/Guide component in Figma:
+//   rail  — an ancestor still has children further down
+//   tee   — branch into this row; elbow for the last child
+//   fork  — expanded node turning down into its children
+//   dash  — leaf or closed folder
+//   dot   — an ancestor with no more children
+// Segments on the path from the root to the selected folder draw in red.
+
+type Node = {
+  key: string;
+  label: string;
+  kind: "root" | "group" | "folder";
+  path?: string;
+  index?: boolean;
+  children: Node[];
+};
+
+const folderNode = (path: string, index: boolean): Node => {
+  const f = folders.get(path)!;
+  return {
+    key: path,
+    label: `/${f.slug}`,
+    kind: "folder",
+    path,
+    index: index && f.depth === 0,
+    children: f.children.map((c) => folderNode(c, index)),
+  };
+};
+
+const root: Node = {
+  key: "~",
+  label: "~/blog",
+  kind: "root",
+  children: directory.map((g) => ({
+    key: `group:${g.label}`,
+    label: g.label,
+    kind: "group" as const,
+    children: g.folders.map((f) => folderNode(f.slug, g.kind === "index")),
+  })),
+};
+
+// Keys from the root down to the selected node.
+const selectedKeys = current
+  ? ["~", `group:${directory.find((g) => g.folders.some((f) => f.slug === current.split("/")[0]))?.label}`, ...lineage(current).map((f) => f.path)]
+  : ["~"];
+const onPath = (n: Node) => selectedKeys.includes(n.key);
+const isSelected = (n: Node) => n.key === selectedKeys[selectedKeys.length - 1];
+// Root and groups are always open; folders open along the selected path.
+// Closed ones still render their subtree, hidden until "expand all".
+const isClosed = (n: Node) => n.kind === "folder" && !onPath(n) && n.children.length > 0;
+
+type Cell = TreeRow["cells"][number];
+
+// ancestors: the chain from the root to this node's parent.
+const buildRow = (n: Node, ancestors: Node[]): TreeRow => {
+  const cells: Cell[] = [];
+  const chain = [...ancestors, n];
+  for (let c = 0; c < ancestors.length; c++) {
+    const parent = chain[c];
+    const child = chain[c + 1];
+    const siblings = parent.children;
+    const i = siblings.indexOf(child);
+    const last = i === siblings.length - 1;
+    const selIndex = siblings.findIndex((s) => onPath(s));
+    const parentOnPath = onPath(parent) && selIndex !== -1;
+    if (c < ancestors.length - 1) {
+      // A rail column past an ancestor: continues if that ancestor has later
+      // siblings; red while the selected sibling is still further down.
+      if (last) cells.push({ kind: "dot" });
+      else {
+        const on = parentOnPath && i < selIndex;
+        cells.push({ kind: "rail", top: { on }, bottom: { on } });
+      }
+    } else {
+      cells.push({
+        kind: last ? "elbow" : "tee",
+        top: { on: parentOnPath && i <= selIndex },
+        branch: { on: parentOnPath && i === selIndex },
+        bottom: { on: parentOnPath && i < selIndex },
+      });
+    }
+  }
+  const kids = n.children;
+  cells.push(
+    kids.length
+      ? { kind: "fork", left: { on: onPath(n) }, down: { on: onPath(n) && !isSelected(n) }, closed: isClosed(n) }
+      : { kind: "dash", on: isSelected(n) },
+  );
+  // The root has no parent column; its own fork starts at the edge.
+  return {
+    key: n.key,
+    label: n.label,
+    kind: n.kind,
+    href: n.kind === "root" ? folderHref() : n.path ? folderHref(n.path) : undefined,
+    count: n.path ? counts[n.path] : undefined,
+    index: n.index,
+    selected: isSelected(n),
+    onPath: onPath(n),
+    current: isSelected(n) ? (currentIsPage || n.kind === "root" ? "page" : "location") : undefined,
+    nested: n.kind === "folder" && ancestors.filter((a) => a.kind === "folder").length > 0,
+    closed: isClosed(n),
+    cells,
+    children: kids.map((k) => buildRow(k, chain)),
+  };
+};
+
+const tree = buildRow(root, []);
+---
+
+<aside
+  id="directory"
+  data-tree
+  aria-label="Directory"
+  class:list={[
+    "bg-panel border-stroke z-30 border-r",
+    // Drawer below lg, toggled from the top bar; a column from lg up.
+    "max-lg:fixed max-lg:inset-y-0 max-lg:top-topbar max-lg:left-0 max-lg:hidden max-lg:w-[min(20rem,85vw)] max-lg:overflow-y-auto max-lg:shadow-popover max-lg:data-open:block",
+    className,
+  ]}
+>
+  <div class="lg:sticky lg:top-topbar lg:max-h-[calc(100dvh-var(--spacing-topbar))] lg:overflow-y-auto pb-6">
+    <div class="border-stroke flex items-center gap-2 border-b py-3.5 pr-5 pl-4">
+      <h2 class="text-label text-fg-subtle">Directory</h2>
+      <button
+        type="button"
+        data-tree-mode-toggle
+        aria-controls="directory-tree"
+        class="text-mono-sm text-fg-subtle hover:text-fg ml-auto text-[0.6875rem] transition-colors"
+      >
+        collapse all
+      </button>
+    </div>
+    <ul id="directory-tree" class="mt-2.5" data-tree-root>
+      <DirectoryTreeBranch row={tree} />
+    </ul>
+  </div>
+</aside>
+
+<!-- Restore the saved expand/collapse choice before paint so the tree doesn't jump. -->
+<script is:inline>
+  (() => {
+    const tree = document.getElementById("directory");
+    let mode = null;
+    try {
+      mode = localStorage.getItem("tree-mode");
+    } catch {}
+    if (!tree || (mode !== "collapsed" && mode !== "expanded")) return;
+    tree.dataset.mode = mode;
+    const btn = tree.querySelector("[data-tree-mode-toggle]");
+    if (btn) btn.textContent = mode === "collapsed" ? "expand all" : "collapse all";
+  })();
+</script>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-tree]").forEach((tree) => {
+    if (tree.dataset.ready) return;
+    tree.dataset.ready = "true";
+
+    // The tree starts open along the selected path (or in the saved mode,
+    // restored by the inline script above). The button then flips
+    // between "collapse all" (top-level folders only) and "expand all"
+    // (every folder and subfolder); DirectoryTreeBranch's CSS reads data-mode.
+    const modeToggle = tree.querySelector<HTMLButtonElement>("[data-tree-mode-toggle]");
+    modeToggle?.addEventListener("click", () => {
+      const next = tree.dataset.mode === "collapsed" ? "expanded" : "collapsed";
+      tree.dataset.mode = next;
+      modeToggle.textContent = next === "collapsed" ? "expand all" : "collapse all";
+      // Kept until the visitor flips it again.
+      try {
+        localStorage.setItem("tree-mode", next);
+      } catch {}
+    });
+
+    // Drawer below lg.
+    const toggle = document.querySelector<HTMLButtonElement>("[data-tree-toggle]");
+    const setOpen = (open: boolean) => {
+      tree.toggleAttribute("data-open", open);
+      toggle?.setAttribute("aria-expanded", String(open));
+      if (open) tree.querySelector<HTMLElement>("a, button")?.focus();
+    };
+    toggle?.addEventListener("click", () => setOpen(!tree.hasAttribute("data-open")));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && tree.hasAttribute("data-open")) {
+        setOpen(false);
+        toggle?.focus();
+      }
+    });
+  });
+</script>

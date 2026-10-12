@@ -1,0 +1,29 @@
+---
+import ListingHeader from "./ListingHeader.astro";
+import FeaturedPosts from "./FeaturedPosts.astro";
+import PostListing, { type DirRow } from "./PostListing.astro";
+import SubscribeForm from "./SubscribeForm.astro";
+import type { Post, PostSummary } from "../lib/blog";
+
+interface Props {
+  path?: string;
+  meta?: string[];
+  title: string;
+  lede?: string;
+  featured?: Post[];
+  posts: PostSummary[];
+  dirs?: DirRow[];
+  page: number;
+  totalPages: number;
+  summary: string;
+}
+const { path, meta, title, lede, featured = [], posts, dirs, page, totalPages, summary } = Astro.props;
+
+// Everything a listing page renders inside the shell — blog home, folder,
+// author — in the board's order. Routes only resolve data and pass it here.
+---
+
+<ListingHeader path={path} meta={meta} title={title} lede={lede} />
+{page === 1 && featured.length > 0 && <FeaturedPosts posts={featured} />}
+<PostListing posts={posts} dirs={dirs} path={path} page={page} totalPages={totalPages} summary={summary} />
+<SubscribeForm id="subscribe" />

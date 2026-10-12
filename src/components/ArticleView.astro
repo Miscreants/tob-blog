@@ -1,0 +1,29 @@
+---
+import ArticleHeader from "./ArticleHeader.astro";
+import ArticleBody from "./ArticleBody.astro";
+import ExplainWithAI from "./ExplainWithAI.astro";
+import MoreInFolder from "./MoreInFolder.astro";
+import SubscribeForm from "./SubscribeForm.astro";
+import type { Post } from "../lib/blog";
+
+interface Props {
+  post: Post;
+  previous?: Post;
+  next?: Post;
+}
+const { post, previous, next } = Astro.props;
+
+// The article column: header, body, Explain with AI, more in this folder.
+// 1000px measure inside 80px gutters at the board width. Below xl, where the
+// rail is hidden, subscribe follows the article.
+---
+
+<article class="mx-auto w-full max-w-[72.5rem] px-6 pt-12 pb-16 md:px-12 2xl:px-20">
+  <ArticleHeader post={post} />
+  <ArticleBody class="mt-12">
+    <slot />
+  </ArticleBody>
+  <ExplainWithAI post={post} class="mt-12" />
+  <MoreInFolder folder={post.data.location} previous={previous} next={next} class="mt-16" />
+</article>
+<SubscribeForm id="subscribe" class="xl:hidden" />

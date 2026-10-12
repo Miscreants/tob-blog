@@ -8,6 +8,7 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 
 import { site } from './src/data/site.ts';
+import rehypeCodeFrame from './src/lib/rehype-code-frame.mjs';
 
 // Single source of truth for the production origin: this config derives `site`
 // from src/data/site.ts rather than repeating the domain. Two copies plus a
@@ -74,6 +75,11 @@ export default defineConfig({
   // sitemap.
   site: site.url,
   output: 'static',
+  // Let Cloudflare quick tunnels (cloudflared tunnel --url) reach the dev
+  // server for sharing previews. Dev/preview only; no effect on the build.
+  server: {
+    allowedHosts: ['.trycloudflare.com'],
+  },
   // Astro 7 defaults compressHTML to 'jsx' (JSX-style whitespace stripping).
   // Keep the v6 HTML-aware behavior so inline spacing doesn't shift.
   compressHTML: true,
@@ -88,6 +94,13 @@ export default defineConfig({
   prefetch: {
     prefetchAll: true,
     defaultStrategy: 'hover',
+  },
+  // Code colors come from the syntax roles in global.css (css-variables theme),
+  // so one highlight pass serves both themes. rehypeCodeFrame adds the
+  // language/copy header around each block.
+  markdown: {
+    shikiConfig: { theme: 'css-variables' },
+    rehypePlugins: [rehypeCodeFrame],
   },
   build: {
     // Inline page CSS into <head> instead of emitting render-blocking

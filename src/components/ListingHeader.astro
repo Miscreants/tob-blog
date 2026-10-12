@@ -1,0 +1,23 @@
+---
+import PathCrumbs from "./PathCrumbs.astro";
+
+interface Props {
+  /** Folder path; omit for the blog root. */
+  path?: string;
+  meta?: string[];
+  title: string;
+  lede?: string;
+  class?: string;
+}
+const { path, meta, title, lede, class: className } = Astro.props;
+
+// Top of a listing page: breadcrumb, Lecturis display title, lede. Bespoke
+// rather than SectionMain: the listing is a self-framed panel on the board's
+// 32px gutter, not a centered marketing column.
+---
+
+<header class:list={["flex flex-col gap-3.5 px-6 pt-10 pb-7 md:px-8", className]}>
+  <PathCrumbs path={path} meta={meta} />
+  <h1 class="text-display text-fg mt-1">{title}</h1>
+  {lede && <p class="text-body-md text-fg-muted max-w-[40rem]">{lede}</p>}
+</header>

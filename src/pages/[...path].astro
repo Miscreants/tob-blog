@@ -1,0 +1,169 @@
+---
+import type { GetStaticPaths } from "astro";
+import type { ComponentProps } from "astro/types";
+import { render } from "astro:content";
+import BlogShell from "../layouts/BlogShell.astro";
+import ListingView from "../components/ListingView.astro";
+import ArticleView from "../components/ArticleView.astro";
+import ArticleRail from "../components/ArticleRail.astro";
+import {
+  folderCounts,
+  folderHref,
+  folders,
+  getPosts,
+  isoDate,
+  paginate,
+  PAGE_SIZE,
+  postsIn,
+  sortKey,
+  summarize,
+  type Post,
+} from "../lib/blog";
+import { site } from "../data/site";
+import { articleSchema } from "../lib/schema";
+
+// One route for the whole tree, mirroring a filesystem:
+//   /<folder>/            folder listing (Figma "Folder View")
+//   /<folder>/page/<n>/   further pages of it
+//   /<location>/<slug>/   an article (Figma "Article")
+export const getStaticPaths = (async () => {
+  const posts = await getPosts();
+  const paths = [];
+
+  for (const folder of folders.values()) {
+    const pages = Math.max(1, Math.ceil(postsIn(posts, folder.path).length / PAGE_SIZE));
+    for (let page = 1; page <= pages; page++) {
+      paths.push({
+        params: { path: page === 1 ? folder.path : `${folder.path}/page/${page}` },
+        props: { view: "folder" as const, folder: folder.path, page },
+      });
+    }
+  }
+
+  for (const post of posts) {
+    if (folders.has(`${post.data.location}/${post.id}`) || post.id === "page") {
+      throw new Error(`posts/${post.id}: slug collides with a folder or the pager`);
+    }
+    // Neighbors within the post's own folder, by date.
+    const siblings = posts.filter((p) => p.data.location === post.data.location);
+    const i = siblings.indexOf(post);
+    paths.push({
+      params: { path: `${post.data.location}/${post.id}` },
+      props: { view: "post" as const, post, newer: siblings[i - 1], older: siblings[i + 1] },
+    });
+  }
+  return paths;
+}) satisfies GetStaticPaths;
+
+type Props =
+  | { view: "folder"; folder: string; page: number }
+  | { view: "post"; post: Post; newer?: Post; older?: Post };
+const props = Astro.props as Props;
+
+const posts = await getPosts();
+
+// ---- Folder view ----
+let listing: (ComponentProps<typeof ListingView> & { folderTitle: string; folderPath: string; blurb?: string }) | undefined;
+if (props.view === "folder") {
+  const node = folders.get(props.folder)!;
+  const inFolder = postsIn(posts, node.path);
+  const { items, total } = paginate(inFolder, props.page);
+  const counts = folderCounts(posts);
+  const parent = node.parent ? folders.get(node.parent) : undefined;
+  const latest = (path: string) => {
+    const first = postsIn(posts, path)[0];
+    return first ? isoDate(new Date(sortKey(first))) : undefined;
+  };
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const dirs =
+    props.page === 1
+      ? [
+          {
+            name: "..",
+            href: folderHref(parent?.path),
+            description: `Back to ~/blog${parent ? `/${parent.path}` : ""}`,
+            location: parent ? `/${parent.slug}` : "~/blog",
+          },
+          ...node.children.map((c) => {
+            const child = folders.get(c)!;
+            return {
+              name: `/${child.slug}`,
+              href: folderHref(c),
+              description: [plural(counts[c], "post"), child.blurb].filter(Boolean).join(" · "),
+              location: `/${child.slug}`,
+              date: latest(c),
+            };
+          }),
+        ]
+      : [];
+  const sub = node.children.length;
+  const meta = [plural(inFolder.length, "post"), ...(sub ? [plural(sub, "subfolder")] : [])];
+  listing = {
+    folderTitle: node.title,
+    folderPath: node.path,
+    blurb: node.blurb,
+    path: node.path,
+    meta: props.page > 1 ? [...meta, `page ${props.page}`] : meta,
+    title: node.title,
+    lede: node.blurb,
+    posts: items.map(summarize),
+    dirs,
+    page: props.page,
+    totalPages: total,
+    summary: [...(sub ? [plural(sub, "folder")] : []), `${items.length} of ${plural(inFolder.length, "post")}`].join(" · "),
+  };
+}
+
+// ---- Article view ----
+const article = props.view === "post" ? await render(props.post) : undefined;
+const schema =
+  props.view === "post"
+    ? articleSchema({
+        path: Astro.url.pathname,
+        title: props.post.data.title,
+        description: props.post.data.description,
+        datePublished: props.post.data.date.toISOString(),
+        dateModified: props.post.data.updated?.toISOString(),
+        articleSection: [props.post.data.location],
+        breadcrumbParent: {
+          name: folders.get(props.post.data.location)!.title,
+          path: props.post.data.location,
+        },
+      })
+    : undefined;
+---
+
+{
+  listing && (
+    <BlogShell
+      title={`${listing.folderTitle} — ${site.name}`}
+      description={listing.blurb ?? site.description}
+      folder={listing.folderPath}
+      preview
+    >
+      <ListingView {...listing} />
+    </BlogShell>
+  )
+}
+
+{
+  props.view === "post" && article && (
+    <BlogShell
+      title={`${props.post.data.title} — ${site.name}`}
+      description={props.post.data.description}
+      ogType="article"
+      jsonLd={schema}
+      folder={props.post.data.location}
+      folderIsPage={false}
+    >
+      <ArticleView post={props.post} previous={props.older} next={props.newer}>
+        <article.Content />
+      </ArticleView>
+      <ArticleRail
+        slot="rail"
+        post={props.post}
+        headings={article.headings.filter((h) => h.depth === 2 || h.depth === 3)}
+      />
+    </BlogShell>
+  )
+}

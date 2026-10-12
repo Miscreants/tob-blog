@@ -1,0 +1,31 @@
+---
+import { legalLinks } from "../data/site";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+// The 53px footer strip: copyright left, legal links right.
+const year = new Date().getFullYear();
+---
+
+<footer
+  class:list={[
+    "bg-canvas border-stroke flex flex-wrap items-center gap-x-6 gap-y-2 border-t px-4 py-[1.1875rem] md:px-6",
+    className,
+  ]}
+>
+  <p class="text-mono-sm text-fg-subtle">© {year} Trail of Bits</p>
+  <ul class="ml-auto flex flex-wrap gap-x-6 gap-y-1">
+    {
+      legalLinks.map((l) => (
+        <li>
+          <a href={l.href} class="text-mono-sm text-fg-subtle hover:text-fg transition-colors">
+            {l.label}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</footer>

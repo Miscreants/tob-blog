@@ -1,0 +1,91 @@
+---
+import Button from "./Button.astro";
+import PathChip from "./PathChip.astro";
+import { isoDate, postHref, type Post } from "../lib/blog";
+
+interface Props {
+  posts: Post[];
+  class?: string;
+}
+const { posts, class: className } = Astro.props;
+
+// "/ Featured (2)": up to two pinned posts side by side, split by a hairline,
+// with a [–] collapse toggle. Collapsed state is not remembered.
+const featured = posts.slice(0, 2);
+---
+
+{
+  featured.length > 0 && (
+    <section aria-labelledby="featured-heading" data-featured class:list={["px-6 pt-2 pb-9 md:px-8", className]}>
+      <div class="border-stroke-strong flex items-center gap-2.5 border-b pb-3">
+        <h2 id="featured-heading" class="text-label text-fg-subtle">
+          / Featured <span class="text-intent">({featured.length})</span>
+        </h2>
+        <button
+          type="button"
+          data-featured-toggle
+          aria-expanded="true"
+          aria-controls="featured-cards"
+          class="text-mono-xs border-stroke-strong text-fg-muted hover:text-fg ml-auto flex items-center gap-1.5 border px-2 py-[0.1875rem] text-[0.6875rem]"
+        >
+          <span class="text-intent font-medium" aria-hidden="true" data-featured-glyph>
+            [–]
+          </span>
+          <span data-featured-label>collapse</span>
+        </button>
+      </div>
+
+      <div id="featured-cards" class="grid gap-8 pt-6 lg:grid-cols-[1fr_1px_1fr]">
+        {featured.map((p, i) => (
+          <>
+            {i === 1 && <div class="bg-stroke max-lg:hidden" aria-hidden="true" />}
+            <article class="flex flex-col gap-2.5">
+              <p class="text-mono-sm text-fg-subtle flex flex-wrap gap-x-2.5">
+                <span class="text-intent">{p.data.type}</span>
+                <span>/{p.data.location}</span>
+                <span>
+                  · <time datetime={isoDate(p.data.date)}>{isoDate(p.data.date)}</time>
+                </span>
+              </p>
+              <h3 class="h3 text-fg">
+                <a href={postHref(p)} class="hover:text-intent transition-colors">
+                  {p.data.title}
+                  <span aria-hidden="true"> ↗</span>
+                </a>
+              </h3>
+              <p class="text-body-sm text-fg-muted">{p.data.description}</p>
+              <ul class="flex flex-wrap gap-1.5" aria-label="Folders">
+                {[p.data.location, ...p.data.alsoIn].map((path) => (
+                  <li>
+                    <PathChip path={path} />
+                  </li>
+                ))}
+              </ul>
+              <div class="mt-auto flex items-center gap-6 pt-6">
+                <Button href={postHref(p)} label="Read post ↵" withArrow={false} aria-label={`Read post: ${p.data.title}`} />
+                <span class="text-body-2xs text-fg-muted">{p.data.authors.join(", ")}</span>
+              </div>
+            </article>
+          </>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-featured]").forEach((section) => {
+    if (section.dataset.ready) return;
+    section.dataset.ready = "true";
+    const toggle = section.querySelector<HTMLButtonElement>("[data-featured-toggle]");
+    const cards = section.querySelector<HTMLElement>("#featured-cards");
+    if (!toggle || !cards) return;
+    toggle.addEventListener("click", () => {
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      toggle.setAttribute("aria-expanded", String(open));
+      cards.hidden = !open;
+      section.querySelector("[data-featured-glyph]")!.textContent = open ? "[–]" : "[+]";
+      section.querySelector("[data-featured-label]")!.textContent = open ? "collapse" : "expand";
+    });
+  });
+</script>

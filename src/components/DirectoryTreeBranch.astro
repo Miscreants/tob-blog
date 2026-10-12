@@ -1,0 +1,144 @@
+---
+// One row of DirectoryTree plus its visible children, rendered recursively so
+// the markup stays a real nested list for assistive tech. Guide cells come
+// precomputed from DirectoryTree.
+
+type Seg = { on: boolean };
+type Cell =
+  | { kind: "rail"; top: Seg; bottom: Seg }
+  | { kind: "tee" | "elbow"; top: Seg; branch: Seg; bottom: Seg }
+  | { kind: "fork"; left: Seg; down: Seg; closed?: boolean }
+  | { kind: "dash"; on: boolean }
+  | { kind: "dot" }
+  | { kind: "blank" };
+
+export interface TreeRow {
+  key: string;
+  label: string;
+  kind: "root" | "group" | "folder";
+  href?: string;
+  count?: number;
+  index?: boolean;
+  selected: boolean;
+  onPath: boolean;
+  current?: "page" | "location";
+  /** A subfolder (depth ≥ 2 folder) — hidden by "collapse all". */
+  nested: boolean;
+  /** A folder off the selected path; its subtree waits for "expand all". */
+  closed: boolean;
+  cells: Cell[];
+  children: TreeRow[];
+}
+
+interface Props {
+  row: TreeRow;
+}
+const { row } = Astro.props;
+
+const seg = (on: boolean) => (on ? "bg-intent" : "bg-stroke-strong");
+---
+
+<li data-tree-row={row.kind} data-nested={row.nested ? "" : undefined} class="tree-row">
+  <div
+    class:list={[
+      "flex h-[1.625rem] items-center pr-5",
+      row.selected ? "bg-panel-muted border-intent border-l-2 pl-3.5" : "pl-4",
+    ]}
+  >
+    <span class="flex shrink-0" aria-hidden="true">
+      {
+        row.cells.map((c) => (
+          <span class="relative h-[1.625rem] w-4" data-guide={c.kind}>
+            {c.kind === "rail" && (
+              <>
+                <span class:list={["absolute top-0 left-2 h-[0.875rem] w-px", seg(c.top.on)]} />
+                <span class:list={["absolute top-[0.8125rem] left-2 h-[0.8125rem] w-px", seg(c.bottom.on)]} />
+              </>
+            )}
+            {(c.kind === "tee" || c.kind === "elbow") && (
+              <>
+                <span class:list={["absolute top-0 left-2 h-[0.875rem] w-px", seg(c.top.on)]} />
+                <span class:list={["absolute top-[0.8125rem] left-2 h-px w-2", seg(c.branch.on)]} />
+                {c.kind === "tee" && (
+                  <span class:list={["absolute top-[0.8125rem] left-2 h-[0.8125rem] w-px", seg(c.bottom.on)]} />
+                )}
+              </>
+            )}
+            {c.kind === "fork" && !c.closed && (
+              <>
+                <span class:list={["absolute top-[0.8125rem] left-0 h-px w-[0.5625rem]", seg(c.left.on)]} />
+                <span data-fork-down class:list={["absolute top-[0.8125rem] left-2 h-[0.8125rem] w-px", seg(c.down.on)]} />
+              </>
+            )}
+            {c.kind === "fork" && c.closed && (
+              <>
+                <span data-fork-closed class="bg-stroke-strong absolute top-[0.8125rem] left-0 h-px w-3" />
+                <span data-fork-open>
+                  <span class="bg-stroke-strong absolute top-[0.8125rem] left-0 h-px w-[0.5625rem]" />
+                  <span class="bg-stroke-strong absolute top-[0.8125rem] left-2 h-[0.8125rem] w-px" />
+                </span>
+              </>
+            )}
+            {c.kind === "dash" && <span class:list={["absolute top-[0.8125rem] left-0 h-px w-3", seg(c.on)]} />}
+            {c.kind === "dot" && <span class="bg-fg-subtle absolute top-3 left-[0.4375rem] size-[3px]" />}
+          </span>
+        ))
+      }
+    </span>
+    <span class="w-1.5 shrink-0" aria-hidden="true"></span>
+    {
+      row.kind === "group" ? (
+        <span class="text-label text-fg-subtle flex-1 truncate">{row.label}</span>
+      ) : (
+        <a
+          href={row.href}
+          aria-current={row.current}
+          class:list={[
+            "text-mono-md min-w-0 flex-1 truncate leading-4 transition-colors",
+            row.selected ? "text-intent font-medium" : row.onPath ? "text-fg" : "text-fg-muted hover:text-fg",
+          ]}
+        >
+          {row.label}
+          {row.index && <span aria-hidden="true"> ↗</span>}
+          {row.count !== undefined && <span class="sr-only">, {row.count} posts</span>}
+        </a>
+      )
+    }
+    {
+      row.count !== undefined && (
+        <span
+          aria-hidden="true"
+          class:list={["text-mono-xs shrink-0 tabular-nums", row.selected ? "text-intent" : "text-fg-subtle"]}
+        >
+          {row.count}
+        </span>
+      )
+    }
+  </div>
+  {
+    row.children.length > 0 && (
+      <ul data-subtree-closed={row.closed ? "" : undefined}>
+        {row.children.map((child) => (
+          <Astro.self row={child} />
+        ))}
+      </ul>
+    )
+  }
+</li>
+
+<style is:global>
+  /* Folders off the selected path stay shut (a dash) until "expand all". */
+  [data-tree]:not([data-mode="expanded"]) [data-subtree-closed],
+  [data-tree]:not([data-mode="expanded"]) [data-fork-open],
+  [data-tree][data-mode="expanded"] [data-fork-closed] {
+    display: none;
+  }
+  /* "collapse all": drop subfolder rows and turn their parents' forks into
+     plain dashes. */
+  [data-tree][data-mode="collapsed"] [data-nested] {
+    display: none;
+  }
+  [data-tree][data-mode="collapsed"] [data-tree-row="folder"]:not([data-nested]) > div [data-fork-down] {
+    display: none;
+  }
+</style>

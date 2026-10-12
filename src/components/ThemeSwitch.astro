@@ -1,0 +1,61 @@
+---
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+// Dark / light segmented switch from the top bar. Two toggle buttons in a
+// labelled group; aria-pressed marks the live theme. Layout's inline script
+// picks the first-paint theme, this only flips and persists it.
+const options = ["dark", "light"] as const;
+---
+
+<div
+  role="group"
+  aria-label="Color theme"
+  data-theme-switch
+  class:list={["border-stroke-strong flex border p-0.5", className]}
+>
+  {
+    options.map((value) => (
+      <button
+        type="button"
+        data-theme-value={value}
+        aria-pressed="false"
+        class="text-mono-xs text-fg-subtle aria-pressed:bg-panel-muted aria-pressed:text-fg group/opt flex items-center gap-1.5 px-2.5 py-1 aria-pressed:font-medium"
+      >
+        <span
+          aria-hidden="true"
+          class="border-fg-subtle group-aria-pressed/opt:border-intent group-aria-pressed/opt:bg-intent size-1.5 rounded-full border"
+        />
+        {value}
+      </button>
+    ))
+  }
+</div>
+
+<script>
+  const root = document.documentElement;
+
+  const sync = () => {
+    document.querySelectorAll<HTMLButtonElement>("[data-theme-switch] [data-theme-value]").forEach((btn) => {
+      btn.setAttribute("aria-pressed", String(btn.dataset.themeValue === root.dataset.theme));
+    });
+  };
+
+  document.querySelectorAll<HTMLElement>("[data-theme-switch]").forEach((group) => {
+    if (group.dataset.ready) return;
+    group.dataset.ready = "true";
+    group.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-theme-value]");
+      if (!btn?.dataset.themeValue) return;
+      root.dataset.theme = btn.dataset.themeValue;
+      try {
+        localStorage.setItem("theme", btn.dataset.themeValue);
+      } catch {}
+      sync();
+    });
+  });
+
+  sync();
+</script>

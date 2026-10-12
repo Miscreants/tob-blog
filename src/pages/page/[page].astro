@@ -1,0 +1,29 @@
+---
+import type { GetStaticPaths } from "astro";
+import BlogShell from "../../layouts/BlogShell.astro";
+import ListingView from "../../components/ListingView.astro";
+import { getPosts, paginate, PAGE_SIZE, summarize } from "../../lib/blog";
+import { site } from "../../data/site";
+
+// ~/blog, pages 2…n. Page 1 is the index route.
+export const getStaticPaths = (async () => {
+  const count = Math.ceil((await getPosts()).length / PAGE_SIZE);
+  return Array.from({ length: Math.max(0, count - 1) }, (_, i) => ({ params: { page: String(i + 2) } }));
+}) satisfies GetStaticPaths;
+
+const page = Number(Astro.params.page);
+const posts = await getPosts();
+const { items, total } = paginate(posts, page);
+---
+
+<BlogShell title={`${site.name} — page ${page}`} description={site.description} preview>
+  <ListingView
+    meta={["index", `page ${page}`]}
+    title="The Trail of Bits Blog"
+    lede={site.description}
+    posts={items.map(summarize)}
+    page={page}
+    totalPages={total}
+    summary={`${posts.length} posts`}
+  />
+</BlogShell>
