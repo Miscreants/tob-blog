@@ -1,0 +1,29 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SliderBasicMap from '../components/SliderBasicMap.astro';
+
+// Sample slides so the preview actually shows the component doing its job —
+// it previously rendered an empty slider. Dev-only route, never built for
+// production.
+const items = [
+  {
+    eyebrow: 'Primitive',
+    title: 'Mapped slides',
+    description: 'SliderBasicMap turns an array of items into CardFeatured slides.',
+  },
+  {
+    eyebrow: 'Responsive',
+    title: 'Per-breakpoint counts',
+    description: 'mobile, mobileLandscape, tablet and desktop each take a per-view count.',
+  },
+  {
+    eyebrow: 'Composable',
+    title: 'Manual children still work',
+    description: 'Anything slotted in renders after the mapped items.',
+  },
+];
+---
+
+<Layout title="Preview: SliderBasicMap">
+  <SliderBasicMap {items} tablet={2} desktop={3} />
+</Layout>

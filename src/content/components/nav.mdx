@@ -1,0 +1,83 @@
+---
+title: Nav
+description: Primary site navigation bar — plain links, dropdowns, mega menu panels, mobile hamburger, scroll-aware styling.
+category: layout
+order: 20
+sourceFile: src/components/Nav.astro
+status: stable
+related: [NavMega, NavMorph, Logo, AnnouncementBanner]
+---
+
+The primary site navigation. Supports plain links, dropdown menus, and full-width mega menu panels. Includes a mobile hamburger menu, scroll-aware styling, and corner accent decorations.
+
+## Props
+
+None — navigation links are hardcoded in the component's frontmatter as a `NavLink[]` array.
+
+## Mechanism
+
+### Link types
+
+The nav supports three link types via a discriminated union:
+
+| Type    | Structure                                                   |
+|---------|-------------------------------------------------------------|
+| Plain   | `{ label, href }` — renders as a simple `<a>` link         |
+| Menu    | `{ label, type: "menu", id, items }` — dropdown with links |
+| Mega    | `{ label, type: "mega", id, columns }` — full-width panel with grouped links |
+
+### Layout
+
+- Uses `section-grid-outside` (5-column grid from `global.css`) for alignment.
+- The bar (`data-nav-bar`) is `fixed` at the top with `z-50`.
+- Mega panels sit outside the bar element so they can span the full container width.
+
+### Scroll behavior
+
+- On scroll past 12px, the bar gains `is-scrolled`: solid background, box shadow, and corner accents appear.
+- Uses `{ passive: true }` on the scroll listener for performance.
+
+### Desktop dropdowns
+
+- Hover-intent pattern with configurable delays (`HOVER_ENTER: 100ms`, `HOVER_LEAVE: 150ms`).
+- When a dropdown is already open, switching to another is instant (no enter delay).
+- Click also toggles (keyboard / mobile friendly).
+- Click outside or press Escape closes all dropdowns.
+
+### Mobile menu
+
+- Hamburger button toggles `data-nav-mobile` panel visibility.
+- Icon swaps between hamburger and X via `hidden` class toggling.
+- Links inside the mobile panel auto-close the menu on click.
+
+### Accessibility
+
+- Dropdown triggers have `aria-controls` pointing to their panel ID and `aria-expanded` state.
+- Hamburger has `aria-label` that toggles between "Open menu" and "Close menu".
+- Logo link has `aria-label="Miscreants home"`.
+- Escape closes all dropdowns and the mobile menu.
+
+## Usage
+
+```astro
+---
+import Nav from "@components/Nav.astro";
+---
+
+<Nav />
+```
+
+To modify links, edit the `links` array in the component's frontmatter.
+
+## Sub-components used
+
+- `Logo` — SVG wordmark
+- `Button` — CTA button ("Get a Demo")
+- `AnnouncementBanner` — dismissible banner above the nav bar
+
+## Notes
+
+- The nav is `fixed`, so page content needs top padding/margin to avoid being hidden behind it.
+- Mega panels use `backdrop-blur-md` and layered shadows for depth.
+- The `AnnouncementBanner` is embedded directly in this component.
+- This file is a preview-free doc — Nav requires full-page context to render meaningfully (fixed positioning, the page-edge grid, scroll behavior). View the live site to see it in action.

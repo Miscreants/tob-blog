@@ -1,0 +1,68 @@
+---
+title: Clickable
+description: Stretched-link wrapper that turns any container into a single clickable surface without nesting interactive elements.
+category: primitive
+order: 40
+sourceFile: src/components/Clickable.astro
+status: stable
+related: [CardFeatured, CardIcon]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Clickable from "@components/Clickable.astro";
+import CardFeatured from "@components/CardFeatured.astro";
+
+The "stretched link" pattern. Wraps any block of content with an absolutely-positioned `<a>` that covers the whole container, so the user can click anywhere on the card to navigate — without putting an `<a>` around the entire markup (which would nest interactive elements and break a11y).
+
+## Preview
+
+<Preview label="Card-as-link">
+  <div class="w-full max-w-md">
+    <Clickable href="/blog/example" label="Read: Example post">
+      <CardFeatured
+        title="The whole card is the link"
+        description="Click anywhere — the heading, body, even the empty space — and you'll navigate. The <a> stretches across the whole container."
+        border="all"
+      >
+        <span slot="eyebrow">Pattern</span>
+      </CardFeatured>
+    </Clickable>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "href", type: "string", required: true, description: "URL the card links to." },
+  { name: "label", type: "string", required: true, description: "Accessible label for the stretched link — what screen readers announce." },
+  { name: "class", type: "string", description: "Extra classes on the outer wrapping div." },
+]} />
+
+## Mechanism
+
+- The outer `<div>` is `position: relative` so the stretched link is contained.
+- An `<a>` with `absolute inset-0 z-[1]` covers the full area of the parent.
+- A `<span class="sr-only">` inside the link provides the accessible name.
+- `focus-visible` styles produce a ringed outline with `rounded-[inherit]` so the focus ring matches the card's corners.
+- Child content sits *below* the link in DOM order but appears unchanged visually.
+
+## Usage
+
+```astro
+---
+import Clickable from "@components/Clickable.astro";
+---
+
+<Clickable href="/blog/my-post" label="Read: My Post Title">
+  <img src="/thumbnail.jpg" alt="" />
+  <h3>My Post Title</h3>
+  <p>A short description...</p>
+</Clickable>
+```
+
+## Gotchas
+
+- **Inner interactive elements need `position: relative; z-index: 2`** (use the `card-action` utility from `global.css`) so they sit above the stretched link and stay independently clickable.
+- The `label` prop is required for accessibility — without it, the link has no accessible name.
+- Don't nest two `Clickable`s — the inner stretched link will eat all clicks meant for the outer.

@@ -1,0 +1,112 @@
+---
+title: Tag
+description: Status / category / filter chip with semantic-token variants, two sizes, optional close button, and optional icon slot.
+category: primitive
+order: 14
+sourceFile: src/components/Tag.astro
+status: stable
+related: [AnimatedTags, FilterBar]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Tag from "@components/Tag.astro";
+
+Small inline chip used for status pills (`Active`, `Beta`), category labels, filter chips, and version markers. Variants are driven by semantic tokens (`success`, `error`, `intent`, `warning`, `neutral`) so they flip automatically across light/dark/brand themes.
+
+## Preview
+
+<Preview label="Variants — solid" align="center">
+  <div class="flex flex-wrap items-center gap-2 py-2">
+    <Tag variant="neutral">Neutral</Tag>
+    <Tag variant="success">Active</Tag>
+    <Tag variant="warning">Beta</Tag>
+    <Tag variant="error">Deprecated</Tag>
+    <Tag variant="intent">New</Tag>
+  </div>
+</Preview>
+
+<Preview label="Variants — outlined" align="center">
+  <div class="flex flex-wrap items-center gap-2 py-2">
+    <Tag variant="neutral" outline>Neutral</Tag>
+    <Tag variant="success" outline>Active</Tag>
+    <Tag variant="warning" outline>Beta</Tag>
+    <Tag variant="error" outline>Deprecated</Tag>
+    <Tag variant="intent" outline>New</Tag>
+  </div>
+</Preview>
+
+<Preview label="Sizes" align="center">
+  <div class="flex flex-wrap items-center gap-2 py-2">
+    <Tag size="sm" variant="success">Small</Tag>
+    <Tag size="md" variant="success">Medium</Tag>
+  </div>
+</Preview>
+
+<Preview label="Closable filter chips" align="center">
+  <div class="flex flex-wrap items-center gap-2 py-2">
+    <Tag variant="neutral" closable closeLabel="Remove News filter">News</Tag>
+    <Tag variant="neutral" closable closeLabel="Remove Updates filter">Updates</Tag>
+    <Tag variant="neutral" closable closeLabel="Remove Releases filter">Releases</Tag>
+  </div>
+</Preview>
+
+<Preview label="With icon slot" align="center">
+  <div class="flex flex-wrap items-center gap-2 py-2">
+    <Tag variant="success">
+      <svg slot="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+      Verified
+    </Tag>
+    <Tag variant="warning">
+      <svg slot="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 9v4M12 17h.01" />
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      </svg>
+      Pending
+    </Tag>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "variant", type: '"neutral" | "success" | "warning" | "error" | "intent"', default: '"neutral"', description: "Color variant — drawn from semantic tokens." },
+  { name: "size", type: '"sm" | "md"', default: '"md"', description: "Tag size." },
+  { name: "outline", type: "boolean", default: "false", description: "Use outlined style (color on transparent) instead of solid fill." },
+  { name: "closable", type: "boolean", default: "false", description: "Add a close button. Click dispatches `tag:close` and removes the tag from the DOM unless prevented." },
+  { name: "closeLabel", type: "string", default: '"Remove"', description: "Accessible label for the close button — should describe what's being removed." },
+  { name: "class", type: "string", description: "Additional classes on the tag." },
+]} />
+
+## Slots
+
+| Slot      | Purpose                                                              |
+|-----------|----------------------------------------------------------------------|
+| (default) | Tag label.                                                           |
+| `icon`    | Optional leading icon (SVG). Sized to `1em` and inherits color.       |
+
+## Events
+
+When `closable`, clicking the close button dispatches a `tag:close` event:
+
+```js
+document.addEventListener("tag:close", (e) => {
+  console.log("Removed:", e.detail.value);
+});
+```
+
+The event is `cancelable` — call `preventDefault()` to keep the tag in the DOM (e.g. if you want to confirm before removing, or sync with backend state first).
+
+## Accessibility
+
+- Real `<button>` for close — keyboard-accessible, focus-visible outline styled to match the tag's text color.
+- `aria-label` on the close button — pass a descriptive `closeLabel` so screen readers announce *what* is being removed (e.g. `"Remove News filter"`), not just "Remove".
+- Color contrast: solid variants use `color-mix()` to keep text legible on tinted backgrounds; outlined variants use the foreground color directly on transparent.
+
+## Notes
+
+- Tag is a `<span>` (inline-flex) — drop it inside any text flow without disrupting layout.
+- `warning` variant uses a literal `#d97706` (amber-600) since the project tokens don't include a warning color. Add `--color-warning` to `global.css` if you want to centralize it.
+- Closable tags self-remove from the DOM after dispatch — for controlled behavior, listen to `tag:close` and call `preventDefault()` then handle removal in your own state.

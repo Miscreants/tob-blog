@@ -1,0 +1,196 @@
+---
+title: Media
+description: Video tile with autoplay, hover, or click activation. Lazy-loads, pauses out of view and on tab-hidden, respects reduced motion, and falls through to a chosen mode on touch devices.
+category: pattern
+order: 55
+sourceFile: src/components/Media.astro
+status: stable
+related: [Tabs, CardFeatured]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Media from "@components/Media.astro";
+
+A small video tile that handles the three activation patterns marketing pages actually need — autoplay heroes, hover-to-play grids, and click-to-play demos — without re-implementing the lazy-load + pause-on-blur + touch-fallback logic each time.
+
+State is exposed via `data-media-status` (`not-active` | `loading` | `playing` | `paused`) so CSS drives the poster/play-overlay swap with no extra JS.
+
+## Preview
+
+<Preview label="Autoplay (default)" align="stretch">
+  <div class="w-full max-w-xl">
+    <Media
+      src="https://osmo.b-cdn.net/resource-media/media-water-1080x1440.mp4"
+      poster="https://cdn.prod.website-files.com/69b7ba9c70e33d403c399111/69b7d8341c40602ff2a854be_water-placeholder-1080x1440.avif"
+      alt="Water flowing"
+      aspect="3/4"
+      class=""
+    />
+  </div>
+</Preview>
+
+<Preview label="Hover to play (touch falls back to autoplay)" align="stretch">
+  <div class="w-full max-w-xl">
+    <Media
+      src="https://osmo.b-cdn.net/resource-media/media-water-1080x1440.mp4"
+      poster="https://cdn.prod.website-files.com/69b7ba9c70e33d403c399111/69b7d8341c40602ff2a854be_water-placeholder-1080x1440.avif"
+      alt="Water flowing"
+      mode="hover"
+      aspect="16/9"
+      class=""
+    />
+  </div>
+</Preview>
+
+<Preview label="Click to play (wrapper as button)" align="stretch">
+  <div class="w-full max-w-xl">
+    <Media
+      src="https://osmo.b-cdn.net/resource-media/media-water-1080x1440.mp4"
+      poster="https://cdn.prod.website-files.com/69b7ba9c70e33d403c399111/69b7d8341c40602ff2a854be_water-placeholder-1080x1440.avif"
+      alt="Water flowing"
+      mode="click"
+      aspect="16/9"
+      ariaLabel="Play product demo"
+      class=""
+    />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "src", type: "string", required: true, description: "Video URL. Loaded lazily on first activation, never up-front." },
+  { name: "poster", type: "string | ImageMetadata", description: "Poster shown until the video plays — an imported astro:assets asset (optimized) or a URL string. Strongly recommended." },
+  { name: "alt", type: "string", default: '""', description: "Alt text for the poster. Empty = decorative (sets aria-hidden on the <video>)." },
+  { name: "mode", type: '"autoplay" | "hover" | "click"', default: '"autoplay"', description: "How the video starts." },
+  { name: "touchMode", type: '"autoplay" | "click"', description: "Fallback mode on no-hover devices. Default: hover→autoplay, others unchanged." },
+  { name: "aspect", type: "string", default: '"16/9"', description: 'CSS aspect-ratio value, e.g. "3/4", "1/1". Pass "auto" to disable.' },
+  { name: "loop", type: "boolean", default: "true", description: "Loop the video on end." },
+  { name: "resetOnPause", type: "boolean", description: "Reset to t=0 on pause. Default: true for hover, false otherwise." },
+  { name: "pauseOffscreen", type: "boolean", default: "true", description: "Pause when scrolled out of viewport." },
+  { name: "rootMargin", type: "string", default: '"10%"', description: "IntersectionObserver root margin (pre-load buffer)." },
+  { name: "pauseDelay", type: "number", default: "200", description: "Pause delay in ms — debounces hover-out flicker." },
+  { name: "preload", type: '"none" | "metadata" | "auto"', default: '"none"', description: "Native <video preload>. Leave at none — the component controls loading." },
+  { name: "ariaLabel", type: "string", description: 'Accessible label when the wrapper is the click target (no slotted toggle). Defaults to "Play video".' },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Status hooks
+
+The wrapper element carries a `data-media-status` attribute you can target from CSS or JS:
+
+| Status        | When                                                                |
+|---------------|---------------------------------------------------------------------|
+| `not-active`  | Mounted, not yet triggered (autoplay before in-view, click before tap). |
+| `loading`     | Source assigned, waiting for `canplay`.                              |
+| `playing`     | Video is playing.                                                    |
+| `paused`      | Paused by hover-out, click, scroll-out, or tab-hidden.               |
+
+The built-in styles already use these to fade the poster out and the video in, and to hide the play overlay once the video is playing.
+
+## Slots
+
+| Slot         | Purpose                                                                                              |
+|--------------|------------------------------------------------------------------------------------------------------|
+| `play-icon`  | Replace the default ▶ SVG inside the click-mode overlay.                                              |
+| `toggle`     | Provide your own click target. Any `[data-media-toggle]` element inside this slot becomes the trigger. |
+
+When a `toggle` slot is supplied, the wrapper is **not** the click target — it stops being a button and the slotted control owns the interaction.
+
+## Examples
+
+### Autoplay hero
+
+```astro
+---
+import Media from "@components/Media.astro";
+---
+
+<Media
+  src="/video/hero.mp4"
+  poster="/img/hero.avif"
+  alt="Product demo"
+  aspect="16/9"
+/>
+```
+
+### Hover-to-play grid tile
+
+```astro
+<Media
+  src="/video/feature-1.mp4"
+  poster="/img/feature-1.avif"
+  alt="Feature 1"
+  mode="hover"
+  aspect="3/4"
+/>
+```
+
+### Click-to-play with a custom toggle button
+
+```astro
+<Media src="/video/demo.mp4" poster="/img/demo.avif" mode="click">
+  <button
+    slot="toggle"
+    data-media-toggle
+    class="absolute inset-0 m-auto h-16 w-16 bg-intent text-fg-on-intent"
+    aria-label="Play product demo"
+  >
+    ▶
+  </button>
+</Media>
+```
+
+### Click-to-play with a custom play icon
+
+```astro
+<Media src="/video/demo.mp4" poster="/img/demo.avif" mode="click" ariaLabel="Play demo">
+  <svg slot="play-icon" viewBox="0 0 24 24" width="64" height="64" fill="currentColor">
+    <circle cx="12" cy="12" r="11" opacity="0.6" />
+    <path d="M9 7v10l8-5z" fill="white" />
+  </svg>
+</Media>
+```
+
+## Mechanism
+
+### Lazy loading
+
+The `src` attribute on `<video>` is left empty at render time; the real URL lives on `data-media-src`. On first activation (in-view + mode trigger met), the script assigns `video.src` and calls `video.load()`. This avoids fetching every video on a grid page until they actually need to play.
+
+### Activation modes
+
+- **autoplay** — plays the moment the tile crosses the IntersectionObserver root margin.
+- **hover** — plays on `mouseenter` / `focusin`, pauses (with `pauseDelay`) on `mouseleave` / `focusout`.
+- **click** — plays on `click`. If no `toggle` slot is provided, the wrapper itself is the button (`role="button"`, `tabindex="0"`, Space/Enter handler, `aria-pressed` reflects state).
+
+### Touch fallback
+
+On `(hover: hover) and (pointer: fine)` = false, the resolved mode follows `touchMode` if set, otherwise:
+- `hover` → `autoplay`
+- `autoplay` and `click` stay as-is
+
+### Auto-pause
+
+- **Out of viewport** — paused (immediately) when `pauseOffscreen` is true.
+- **Tab hidden** — paused on `visibilitychange` (saves CPU/battery).
+- **Reduced motion** — autoplay and hover modes are gated entirely; click mode stays interactive (the user is asking for it).
+
+### Re-init on view transitions
+
+`initMedia()` runs once on `DOMContentLoaded` and again on every `astro:page-load`. Each instance guards against double-init via `data-script-initialized`.
+
+## Accessibility
+
+- Decorative video by default — `aria-hidden="true"` is set unless `alt` is provided.
+- Click-mode wrapper acts as a real button: keyboard activation (Space/Enter), visible `:focus-visible` outline using `--color-focus`, and `aria-pressed` reflects play state.
+- Slotted `toggle` lets you own the affordance entirely (recommended when you need a labeled button rather than a whole-tile click target).
+- Autoplay and hover modes are suppressed under `prefers-reduced-motion: reduce`. Click mode is preserved because activation is user-initiated.
+
+## Notes
+
+- **No web/mp4 fallback array.** If you need multi-format sources, replace the inner `<video>` with `<source>` children — the lazy-load logic uses `video.src` so you'd need to adapt that, but the rest of the script works unchanged.
+- **No native `controls`.** Intentional — the component is for ambient/marketing video, not a player. Wrap a real `<video controls>` if that's what you need.
+- **Poster accepts an imported asset _or_ a URL string.** Pass an `astro:assets` import (`import poster from "@images/poster.webp"`) and it's optimized through `<Image>`; pass a string (CMS/remote) and it renders a plain `<img>`. See the **Image & Picture** doc.
+- **`muted` is hardcoded.** Browsers block sound autoplay anyway; if you genuinely need sound, switch to click mode and remove the attribute on the rendered `<video>`.

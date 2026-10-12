@@ -1,0 +1,416 @@
+---
+// SliderBasic — horizontal carousel using native CSS scroll-snap.
+//
+// Why not Swiper?
+//   * Native scroll-snap is hardware-accelerated and ships zero extra deps.
+//     Touch/trackpad inertia "just works" — the browser handles it.
+//   * The only JS needed is for prev/next buttons, pagination dots, and
+//     keyboard nav. The script below is tiny and fully scoped per slider.
+//
+// Breakpoint API mirrors <Grid />: `mobile`, `mobileLandscape`, `tablet`,
+// `desktop` — each is the number of slides visible at that breakpoint.
+
+import { Icon } from "astro-icon/components";
+
+type PerView = 1 | 2 | 3 | 4 | 5 | 6;
+type Gap = "none" | "sm" | "md" | "lg";
+
+interface Props {
+  id?: string;
+  ariaLabel?: string;
+  mobile?: PerView;            // base (always applies)
+  mobileLandscape?: PerView;   // sm: 640px+
+  tablet?: PerView;            // md: 768px+
+  desktop?: PerView;           // lg: 1024px+
+  gap?: Gap;
+  showArrows?: boolean;
+  showDots?: boolean;
+  // Mouse click-and-drag on desktop. Touch already works via native
+  // scroll-snap regardless of this flag. Default: enabled.
+  draggable?: boolean;
+  class?: string;
+}
+
+const {
+  id,
+  ariaLabel = "Slider",
+  mobile = 1,
+  mobileLandscape,
+  tablet,
+  desktop,
+  gap = "md",
+  showArrows = true,
+  showDots = true,
+  draggable = true,
+  class: className = "",
+} = Astro.props;
+
+const gapClass = {
+  none: "gap-0",
+  sm: "gap-2",
+  md: "gap-4",
+  lg: "gap-6",
+}[gap];
+
+// Per-view counts are exposed as CSS vars so the slide-width calc()
+// below can scale per-breakpoint without generating one class per combo.
+const styleVars = [
+  `--per-view: ${mobile}`,
+  mobileLandscape ? `--per-view-sm: ${mobileLandscape}` : null,
+  tablet ? `--per-view-md: ${tablet}` : null,
+  desktop ? `--per-view-lg: ${desktop}` : null,
+]
+  .filter(Boolean)
+  .join("; ");
+---
+
+<div
+  data-slider
+  data-draggable={draggable ? "true" : "false"}
+  id={id}
+  role="region"
+  aria-roledescription="carousel"
+  aria-label={ariaLabel}
+  class:list={["relative", className]}
+  style={styleVars}
+>
+  {/* Live region announces the current slide for screen readers. */}
+  <div data-slider-live class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  {/* Track — the actual scroller. Direct children become slides via CSS. */}
+  <div
+    data-slider-track
+    tabindex="0"
+    aria-label={`${ariaLabel} slides`}
+    class:list={[
+      // `items-stretch` forces every slide to match the tallest one's height
+      // along the cross axis — without it, flex items take their intrinsic
+      // height and `h-full` on inner cards has nothing to resolve against.
+      "slider-track relative flex items-stretch overflow-x-auto scroll-smooth snap-x snap-mandatory",
+      "outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+      gapClass,
+    ]}
+  >
+    <slot />
+  </div>
+
+  {showArrows && (
+    <div class="mt-4 flex items-center justify-end gap-2">
+      <button
+        type="button"
+        data-slider-prev
+        aria-label="Previous slide"
+        class="grid h-9 w-9 place-items-center border bg-fg border-stroke text-canvas transition hover:border-stroke-strong hover:bg-canvas hover:text-fg disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas cursor-pointer"
+      >
+        <Icon name="lucide:chevron-left" class="h-4 w-4" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        data-slider-next
+        aria-label="Next slide"
+        class="grid h-9 w-9 place-items-center border bg-fg border-stroke text-canvas transition hover:border-stroke-strong hover:bg-canvas hover:text-fg disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas cursor-pointer"
+      >
+        <Icon name="lucide:chevron-right" class="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
+  )}
+
+  {showDots && (
+    <div
+      data-slider-dots
+      role="tablist"
+      aria-label={`${ariaLabel} pagination`}
+      class="mt-3 flex items-center justify-center gap-2"
+    ></div>
+  )}
+</div>
+
+<style is:global>
+  /* Each direct child of the track is a slide. Width derived from --per-view
+     and the column gap so N slides + (N-1) gaps fit exactly in the viewport.
+     `is:global` is required so children from other components (CardFeatured,
+     etc.) match — Astro's default scoped CSS would skip them. */
+  [data-slider-track] > * {
+    flex: 0 0 calc(
+      (100% - (var(--per-view) - 1) * var(--slider-gap, 1rem)) / var(--per-view)
+    );
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    min-width: 0;
+  }
+
+  /* Gap → CSS var so the width math stays accurate. */
+  [data-slider-track].gap-0 { --slider-gap: 0; }
+  [data-slider-track].gap-2 { --slider-gap: 0.5rem; }
+  [data-slider-track].gap-4 { --slider-gap: 1rem; }
+  [data-slider-track].gap-6 { --slider-gap: 1.5rem; }
+
+  /* Per-breakpoint slide widths. Selectors are scoped to sliders that
+     actually declare a count for that breakpoint. */
+  @media (min-width: 640px) {
+    [data-slider][style*="--per-view-sm"] [data-slider-track] > * {
+      flex-basis: calc(
+        (100% - (var(--per-view-sm) - 1) * var(--slider-gap, 1rem)) / var(--per-view-sm)
+      );
+    }
+  }
+  @media (min-width: 768px) {
+    [data-slider][style*="--per-view-md"] [data-slider-track] > * {
+      flex-basis: calc(
+        (100% - (var(--per-view-md) - 1) * var(--slider-gap, 1rem)) / var(--per-view-md)
+      );
+    }
+  }
+  @media (min-width: 1024px) {
+    [data-slider][style*="--per-view-lg"] [data-slider-track] > * {
+      flex-basis: calc(
+        (100% - (var(--per-view-lg) - 1) * var(--slider-gap, 1rem)) / var(--per-view-lg)
+      );
+    }
+  }
+
+  /* Hide the native scrollbar — interaction is via swipe/buttons/keys. */
+  [data-slider-track] {
+    scrollbar-width: none;
+  }
+  [data-slider-track]::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mouse-drag affordance — only when the slider opted in. */
+  [data-slider][data-draggable="true"] [data-slider-track] {
+    cursor: grab;
+  }
+  [data-slider][data-draggable="true"] [data-slider-track].is-dragging {
+    cursor: grabbing;
+    user-select: none;
+    scroll-snap-type: none;
+    scroll-behavior: auto;
+  }
+  /* Block native image drag inside slides so it doesn't hijack the gesture. */
+  [data-slider][data-draggable="true"] [data-slider-track] img {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
+  /* Pagination dot styling. JS sets data-active="true" on the current dot. */
+  [data-slider-dot] {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: var(--color-stroke);
+    transition: background-color 150ms ease, transform 150ms ease;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+  }
+  [data-slider-dot][data-active="true"] {
+    background: var(--color-fg);
+    transform: scale(1.2);
+  }
+  [data-slider-dot]:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-slider-track] {
+      scroll-behavior: auto;
+    }
+  }
+</style>
+
+<script>
+  type Els = {
+    root: HTMLElement;
+    track: HTMLElement;
+    slides: HTMLElement[];
+    prev: HTMLButtonElement | null;
+    next: HTMLButtonElement | null;
+    dotsRoot: HTMLElement | null;
+    live: HTMLElement | null;
+  };
+
+  const init = (root: HTMLElement) => {
+    const track = root.querySelector<HTMLElement>("[data-slider-track]");
+    if (!track) return;
+
+    const slides = Array.from(track.children).filter(
+      (n): n is HTMLElement => n instanceof HTMLElement
+    );
+    if (slides.length === 0) return;
+
+    const els: Els = {
+      root,
+      track,
+      slides,
+      prev: root.querySelector<HTMLButtonElement>("[data-slider-prev]"),
+      next: root.querySelector<HTMLButtonElement>("[data-slider-next]"),
+      dotsRoot: root.querySelector<HTMLElement>("[data-slider-dots]"),
+      live: root.querySelector<HTMLElement>("[data-slider-live]"),
+    };
+
+    // Tag each slide with role + index so screen readers can describe them.
+    slides.forEach((slide, i) => {
+      slide.setAttribute("role", "group");
+      slide.setAttribute("aria-roledescription", "slide");
+      slide.setAttribute("aria-label", `${i + 1} of ${slides.length}`);
+    });
+
+    // --- pagination dots --------------------------------------------------
+    const dots: HTMLButtonElement[] = [];
+    if (els.dotsRoot) {
+      slides.forEach((_, i) => {
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.dataset.sliderDot = "";
+        dot.dataset.active = i === 0 ? "true" : "false";
+        dot.setAttribute("role", "tab");
+        dot.setAttribute("aria-label", `Go to slide ${i + 1}`);
+        dot.setAttribute("aria-selected", i === 0 ? "true" : "false");
+        dot.addEventListener("click", () => goTo(i));
+        els.dotsRoot!.appendChild(dot);
+        dots.push(dot);
+      });
+    }
+
+    // --- current slide tracking ------------------------------------------
+    let currentIdx = 0;
+
+    const goTo = (idx: number) => {
+      const clamped = Math.max(0, Math.min(idx, slides.length - 1));
+      const slide = slides[clamped];
+      if (!slide) return;
+      // scrollIntoView on a child also scrolls the page; use offset math
+      // against the track itself so only the carousel scrolls.
+      const target = slide.offsetLeft - els.track.offsetLeft;
+      els.track.scrollTo({ left: target, behavior: "smooth" });
+    };
+
+    // Compute which slide is closest to the left edge of the track viewport.
+    const computeCurrent = () => {
+      const trackLeft = els.track.getBoundingClientRect().left;
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      slides.forEach((slide, i) => {
+        const dist = Math.abs(slide.getBoundingClientRect().left - trackLeft);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = i;
+        }
+      });
+      return bestIdx;
+    };
+
+    const update = () => {
+      const idx = computeCurrent();
+      if (idx === currentIdx) return;
+      currentIdx = idx;
+      dots.forEach((d, i) => {
+        const active = i === idx;
+        d.dataset.active = active ? "true" : "false";
+        d.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      if (els.live) els.live.textContent = `Slide ${idx + 1} of ${slides.length}`;
+      if (els.prev) els.prev.disabled = idx === 0;
+      if (els.next) els.next.disabled = idx === slides.length - 1;
+    };
+
+    // rAF-throttle scroll updates so dot/button state stays in sync
+    // without thrashing on fast swipes.
+    let rafId = 0;
+    els.track.addEventListener(
+      "scroll",
+      () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          update();
+        });
+      },
+      { passive: true }
+    );
+
+    // --- buttons + keyboard ----------------------------------------------
+    els.prev?.addEventListener("click", () => goTo(currentIdx - 1));
+    els.next?.addEventListener("click", () => goTo(currentIdx + 1));
+
+    els.track.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goTo(currentIdx + 1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goTo(currentIdx - 1);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        goTo(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        goTo(slides.length - 1);
+      }
+    });
+
+    // --- mouse drag (desktop) --------------------------------------------
+    // Touch already works via native scroll-snap; this only adds click-and-drag
+    // for mouse. Gated on the `data-draggable` attribute so it can be turned
+    // off per instance.
+    if (root.dataset.draggable === "true") {
+      let isDown = false;
+      let startX = 0;
+      let startScroll = 0;
+      let dragged = false;
+
+      els.track.addEventListener("pointerdown", (e) => {
+        // Touch keeps using native scrolling — better inertia than any JS sim.
+        if (e.pointerType !== "mouse") return;
+        isDown = true;
+        dragged = false;
+        startX = e.clientX;
+        startScroll = els.track.scrollLeft;
+        els.track.classList.add("is-dragging");
+      });
+
+      els.track.addEventListener("pointermove", (e) => {
+        if (!isDown) return;
+        const dx = e.clientX - startX;
+        // Treat as a real drag once we move past a small threshold — keeps
+        // tiny accidental movements during a click from being suppressed.
+        if (Math.abs(dx) > 4) dragged = true;
+        els.track.scrollLeft = startScroll - dx;
+      });
+
+      const endDrag = () => {
+        if (!isDown) return;
+        isDown = false;
+        els.track.classList.remove("is-dragging");
+        // Re-enabling snap mid-scroll lets the browser settle to the nearest
+        // slide with its native easing — no JS animation needed.
+      };
+
+      els.track.addEventListener("pointerup", endDrag);
+      els.track.addEventListener("pointercancel", endDrag);
+      els.track.addEventListener("pointerleave", endDrag);
+
+      // Suppress click-through on links/buttons after a real drag, so a user
+      // who drags past a card link doesn't accidentally navigate on release.
+      els.track.addEventListener(
+        "click",
+        (e) => {
+          if (dragged) {
+            e.preventDefault();
+            e.stopPropagation();
+            dragged = false;
+          }
+        },
+        true
+      );
+    }
+
+    // initial state
+    if (els.prev) els.prev.disabled = true;
+    if (els.next) els.next.disabled = slides.length <= 1;
+  };
+
+  document.querySelectorAll<HTMLElement>("[data-slider]").forEach(init);
+</script>

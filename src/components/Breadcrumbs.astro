@@ -1,0 +1,70 @@
+---
+import { Icon } from "astro-icon/components";
+
+type Crumb = { label: string; href?: string };
+
+interface Props {
+  items: Crumb[];
+  homeHref?: string;
+  homeLabel?: string;
+  ariaLabel?: string;
+  class?: string;
+}
+
+const {
+  items,
+  homeHref = "/",
+  homeLabel = "Home",
+  ariaLabel = "Breadcrumb",
+  class: className = "",
+} = Astro.props;
+
+const lastIdx = items.length - 1;
+---
+
+<nav
+  aria-label={ariaLabel}
+  class:list={[
+    "inline-flex w-fit items-center gap-1.5 border border-stroke bg-canvas px-2.5 py-1.5 text-xs text-fg-muted mb-8",
+    className,
+  ]}
+>
+  <ol class="flex items-center gap-1.5">
+    <li class="flex items-center">
+      <a
+        href={homeHref}
+        aria-label={homeLabel}
+        class="grid h-6 w-6 place-items-center text-fg-muted transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      >
+        <Icon name="lucide:house" class="h-3.5 w-3.5" aria-hidden="true" />
+      </a>
+    </li>
+
+    {
+      items.map((item, i) => {
+        const isLast = i === lastIdx;
+        return (
+          <li class="flex items-center gap-1.5">
+            <Icon
+              name="lucide:chevron-right"
+              class="h-3.5 w-3.5 text-fg-subtle"
+              aria-hidden="true"
+            />
+            {isLast || !item.href ? (
+              <span aria-current={isLast ? "page" : undefined} class="text-fg">
+                {item.label}
+              </span>
+            ) : (
+              <a
+                href={item.href}
+                class="transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                {item.label}
+              </a>
+            )}
+          </li>
+        );
+      })
+    }
+  </ol>
+</nav>

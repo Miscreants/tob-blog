@@ -1,0 +1,174 @@
+---
+// FeatureScrollSpy — a sticky-TOC + scrolling-content section.
+//
+// The TOC is data-driven (so it's predictable + accessible), but the right
+// side is a `<slot />` for full content flexibility. Each piece of content
+// must carry the same `id` as one of the `items` so the spy can match them.
+//
+// Usage:
+//   <FeatureScrollSpy
+//     tocLabel="Features"
+//     items={[
+//       { id: "workflows", label: "Real-time workflows" },
+//       { id: "lifecycle", label: "Data lifecycle" },
+//       { id: "schema",    label: "Schema-driven" },
+//     ]}
+//   >
+//     <article id="workflows">…</article>
+//     <article id="lifecycle">…</article>
+//     <article id="schema">…</article>
+//   </FeatureScrollSpy>
+//
+// As the user scrolls, the matching TOC item is highlighted via
+// `data-active="true"`. Clicking a TOC link scrolls smoothly to its panel.
+
+type Item = {
+  id: string;        // anchor target — must match an id on the slotted content
+  label: string;     // text shown in the TOC
+  eyebrow?: string;  // optional small label above (e.g. "01", "Step 1")
+};
+
+interface Props {
+  items: Item[];
+  tocLabel?: string;
+  ariaLabel?: string;
+  class?: string;
+}
+
+const {
+  items,
+  tocLabel = "On this page",
+  ariaLabel = "Section navigation",
+  class: className = "",
+} = Astro.props;
+---
+
+<section
+  data-scrollspy
+  aria-label={ariaLabel}
+  class:list={["relative", className]}
+>
+  <div class="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-8">
+
+    {/* TOC sidebar — sticky on md+, top of stack on mobile. */}
+    <aside class="md:col-span-4">
+      <div class="md:sticky md:top-24">
+        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+          {tocLabel}
+        </h3>
+        <nav aria-label={ariaLabel}>
+          <ul class="flex flex-col">
+            {items.map((item, i) => (
+              <li>
+                <a
+                  href={`#${item.id}`}
+                  data-scrollspy-link
+                  data-target={item.id}
+                  data-active={i === 0 ? "true" : "false"}
+                  class="flex items-baseline gap-3 border-l-2 border-stroke px-4 py-2 text-sm text-fg-muted transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas data-[active=true]:border-fg data-[active=true]:text-fg"
+                >
+                  {item.eyebrow && (
+                    <span class="text-xs text-fg-subtle tabular-nums shrink-0">
+                      {item.eyebrow}
+                    </span>
+                  )}
+                  <span>{item.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </aside>
+
+    {/* Content — caller-provided slot. Each top-level piece should carry
+        an `id` matching one of the TOC items above. */}
+    <div data-scrollspy-content class="md:col-span-8 flex flex-col gap-24">
+      <slot />
+    </div>
+
+  </div>
+</section>
+
+<style is:global>
+  /* `scroll-margin-top` keeps anchor jumps from sliding behind the fixed
+     <NavMorph>. Applied to any direct child of the content area that has an
+     id — i.e. the panels users put in the slot. is:global so it matches
+     children rendered by other components. */
+  [data-scrollspy-content] > [id] {
+    scroll-margin-top: 6rem;
+  }
+</style>
+
+<script>
+  const init = (root: HTMLElement) => {
+    const links = Array.from(
+      root.querySelectorAll<HTMLAnchorElement>("[data-scrollspy-link]")
+    );
+    if (links.length === 0) return;
+
+    // Resolve TOC targets to actual DOM elements once. If a target id has no
+    // matching element in the slot, we skip it silently so the component
+    // doesn't break when items and slot content drift.
+    const targets = links
+      .map((link) => {
+        const id = link.dataset.target;
+        const el = id ? document.getElementById(id) : null;
+        return el ? { link, el } : null;
+      })
+      .filter((x): x is { link: HTMLAnchorElement; el: HTMLElement } => x !== null);
+
+    if (targets.length === 0) return;
+
+    const setActive = (id: string) => {
+      links.forEach((link) => {
+        link.dataset.active = link.dataset.target === id ? "true" : "false";
+      });
+    };
+
+    // The "active band" sits in the upper third of the viewport. A panel
+    // becomes active the moment its top crosses into the band. The wide
+    // bottom margin ensures the observer fires reliably on tall panels.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Multiple panels can intersect at once during fast scrolls. Pick
+        // the one whose top is closest to the band's top edge.
+        const inBand = entries
+          .filter((e) => e.isIntersecting)
+          .map((e) => ({
+            id: (e.target as HTMLElement).id,
+            top: e.boundingClientRect.top,
+          }))
+          .sort((a, b) => Math.abs(a.top) - Math.abs(b.top));
+
+        if (inBand[0]) setActive(inBand[0].id);
+      },
+      {
+        rootMargin: "-25% 0px -65% 0px",
+        threshold: 0,
+      }
+    );
+
+    targets.forEach(({ el }) => observer.observe(el));
+
+    // Smooth-scroll on TOC click. We intercept here (rather than relying on
+    // a global `html { scroll-behavior: smooth }`) so the rest of the page's
+    // scroll behavior — buttons, browser-back, programmatic scroll — stays
+    // untouched. `scroll-margin-top` on the panels still applies.
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    targets.forEach(({ link, el }) => {
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        el.scrollIntoView({
+          behavior: reduced ? "auto" : "smooth",
+          block: "start",
+        });
+        // Reflect the anchor in the URL without an extra history entry, so
+        // shareable links work and browser-back still feels right.
+        history.replaceState(null, "", `#${el.id}`);
+      });
+    });
+  };
+
+  document.querySelectorAll<HTMLElement>("[data-scrollspy]").forEach(init);
+</script>

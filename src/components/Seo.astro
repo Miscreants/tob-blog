@@ -1,0 +1,81 @@
+---
+// Seo — centralizes per-page <head> metadata: title, description, canonical,
+// robots, favicons, Open Graph, Twitter Card, and JSON-LD structured data.
+// Rendered by Layout.astro; pages pass values through (or rely on frontmatter).
+//
+// Absolute URLs (canonical, og:url, og:image) are resolved against `Astro.site`
+// (astro.config `site`), so they're correct for whatever domain the build targets.
+// Site-wide defaults (name, default image, twitter handle) come from src/data/site.
+import { site } from "../data/site";
+
+interface Props {
+  /** Document title — also used for og:title / twitter:title. */
+  title: string;
+  /** Meta description — also used for og/twitter description. Defaults to site.description. */
+  description?: string;
+  /** og:type. "website" for pages, "article" for posts. */
+  ogType?: "website" | "article";
+  /** Social share image. Root-relative or absolute; resolved to absolute. */
+  image?: string;
+  /** When true, ask crawlers not to index this page. */
+  noindex?: boolean;
+  /** JSON-LD graph(s) to emit as application/ld+json. */
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+}
+
+const {
+  title,
+  description = site.description,
+  ogType = "website",
+  image = site.ogImage,
+  noindex = false,
+  jsonLd,
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = new URL(image, Astro.site).href;
+const schemas = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+---
+
+<title>{title}</title>
+{description && <meta name="description" content={description} />}
+<link rel="canonical" href={canonical} />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
+
+{/* Favicons — assets live in /public, all generated from favicon.svg.
+    ORDER AND ATTRIBUTES MATTER. The SVG carries its own prefers-color-scheme
+    rule, so it is the only icon that adapts to dark browser chrome — but a
+    raster <link> advertising a large explicit `sizes` will out-rank it in
+    Chrome's icon picking and you get the black mark on a dark tab strip. So:
+    the SVG is declared with `sizes="any"` and no raster competes at icon size.
+    The PNG pair is media-gated purely as a fallback for engines without SVG
+    icon support, and the .ico is last, for legacy. Swap the SVG per project
+    and regenerate the rest from it. */}
+<link rel="icon" href="/favicon.ico" sizes="32x32" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" type="image/png" media="(prefers-color-scheme: light)" href="/favicon-96.png" />
+<link rel="icon" type="image/png" media="(prefers-color-scheme: dark)" href="/favicon-96-dark.png" />
+{/* iOS composites a transparent touch icon onto black, so this one ships with
+    an opaque light background rather than the transparent mark. */}
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+{/* Open Graph */}
+<meta property="og:type" content={ogType} />
+<meta property="og:site_name" content={site.name} />
+<meta property="og:title" content={title} />
+{description && <meta property="og:description" content={description} />}
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:alt" content={title} />
+
+{/* Twitter Card */}
+<meta name="twitter:card" content="summary_large_image" />
+{site.twitter && <meta name="twitter:site" content={site.twitter} />}
+<meta name="twitter:title" content={title} />
+{description && <meta name="twitter:description" content={description} />}
+<meta name="twitter:image" content={ogImage} />
+
+{/* Structured data */}
+{schemas.map((schema) => (
+  <script type="application/ld+json" set:html={JSON.stringify(schema)} />
+))}

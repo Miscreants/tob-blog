@@ -1,0 +1,138 @@
+---
+title: Accordion
+description: Low-level disclosure primitive — full markup control, ARIA + keyboard wired by data-attribute contract.
+category: pattern
+order: 10
+sourceFile: src/components/Accordion.astro
+status: stable
+related: [AccordionFAQ, AccordionMorph]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Accordion from "@components/Accordion.astro";
+
+A behavior-only disclosure primitive. The component handles state, ARIA wiring, keyboard navigation, and height animation — and the caller provides the markup for each item via a `data-accordion="..."` contract. Use this when you need full control over how items look (rich content, icons, embedded buttons, custom typography). For plain question/answer lists, reach for `AccordionFAQ` instead.
+
+## Preview
+
+<Preview label="Three items, single-open">
+  <div class="w-full max-w-md">
+    <Accordion closePrevious={true} openByDefault={1}>
+      <div data-accordion="item" class="border-b border-stroke">
+        <button type="button" data-accordion="button" class="flex w-full justify-between py-4 text-left text-fg">
+          <span>What is Astro?</span>
+          <svg data-accordion="icon" class="h-4 w-4 shrink-0 text-fg-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div data-accordion="content">
+          <div class="pb-4 text-fg-muted">A web framework for content-driven websites — ships zero JS by default.</div>
+        </div>
+      </div>
+
+      <div data-accordion="item" class="border-b border-stroke">
+        <button type="button" data-accordion="button" class="flex w-full justify-between py-4 text-left text-fg">
+          <span>How does it compare to Next.js?</span>
+          <svg data-accordion="icon" class="h-4 w-4 shrink-0 text-fg-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div data-accordion="content">
+          <div class="pb-4 text-fg-muted">Astro ships less JavaScript by default. Next.js is better for app-like UIs.</div>
+        </div>
+      </div>
+
+      <div data-accordion="item">
+        <button type="button" data-accordion="button" class="flex w-full justify-between py-4 text-left text-fg">
+          <span>Can I use React inside Astro?</span>
+          <svg data-accordion="icon" class="h-4 w-4 shrink-0 text-fg-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div data-accordion="content">
+          <div class="pb-4 text-fg-muted">Yes — and Vue, Svelte, Solid, Preact, and Lit. Use the right tool per island.</div>
+        </div>
+      </div>
+    </Accordion>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "closePrevious", type: "boolean", default: "true", description: "Close other items when one opens (single-open mode)." },
+  { name: "closeOnSecondClick", type: "boolean", default: "true", description: "Allow closing an open item by clicking it again." },
+  { name: "openByDefault", type: "number", description: "1-based index of the item to open on page load." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Markup contract
+
+The component expects this structure inside its slot:
+
+```html
+<div data-accordion="item">
+  <button type="button" data-accordion="button">
+    Trigger text
+    <svg data-accordion="icon"></svg>    <!-- optional -->
+  </button>
+  <div data-accordion="content">
+    <div>Hidden content here</div>       <!-- single wrapper -->
+  </div>
+</div>
+```
+
+### Why `<button>` and not `<div>`
+
+`[data-accordion="button"]` **should be a native `<button>` element**. Native buttons are focusable and activatable by default, receive the correct accessible name from their visible text, and fire click on Enter and Space without extra wiring. The script applies ARIA and a roving tabindex on whatever element you provide, but it does not re-implement platform focus semantics — a `<div role="button">` works, but is fragile and fails silently for users on platforms or AT that rely on native semantics.
+
+### Content wrapper requirement
+
+The content div must have **exactly one direct child wrapper**. The grid-row animation sets `min-height: 0` on `[data-accordion="content"] > *` so it can collapse to zero; with two siblings directly inside, margins can collapse oddly mid-animation. Always wrap your content in one `<div>`.
+
+## Mechanism
+
+### Animation
+
+- Uses a **CSS grid trick** for height: `grid-template-rows` transitions from `minmax(0, 0fr)` to `minmax(0, 1fr)`.
+- No JS height calculation — the browser measures.
+- The optional `[data-accordion="icon"]` element rotates 180° when active.
+- Respects `prefers-reduced-motion: reduce` — both height and icon transitions are disabled.
+
+### ARIA & accessibility
+
+- Each button receives `role="button"`, `aria-expanded`, `aria-controls`, and a generated `id`.
+- Each content region receives `role="region"` and `aria-labelledby` pointing at its button.
+- Keyboard: ArrowUp/Down between buttons, Home/End to first/last, Enter/Space toggles.
+- Roving `tabindex` — only the focused button has `tabindex="0"`, others are `-1`.
+
+### Script initialization
+
+- `data-script-initialized` guards against double-init across Astro view transitions.
+
+## Usage
+
+```astro
+---
+import Accordion from "@components/Accordion.astro";
+---
+
+<Accordion closePrevious={true} openByDefault={1}>
+  <div data-accordion="item">
+    <button type="button" data-accordion="button" class="flex w-full justify-between py-4">
+      <span>What is Astro?</span>
+      <svg data-accordion="icon" class="h-4 w-4">...</svg>
+    </button>
+    <div data-accordion="content">
+      <div class="pb-4 text-fg-muted">A web framework for content-driven websites.</div>
+    </div>
+  </div>
+</Accordion>
+```
+
+## Notes
+
+- **Nested accordions are not supported.** The component queries all descendant `[data-accordion="item"]` elements, so an inner accordion's items leak into the outer's keyboard handler.
+- Styles use `is:global` because the data-attribute selectors need to reach into slot content.
+- For a typed, mapped API over FAQ-style data, use `AccordionFAQ`.

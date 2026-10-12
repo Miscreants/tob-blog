@@ -1,0 +1,97 @@
+---
+title: AnimatedTags
+description: Radio group of icon pills where the selected one springs open to show its label. Pure CSS, zero JS.
+category: pattern
+order: 90
+sourceFile: src/components/AnimatedTags.astro
+status: stable
+related: []
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import AnimatedTags from "@components/AnimatedTags.astro";
+
+A radio group of icon-only "tag" pills where the selected one expands with a bouncy spring to show its label, and the rest collapse back to icon-only. They use — native `<input type="radio">` for state, `:has(input:checked)` for styling, and the `grid-template-columns: 0fr → 1fr` trick for the width animation.
+
+## Preview
+
+<Preview label="Default — 'Random' selected">
+  <AnimatedTags
+    name="docs-style-1"
+    value="random"
+    ariaLabel="Choose a style"
+    items={[
+      { value: "cartoon",    label: "Cartoon",    icon: "lucide:rabbit" },
+      { value: "pixel",      label: "Pixel",      icon: "lucide:layout-grid" },
+      { value: "watercolor", label: "Watercolor", icon: "lucide:brush" },
+      { value: "random",     label: "Random",     icon: "lucide:sparkles" },
+    ]}
+  />
+</Preview>
+
+<Preview label="Two-item group">
+  <AnimatedTags
+    name="docs-style-2"
+    ariaLabel="Toggle"
+    items={[
+      { value: "on",  label: "On",  icon: "lucide:zap" },
+      { value: "off", label: "Off", icon: "lucide:moon" },
+    ]}
+  />
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "items", type: "Item[]", required: true, description: "Array of { value, label, icon? } — one per radio." },
+  { name: "name", type: "string", default: "random tags-xxxxx", description: "Form field name. Must be unique per group on the page." },
+  { name: "value", type: "string", description: "Initial selected value. Defaults to the first item's value." },
+  { name: "ariaLabel", type: "string", default: '"Select an option"', description: "Accessible name on the radiogroup wrapper." },
+  { name: "class", type: "string", description: "Extra classes on the root." },
+]} />
+
+The `Item` shape:
+
+```ts
+type Item = {
+  value: string;
+  label: string;
+  icon?: string;       // optional lucide name (e.g. "lucide:rabbit")
+};
+```
+
+## Why no JS
+
+| Concern              | React + Framer Motion       | Native + CSS                                                |
+|----------------------|-----------------------------|-------------------------------------------------------------|
+| Selection state      | `useState`                  | `<input type="radio">`                                      |
+| Keyboard nav         | Manual key handlers         | Free — arrow keys move between radios                       |
+| Form integration     | Custom serialization        | Submits as a normal radio under the configured `name`        |
+| Layout animation     | Framer Motion `layout`      | `grid-template-columns: 0fr → 1fr` + `linear()` spring       |
+
+## Mechanism
+
+### `:has()` selects the active label
+
+Every item is a `<label>` wrapping a visually-hidden `<input type="radio">` and the visible pill. Sharing a `name` makes them an exclusive group, so native arrow-key navigation works. The label's `:has(input:checked)` flips the pill's color, background, expanded label width, and `margin-inline-start` simultaneously.
+
+### Width animation via `grid-template-columns`
+
+The label-text wrapper is a 1-column grid. Animating `grid-template-columns` between `minmax(0, 0fr)` and `minmax(0, 1fr)` interpolates between "no track" and "auto-sized track" — animating to intrinsic width without measuring.
+
+`minmax(0, …)` matters: without it, `white-space: nowrap` text forces the track open even at 0fr.
+
+### The bouncy spring
+
+A `linear()` easing function with values that overshoot 1.0 — matching `visualDuration: 0.3, bounce: 0.3` from Framer Motion. `cubic-bezier()` can't express overshoots above 1.0.
+
+### No flex `gap`
+
+The icon-to-label spacing is `margin-inline-start` on the label, animated in lockstep with the width — not a flex `gap`. Flex `gap` reserves space even when one item has 0 width, leaking phantom padding next to the icon on inactive pills.
+
+## Gotchas
+
+1. **`:has()` browser support.** Chrome 105+, Safari 15.4+, Firefox 121+. Older browsers won't apply the active-state styling — every pill looks inactive. If you need wider support, a JS shim that toggles a class on `change` would do the same job.
+2. **`name` uniqueness.** Two instances with the same `name` would behave as one radio group across both. The default random `name` avoids this.
+3. **Long labels.** The pill expands to label width + padding. Very long labels can wrap the row or push siblings off-screen — cap label length or constrain the parent.

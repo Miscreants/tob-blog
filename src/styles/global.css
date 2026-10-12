@@ -1,0 +1,516 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   THEME ATTRIBUTE
+   Three modes, all keyed on a single `[data-theme="..."]` attribute that can
+   live on <html> (whole page) or on any ancestor (scoped island):
+     - light  (default — matches the @theme values below)
+     - dark   (inverse palette)
+     - brand  (brand palette; currently dark-leaning but semantically distinct)
+
+   Each mode registers its own Tailwind variant so per-mode utility overrides
+   (`dark:bg-panel`, `brand:text-intent`) don't leak across modes. No
+   prefers-color-scheme fallback by design — the theme is whatever the site
+   sets.
+   ========================================================================== */
+@custom-variant dark  (&:where([data-theme="dark"],  [data-theme="dark"]  *));
+@custom-variant brand (&:where([data-theme="brand"], [data-theme="brand"] *));
+
+/* ==========================================================================
+   THEME TOKENS
+   Variables under recognized namespaces (--color-*, --spacing-*, --font-*,
+   --container-*, etc.) auto-generate matching Tailwind utilities.
+   --container-7xl: 90rem  →  max-w-7xl is now 90rem instead of default 80rem.
+
+   Semantic color roles (canvas, panel, fg, stroke, intent, …) are what
+   components should reference. Raw neutral scale is kept for one-off cases
+   only — prefer the semantic roles so dark mode "just works".
+   ========================================================================== */
+@theme {
+  /* ---------- Typography ---------- */
+  /* Family names must match what @fontsource-variable/* registers (they all end
+     in " Variable") and each family must be imported in Layout.astro, or the
+     stack silently falls through to the system fallback. */
+  --font-sans:
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-heading:
+    "Archivo Variable", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono:
+    "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --container-7xl: 90rem;
+
+  /* Page-edge breathing room. Auto-generates `px-site-margin`, `mx-site-margin`
+     (and `-mx-site-margin` to bleed past it). Used by `container-page` so the
+     centered page box never touches the viewport on small screens — this
+     replaces the gutter columns the old `section-grid-outside` grid provided. */
+  --spacing-site-margin: clamp(1rem, 1vw, 2rem);
+
+  /* Fluid-type anchor points (unitless rem values).
+     Type interpolates linearly from MIN at 20rem → MAX at 90rem of the
+     nearest query container. Keep unitless so the math works in calc(). */
+  --container-min: 20;
+  --container-max: 90;
+
+  /* ---------- Neutral scale (light) ---------- */
+  --color-neutral-50: #f9f9f9;
+  --color-neutral-100: #f9f9f9;
+  --color-neutral-200: #f3f3f3;
+  --color-neutral-300: #f1f1f1;
+  --color-neutral-400: #ebebeb;
+  --color-neutral-500: #e8e8e8;
+  --color-neutral-600: #e5e5e5;
+  --color-neutral-700: #dfdfdf;
+  --color-neutral-800: #dddddd;
+  --color-neutral-900: #d7d7d7;
+  --color-neutral-950: #d7d7d7;
+
+  /* ---------- Semantic roles — LIGHT defaults ----------
+     Override these in [data-theme="dark"] below. Components should read
+     from these (bg-canvas, text-fg, border-stroke, …) rather than raw
+     neutrals — dark mode then "just works" via the cascade.
+     ------------------------------------------------------ */
+
+  /* Backgrounds */
+  --color-canvas: #f3f3f3;             /* whole-page bg */
+  --color-panel: #f9f9f9;              /* cards, popovers, elevated panels */
+  --color-panel-muted: #ebebeb;        /* subtle surfaces + hover states */
+
+  /* Foreground (text) */
+  --color-fg: #0a0a0a;                 /* default text */
+  --color-fg-muted: #525252;           /* captions, labels, secondary copy */
+  --color-fg-subtle: #8a8a8a;          /* placeholders, disabled */
+  --color-fg-on-intent: #ffffff;       /* text on intent-colored surfaces */
+
+  /* Intent (brand / primary action) */
+  --color-intent: #0a0a0a;             /* primary action color */
+  --color-intent-hover: #1a1a1a;       /* hover state for intent */
+
+  /* Borders */
+  --color-stroke: #d7d7d7;             /* default border */
+  --color-stroke-strong: #bdbdbd;      /* emphasized borders, dividers */
+
+  /* Focus */
+  --color-focus: #0a0a0a;              /* focus ring color */
+
+  /* Status — the only permitted accent hues.
+     `warning` deliberately carries one value across every theme (like the
+     amber it replaces did); add per-theme overrides at design intake if the
+     brand needs them. */
+  --color-error: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+
+  /* ---------- Radius ----------
+     Standard scale (xs–2xl) comes from Tailwind v4 defaults. Add semantic
+     handles for common shapes used in the design.
+     ----------------------------- */
+  --radius-card: 0.875rem;               /* dropdown panels, cards */
+  --radius-pill: 9999px;                 /* nav bar, pill buttons */
+
+  /* ---------- Shadows ----------
+     Layered popover shadow used by dropdowns and floating panels. Header
+     shadow appears only when the nav bar is scrolled. Both flip per theme.
+     ------------------------------ */
+  --shadow-popover:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 12px 24px -8px rgb(0 0 0 / 0.08),
+    0 24px 48px -12px rgb(0 0 0 / 0.12);
+  --shadow-header:
+    0 8px 10px -10px rgb(0 0 0 / 0.2);
+
+  /* ---------- Theme-aware decorative tokens ----------
+     Used by section-pattern. Override per theme so that utility
+     doesn't need to be rewritten in dark contexts.
+     -------------------------------------------------- */
+  --pattern-stripe: rgb(0 0 0 / 0.08);
+
+  /* ---------- Motion: durations, easings, timing partials ----------
+     Durations auto-generate `duration-*` utilities.
+     Easings are plain CSS vars (use via `var(--cubic-default)` or as
+     custom timing-function values).
+     Timing partials are pre-composed duration+easing pairs meant to be
+     concatenated with a keyframe name at the call site, e.g.
+       animation: fade-in var(--timing-default-half);
+       transition: opacity var(--timing-default-half);
+     Kept out of the --animation-* namespace because they are partial
+     shorthands (no name) and Tailwind would otherwise generate
+     inert animate-* utilities from them.
+     ------------------------------------------------------ */
+
+  /* Easings — declare first so the partials below resolve cleanly. */
+  --cubic-default: cubic-bezier(0.625, 0.05, 0, 1);
+  --cubic-bounce:  linear(0, 0.5737 7.6%, 0.8382 11.87%, 0.9463 14.19%, 1.0292 16.54%, 1.0886 18.97%, 1.1258 21.53%, 1.137 22.97%, 1.1424 24.48%, 1.1423 26.1%, 1.1366 27.86%, 1.1165 31.01%, 1.0507 38.62%, 1.0219 42.57%, 0.9995 46.99%, 0.9872 51.63%, 0.9842 58.77%, 1.0011 81.26%, 1);
+  --hover-effect:  cubic-bezier(0.175, 0.885, 0.32, 1.1);
+
+  /* Durations (→ generates duration-default-* utilities) */
+  --duration-default-quarter: 0.2s;
+  --duration-default-half:    0.4s;
+  --duration-default:         0.8s;
+  --duration-default-onehalf: 1.2s;
+  --duration-default-double:  1.6s;
+
+  /* Default timing partials (duration + --cubic-default) */
+  --timing-default-quarter: var(--duration-default-quarter) var(--cubic-default);
+  --timing-default-half:    var(--duration-default-half)    var(--cubic-default);
+  --timing-default:         var(--duration-default)         var(--cubic-default);
+  --timing-default-onehalf: var(--duration-default-onehalf) var(--cubic-default);
+  --timing-default-double:  var(--duration-default-double)  var(--cubic-default);
+
+  /* Hover timing partials (duration + --hover-effect) */
+  --timing-hover-half:    var(--duration-default-half)    var(--hover-effect);
+  --timing-hover-default: var(--duration-default)         var(--hover-effect);
+  --timing-hover-onehalf: var(--duration-default-onehalf) var(--hover-effect);
+  --timing-hover-double:  var(--duration-default-double)  var(--hover-effect);
+}
+
+/* ==========================================================================
+   THEME OVERRIDES
+   Redefining the semantic tokens inside these scopes cascades to every
+   descendant automatically — no per-element dark utilities needed.
+   [data-theme="light"] repeats the defaults so a light island inside a
+   dark ancestor forces itself back to light.
+   ========================================================================== */
+[data-theme="light"],
+[data-theme="dark"],
+[data-theme="brand"] {
+  color: var(--color-fg);
+  background-color: var(--color-canvas);
+}
+
+[data-theme="light"] {
+  --color-canvas: #f3f3f3;
+  --color-panel: #f9f9f9;
+  --color-panel-muted: #ebebeb;
+  --color-fg: #0a0a0a;
+  --color-fg-muted: #525252;
+  --color-fg-subtle: #8a8a8a;
+  --color-fg-on-intent: #ffffff;
+  --color-intent: #0a0a0a;
+  --color-intent-hover: #1a1a1a;
+  --color-stroke: #d7d7d7;
+  --color-stroke-strong: #bdbdbd;
+  --color-focus: #0a0a0a;
+  --color-error: #841B20;
+  --color-success: #4C6649;
+  --pattern-stripe: rgb(0 0 0 / 0.08);
+  --shadow-popover:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 12px 24px -8px rgb(0 0 0 / 0.08),
+    0 24px 48px -12px rgb(0 0 0 / 0.12);
+  --shadow-header: 0 8px 10px -10px rgb(0 0 0 / 0.2);
+}
+
+[data-theme="dark"] {
+  --color-canvas: #0a0a0a;
+  --color-panel: #141414;
+  --color-panel-muted: #1f1f1f;
+  --color-fg: #f5f5f5;
+  --color-fg-muted: #a3a3a3;
+  --color-fg-subtle: #6b6b6b;
+  --color-fg-on-intent: #0a0a0a;
+  --color-intent: #f5f5f5;
+  --color-intent-hover: #e5e5e5;
+  --color-stroke: #2a2a2a;
+  --color-stroke-strong: #3d3d3d;
+  --color-focus: #f5f5f5;
+  --color-error: #841B20;
+  --color-success: #4C6649;
+  --pattern-stripe: rgb(255 255 255 / 0.1);
+  --shadow-popover:
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 12px 24px -8px rgb(0 0 0 / 0.5),
+    0 24px 48px -12px rgb(0 0 0 / 0.6);
+  --shadow-header: 0 8px 10px -10px rgb(0 0 0 / 0.8);
+
+  color-scheme: dark;
+}
+
+[data-theme="brand"] {
+  --color-canvas: #0a0a0a;
+  --color-panel: #141414;
+  --color-panel-muted: #1f1f1f;
+  --color-fg: #f5f5f5;
+  --color-fg-muted: #a3a3a3;
+  --color-fg-subtle: #6b6b6b;
+  --color-fg-on-intent: #0a0a0a;
+  --color-intent: #f5f5f5;
+  --color-intent-hover: #e5e5e5;
+  --color-stroke: #2a2a2a;
+  --color-stroke-strong: #3d3d3d;
+  --color-focus: #f5f5f5;
+  --color-error: #841B20;
+  --color-success: #4C6649;
+  --pattern-stripe: rgb(255 255 255 / 0.1);
+  --shadow-popover:
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 12px 24px -8px rgb(0 0 0 / 0.5),
+    0 24px 48px -12px rgb(0 0 0 / 0.6);
+  --shadow-header: 0 8px 10px -10px rgb(0 0 0 / 0.8);
+
+  /* `color-scheme` only accepts normal | light | dark | light dark.
+     Brand is dark-leaning, so UA controls and scrollbars should use dark. */
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   BASE
+   Make <body> a query container so every descendant has a valid ancestor to
+   resolve `cqi` units against. Fluid type below works anywhere in the tree
+   without wrapping content in an explicit container.
+   ========================================================================== */
+@layer base {
+  body {
+    @apply bg-canvas text-fg min-h-screen;
+  }
+  body > main {
+    flex: 1 0 auto;
+  }
+  html {
+    scrollbar-gutter: stable;
+    /* Offset anchor-link scrolls so targets land below the fixed nav. */
+    scroll-padding-top: 6rem;
+  }
+  /* Project rule: every interactive control gets the pointer cursor. Tailwind v4
+     ships `cursor: default` on `<button>` by default, which feels inert. We
+     restore `pointer` for buttons, links, role=button/menuitem, and summary —
+     except when explicitly disabled. */
+  :where(
+    a[href],
+    button:not(:disabled),
+    [role="button"]:not([aria-disabled="true"]),
+    [role="menuitem"]:not([aria-disabled="true"]),
+    summary
+  ) {
+    cursor: pointer;
+  }
+  :where(button:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed;
+  }
+}
+
+/* ==========================================================================
+   FLUID TYPOGRAPHY
+   Each heading and body size is an independent clamp() so the design
+   system can tune them individually. The formula is linear interpolation
+   between two rem anchors driven by `cqi` (1cqi = 1% of the nearest query
+   container's inline size).
+
+   For anchors (20rem → MIN) and (90rem → MAX):
+     slope      = (MAX - MIN) / 70
+     intercept  = MIN - slope * 20
+     font-size  = clamp(MIN, intercept*1rem + slope*100cqi, MAX)
+
+   Values below are pre-computed for readability. To retune a size, change
+   its MIN/MAX and recompute intercept + slope*100.
+   ========================================================================== */
+
+/* ----- H1: 2.75rem → 5.25rem  (44 → 84px) ----- */
+@utility h1 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  font-size: clamp(2.75rem, 2.0357rem + 3.5714cqi, 5.25rem);
+  text-wrap: balance;
+}
+
+/* ----- H2: 2rem → 3.5rem  (32 → 56px) ----- */
+@utility h2 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-size: clamp(2rem, 1.5714rem + 2.1429cqi, 3.5rem);
+  text-wrap: balance;
+}
+
+/* ----- H3: 1.5rem → 2.25rem  (24 → 36px) ----- */
+@utility h3 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-size: clamp(1.5rem, 1.2857rem + 1.0714cqi, 2.25rem);
+  text-wrap: balance;
+}
+
+/* ----- H4: 1.25rem → 1.75rem  (20 → 28px) ----- */
+@utility h4 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  font-size: clamp(1.25rem, 1.1071rem + 0.7143cqi, 1.75rem);
+}
+
+/* ----- H5: 1.125rem → 1.375rem  (18 → 22px) ----- */
+@utility h5 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  line-height: 1.3;
+  font-size: clamp(1.125rem, 1.0536rem + 0.3571cqi, 1.375rem);
+}
+
+/* ----- H6: 1rem → 1.125rem  (16 → 18px) ----- */
+@utility h6 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  line-height: 1.4;
+  font-size: clamp(1rem, 0.9643rem + 0.1786cqi, 1.125rem);
+}
+
+/* ----- Body XL: 1rem → 1.25rem  (16 → 20px) — hero subhead, lead paragraphs ----- */
+@utility text-body-xl {
+  font-size: clamp(1rem, 0.9286rem + 0.3571cqi, 1.25rem);
+  line-height: 1.55;
+}
+
+/* ----- Body LG: 0.9375rem → 1.125rem  (15 → 18px) — default body ----- */
+@utility text-body-lg {
+  font-size: clamp(0.9375rem, 0.8839rem + 0.2679cqi, 1.125rem);
+  line-height: 1.55;
+}
+
+/* ----- Body MD: 0.875rem → 1rem  (14 → 16px) — secondary body, cards ----- */
+@utility text-body-md {
+  font-size: clamp(0.875rem, 0.8393rem + 0.1786cqi, 1rem);
+  line-height: 1.5;
+}
+
+/* ----- Body SM: 0.8125rem → 0.9375rem  (13 → 15px) — captions, labels ----- */
+@utility text-body-sm {
+  font-size: clamp(0.8125rem, 0.7768rem + 0.1786cqi, 0.9375rem);
+  line-height: 1.5;
+}
+
+@utility text-body-xsm {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+
+/* ----- Re-anchor fluid type to a smaller context (cards, sidebars, modals).
+         Drop `cq` onto any element and its descendants' `cqi`-based sizes
+         will resolve against THIS element instead of <body>. ----- */
+@utility cq {
+  container-type: inline-size;
+}
+
+/* ==========================================================================
+   COMPONENTS
+   Reusable class shortcuts. @apply expands Tailwind utilities into real CSS.
+   ========================================================================== */
+/*
+ * Page container — centered, capped at --container-7xl. Pure horizontal
+ * containment, no padding. Pair with .section-gutter on the parent
+ * <section> to keep the box off the screen edges.
+ */
+@utility container-large {
+  @apply mx-auto w-full max-w-7xl;
+  container-type: inline-size;
+}
+
+/*
+ * Section gutter — horizontal breathing room between the container box
+ * and the viewport edge. Lives on the <section>, not the container, so
+ * the container itself can be a clean centered cap and the gutter can
+ * vary per section if needed.
+ */
+@utility section-gutter {
+  @apply px-4 md:px-12 lg:px-24;
+}
+
+/*
+ * Diagonal-stripes background. Pair with a child that has its own
+ * background (e.g. .container-large with bg-canvas) — the child knocks
+ * out the middle and the pattern only shows in the gutter columns.
+ * Stripe color resolves from --pattern-stripe, which flips per theme.
+ */
+@utility section-pattern {
+  background-image: repeating-linear-gradient(
+    315deg,
+    var(--pattern-stripe) 0,
+    var(--pattern-stripe) 1px,
+    transparent 0,
+    transparent 50%
+  );
+  background-size: 5px 5px;
+}
+
+@utility section-pattern-horizontal {
+  background-image: repeating-linear-gradient(
+    315deg,
+    var(--pattern-stripe) 0,
+    var(--pattern-stripe) 1px,
+    transparent 0,
+    transparent 50%
+  );
+  background-size: 5px 5px;
+}
+
+/* Vertical rhythm only — horizontal padding is owned by .container-large.
+   One scale, three shapes (py / pt / pb) — keep the three blocks in sync.
+   Mobile → md, in px:  xs 32→40 · sm 48→64 · md 64→96 · lg 96→128 · xl 128→192 */
+@utility section-padding-xs { @apply py-8 md:py-10; }
+@utility section-padding-sm { @apply py-12 md:py-16; }
+@utility section-padding-md { @apply py-16 md:py-24; }
+@utility section-padding    { @apply section-padding-md; }  /* alias — prefer -md */
+@utility section-padding-lg { @apply py-24 md:py-32; }
+@utility section-padding-xl { @apply py-32 md:py-48; }
+
+@utility section-pt-xs { @apply pt-8 md:pt-10; }
+@utility section-pt-sm { @apply pt-12 md:pt-16; }
+@utility section-pt-md { @apply pt-16 md:pt-24; }
+@utility section-pt-lg { @apply pt-24 md:pt-32; }
+@utility section-pt-xl { @apply pt-32 md:pt-48; }
+
+@utility section-pb-xs { @apply pb-8 md:pb-10; }
+@utility section-pb-sm { @apply pb-12 md:pb-16; }
+@utility section-pb-md { @apply pb-16 md:pb-24; }
+@utility section-pb-lg { @apply pb-24 md:pb-32; }
+@utility section-pb-xl { @apply pb-32 md:pb-48; }
+/* DISABLED — the 5-column "pattern on the sides" grid. Kept for reference but
+   no longer applied anywhere; sections/nav/footer now center via `container-page`
+   instead. The middle column was the 90rem content area; columns 2 & 4 were the
+   1rem/2.5rem gutters that hosted the decorative `section-pattern` stripes.
+@utility section-grid-outside {
+  @apply grid grid-cols-[1fr_1rem_minmax(0,90rem)_1rem_1fr] md:grid-cols-[1fr_2.5rem_minmax(0,90rem)_2.5rem_1fr];
+}
+*/
+
+
+@utility card-action {
+  position: relative;
+  z-index: 2;
+}
+
+/* The page box: a centered 90rem content cap with `site-margin` edge padding.
+   Every top-level boxed element (SectionMain, Nav, Footer) uses this so they
+   line up with each other. Replaces the old `section-grid-outside` centering. */
+@utility container-page {
+  @apply mx-auto w-full max-w-[90rem] px-site-margin;
+}
+
+@utility animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Reduced-motion users: stop the scroll entirely. The logos remain visible
+   in their starting position — the duplicate second slot simply sits
+   offscreen behind overflow-hidden, so no visual artifact. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}
+
+::before,
+::after {
+  box-sizing: border-box;
+}

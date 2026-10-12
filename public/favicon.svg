@@ -1,0 +1,18 @@
+<svg width="68" height="68" viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Miscreants circled-M mark. Paths are the official favicon artwork,
+         verbatim. favicon.png and favicon.ico are rasterised from this file, so
+         this is the single source for the icon — replace it per project and
+         regenerate the other two rather than editing them separately.
+         The fills are driven by the style block below instead of the source's
+         hardcoded fill="black", so the mark stays legible on dark browser
+         chrome. Drop the <style> and restore fill="black" if a project wants it
+         pure black in every context. -->
+    <path d="M33.7949 67.5923C15.1609 67.5923 0 52.4314 0 33.7949C0 15.1584 15.1609 0 33.7949 0C52.4289 0 67.5898 15.1609 67.5898 33.7949C67.5898 52.4289 52.4289 67.5923 33.7949 67.5923ZM33.7949 6.70775C18.86 6.70775 6.70527 18.86 6.70527 33.7974C6.70527 48.7348 18.8575 60.8871 33.7949 60.8871C48.7322 60.8871 60.8846 48.7348 60.8846 33.7974C60.8846 18.86 48.7322 6.70775 33.7949 6.70775Z"/>
+    <path d="M44.8619 47.4915V28.8098L36.1149 47.4915H31.3962L22.6492 28.963V47.4915H17.0088V20.103H24.1435L33.8874 40.8943L43.5937 20.103H50.5751V47.4915H44.8594H44.8619Z"/>
+    <style>
+        path { fill: #0a0a0a; }
+        @media (prefers-color-scheme: dark) {
+            path { fill: #f5f5f5; }
+        }
+    </style>
+</svg>

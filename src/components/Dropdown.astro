@@ -1,0 +1,386 @@
+---
+// Dropdown — accessible popover-based dropdown with three modes:
+//   - "menu"        Action menu (links/buttons). role=menu / menuitem.
+//   - "select"      Single-choice picker with native <input type="radio">.
+//   - "multiselect" Multi-choice picker with native <input type="checkbox">.
+//
+// Built on the native Popover API: light-dismiss, Escape, and top-layer
+// rendering (no clipping inside overflow:hidden) come for free. Positioning
+// is handled in JS so it works in browsers that don't yet ship CSS Anchor
+// Positioning; a `@supports` block opts into anchor positioning where
+// available.
+//
+// Markup contract (inside the default slot):
+//   <button data-dropdown="trigger">
+//     <span data-dropdown="label">…</span>      // optional, replaced on selection
+//     <svg data-dropdown="arrow">…</svg>         // optional, rotates when open
+//   </button>
+//   <div data-dropdown="list">
+//     <label data-dropdown="item">              // <button>/<a> for menu mode
+//       <input type="radio|checkbox" … />        // for select / multiselect
+//       Label text
+//     </label>
+//   </div>
+
+interface Props {
+  /** Stable ID. Auto-generated if omitted. */
+  id?: string;
+  /** Behavior + ARIA pattern. */
+  mode?: "menu" | "select" | "multiselect";
+  /** Horizontal alignment of the popover relative to the trigger. */
+  align?: "start" | "end";
+  /** Close popover after a selection. Default: true for menu/select, false for multiselect. */
+  closeOnSelect?: boolean;
+  /** Don't update the trigger label from selection. Default: true for menu, false otherwise. */
+  staticLabel?: boolean;
+  /** Multiselect label format: "count" → "Filter (3)"; "list" → "News, Updates". */
+  multiselectFormat?: "count" | "list";
+  /** Match width of the trigger as a min-width. Default true. */
+  matchTriggerWidth?: boolean;
+  class?: string;
+}
+
+const {
+  id,
+  mode = "menu",
+  align = "start",
+  closeOnSelect,
+  staticLabel,
+  multiselectFormat = "count",
+  matchTriggerWidth = true,
+  class: className,
+} = Astro.props;
+
+// SSR-stable enough for popover-target wiring. Collisions are vanishingly
+// unlikely and the script also re-derives a unique ID if one is missing.
+const componentId = id ?? `dd-${Math.random().toString(36).slice(2, 10)}`;
+---
+
+<div
+  id={componentId}
+  data-dropdown="component"
+  data-dropdown-mode={mode}
+  data-dropdown-align={align}
+  data-dropdown-close-on-select={closeOnSelect === undefined ? undefined : String(closeOnSelect)}
+  data-dropdown-static-label={staticLabel ? "true" : undefined}
+  data-dropdown-multiselect-format={multiselectFormat}
+  data-dropdown-match-trigger-width={matchTriggerWidth ? undefined : "false"}
+  data-dropdown-open="false"
+  class:list={["dropdown", className]}
+>
+  <slot />
+</div>
+
+<style is:global>
+  /* ----- Wrapper ----- */
+  [data-dropdown="component"] {
+    position: relative;
+    display: inline-block;
+  }
+
+  /* ----- Arrow rotation (CSS-only state hook) ----- */
+  [data-dropdown="arrow"] {
+    transition: transform 0.2s var(--cubic-default, ease);
+  }
+  [data-dropdown-open="true"] [data-dropdown="arrow"] {
+    transform: rotate(180deg);
+  }
+
+  /* ----- Popover ----- */
+  [data-dropdown="list"][popover] {
+    /* Reset UA popover defaults so it sits below the trigger, not center-screen. */
+    margin: 0;
+    padding: 0;
+    inset: auto;
+    border: 1px solid var(--color-stroke);
+    background: var(--color-panel);
+    color: var(--color-fg);
+    
+    box-shadow: var(--shadow-popover);
+    overflow: auto;
+    max-height: min(60vh, 24rem);
+
+    /* Animation in/out (display: discrete + opacity transitions). */
+    opacity: 0;
+    transform: translateY(-4px);
+    transition:
+      opacity 150ms ease,
+      transform 150ms ease,
+      overlay 150ms allow-discrete,
+      display 150ms allow-discrete;
+  }
+
+  [data-dropdown="list"][popover]:popover-open {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @starting-style {
+    [data-dropdown="list"][popover]:popover-open {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  /* ----- Item base styles (consumers can fully override via .class) ----- */
+  [data-dropdown="item"] {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  [data-dropdown="item"]:hover,
+  [data-dropdown="item"]:focus-within,
+  [data-dropdown="item"][role="menuitem"]:focus-visible {
+    background: var(--color-panel-muted);
+    outline: none;
+  }
+  [data-dropdown="item"][aria-disabled="true"],
+  [data-dropdown="item"]:has(:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Positioning is handled in JS — see the script below. CSS Anchor
+     Positioning is intentionally not used because each instance would need
+     a unique `anchor-name`, which complicates the markup contract. The JS
+     positioner is small, viewport-clamped, and works in every browser
+     that ships the Popover API. */
+</style>
+
+<script>
+  type Mode = "menu" | "select" | "multiselect";
+
+  const isInteractive = (el: Element | null) =>
+    !!el &&
+    !el.matches('[disabled], [aria-disabled="true"]') &&
+    !el.closest('[disabled], [aria-disabled="true"]');
+
+  const initOne = (root: HTMLElement) => {
+    if (root.dataset.scriptInitialized) return;
+    root.dataset.scriptInitialized = "true";
+
+    const trigger = root.querySelector<HTMLElement>('[data-dropdown="trigger"]');
+    const list = root.querySelector<HTMLElement>('[data-dropdown="list"]');
+    if (!trigger || !list) {
+      console.warn("Dropdown: missing [data-dropdown=trigger] or [data-dropdown=list] in:", root);
+      return;
+    }
+
+    const mode = (root.getAttribute("data-dropdown-mode") || "menu") as Mode;
+    const align = root.getAttribute("data-dropdown-align") || "start";
+    const matchTriggerWidth = root.getAttribute("data-dropdown-match-trigger-width") !== "false";
+    const closeOnSelectAttr = root.getAttribute("data-dropdown-close-on-select");
+    const closeOnSelect =
+      closeOnSelectAttr === "true" ? true :
+      closeOnSelectAttr === "false" ? false :
+      mode !== "multiselect"; // default: close for menu/select, stay open for multiselect
+    const staticLabel = root.getAttribute("data-dropdown-static-label") === "true" || mode === "menu";
+    const multiselectFormat = root.getAttribute("data-dropdown-multiselect-format") || "count";
+
+    // ---- Wire popover API + ARIA ----
+    const componentId = root.id || `dd-${Math.random().toString(36).slice(2, 10)}`;
+    if (!root.id) root.id = componentId;
+
+    const popoverId = `${componentId}-popover`;
+    const triggerId = `${componentId}-trigger`;
+
+    list.setAttribute("popover", "");
+    list.id = popoverId;
+    if (!trigger.id) trigger.id = triggerId;
+
+    trigger.setAttribute("popovertarget", popoverId);
+    trigger.setAttribute("aria-controls", popoverId);
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.setAttribute("aria-haspopup", mode === "menu" ? "menu" : "listbox");
+
+    if (mode === "menu") {
+      list.setAttribute("role", "menu");
+      list.setAttribute("aria-labelledby", trigger.id);
+    } else if (mode === "select") {
+      list.setAttribute("role", "radiogroup");
+      list.setAttribute("aria-labelledby", trigger.id);
+    } else {
+      list.setAttribute("role", "group");
+      list.setAttribute("aria-labelledby", trigger.id);
+    }
+
+    const items = () =>
+      Array.from(list.querySelectorAll<HTMLElement>('[data-dropdown="item"]')).filter(isInteractive);
+
+    if (mode === "menu") {
+      items().forEach((item) => {
+        item.setAttribute("role", "menuitem");
+        if (!item.hasAttribute("tabindex")) item.setAttribute("tabindex", "-1");
+      });
+    }
+
+    // ---- Position the popover ----
+    const reposition = () => {
+      if (!list.matches(":popover-open")) return;
+      const trgRect = trigger.getBoundingClientRect();
+      const listRect = list.getBoundingClientRect();
+      const margin = 4;
+
+      // Vertical: prefer below, flip above when no room.
+      const spaceBelow = window.innerHeight - trgRect.bottom;
+      const flipUp = spaceBelow < listRect.height + margin && trgRect.top > listRect.height + margin;
+      const top = flipUp ? trgRect.top - listRect.height - margin : trgRect.bottom + margin;
+
+      // Horizontal: align start or end.
+      let left = align === "end" ? trgRect.right - listRect.width : trgRect.left;
+      // Clamp into viewport.
+      left = Math.max(8, Math.min(left, window.innerWidth - listRect.width - 8));
+
+      // CSS already sets `inset: auto` and `margin: 0` on [popover]; we only
+      // need to write top/left. Setting `inset: auto` here would overwrite
+      // top/left because it's a shorthand for all four sides.
+      list.style.position = "fixed";
+      list.style.top = `${top}px`;
+      list.style.left = `${left}px`;
+
+      if (matchTriggerWidth) {
+        list.style.minWidth = `${trgRect.width}px`;
+      }
+    };
+
+    let scrollListener: (() => void) | null = null;
+
+    // ---- Toggle handler ----
+    list.addEventListener("toggle", (e) => {
+      const open = (e as ToggleEvent).newState === "open";
+      trigger.setAttribute("aria-expanded", String(open));
+      root.setAttribute("data-dropdown-open", String(open));
+
+      if (open) {
+        reposition();
+        scrollListener = () => reposition();
+        window.addEventListener("scroll", scrollListener, { passive: true, capture: true });
+        window.addEventListener("resize", scrollListener);
+
+        // Move focus into the popover for menu mode (matches WAI-ARIA menu pattern).
+        if (mode === "menu") {
+          const all = items();
+          if (all[0]) requestAnimationFrame(() => all[0].focus());
+        }
+      } else {
+        if (scrollListener) {
+          window.removeEventListener("scroll", scrollListener, { capture: true } as any);
+          window.removeEventListener("resize", scrollListener);
+          scrollListener = null;
+        }
+      }
+    });
+
+    // ---- Trigger keyboard: ArrowDown/Up open + focus ----
+    trigger.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault();
+      if (!list.matches(":popover-open")) list.showPopover();
+      const all = items();
+      if (!all.length) return;
+      const target = e.key === "ArrowDown" ? all[0] : all[all.length - 1];
+      requestAnimationFrame(() => target.focus());
+    });
+
+    // ---- Menu mode: arrow nav + Tab to close ----
+    if (mode === "menu") {
+      list.addEventListener("keydown", (e) => {
+        const all = items();
+        const i = all.indexOf(document.activeElement as HTMLElement);
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          all[(i + 1) % all.length]?.focus();
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          all[(i - 1 + all.length) % all.length]?.focus();
+        } else if (e.key === "Home") {
+          e.preventDefault();
+          all[0]?.focus();
+        } else if (e.key === "End") {
+          e.preventDefault();
+          all[all.length - 1]?.focus();
+        } else if (e.key === "Tab") {
+          // Tab leaves the menu — close and let focus continue naturally.
+          list.hidePopover();
+        }
+      });
+
+      // Close after activating a menu item (links navigate, buttons fire actions).
+      if (closeOnSelect) {
+        list.addEventListener("click", (e) => {
+          const item = (e.target as HTMLElement).closest('[data-dropdown="item"]');
+          if (item && isInteractive(item)) {
+            list.hidePopover();
+          }
+        });
+      }
+    }
+
+    // ---- Select / multiselect: react to native input changes ----
+    const labelEl = trigger.querySelector<HTMLElement>('[data-dropdown="label"]');
+    const initialLabel = labelEl?.textContent ?? "";
+
+    const optionLabel = (input: HTMLInputElement) => {
+      const item = input.closest<HTMLElement>('[data-dropdown="item"]');
+      if (!item) return input.value;
+      const labeled = item.querySelector<HTMLElement>('[data-dropdown="item-label"]');
+      if (labeled) return labeled.textContent?.trim() ?? input.value;
+      // Fallback: text content minus the input.
+      const clone = item.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll("input").forEach((i) => i.remove());
+      return clone.textContent?.trim() || input.value;
+    };
+
+    if (mode === "select" || mode === "multiselect") {
+      const updateLabel = () => {
+        if (!labelEl || staticLabel) return;
+        if (mode === "select") {
+          const checked = list.querySelector<HTMLInputElement>('input[type="radio"]:checked');
+          labelEl.textContent = checked ? optionLabel(checked) : initialLabel;
+        } else {
+          const checked = Array.from(list.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked'));
+          if (!checked.length) {
+            labelEl.textContent = initialLabel;
+          } else if (multiselectFormat === "list") {
+            labelEl.textContent = checked.map(optionLabel).join(", ");
+          } else {
+            labelEl.textContent = `${initialLabel} (${checked.length})`;
+          }
+        }
+      };
+
+      // Reflect any pre-checked initial state.
+      updateLabel();
+
+      list.addEventListener("change", (e) => {
+        const target = e.target as HTMLInputElement;
+        if (!target.matches('input[type="radio"], input[type="checkbox"]')) return;
+        updateLabel();
+        if (closeOnSelect && mode === "select" && target.type === "radio") {
+          list.hidePopover();
+          trigger.focus();
+        }
+      });
+    }
+
+    // ---- Multiselect: close when focus leaves the popover entirely ----
+    if (mode === "multiselect") {
+      list.addEventListener("focusout", (e) => {
+        const next = (e as FocusEvent).relatedTarget as Node | null;
+        if (!next) return; // Focus going to nothing — leave popover state to native API.
+        if (!list.contains(next) && next !== trigger) {
+          list.hidePopover();
+        }
+      });
+    }
+  };
+
+  const initAll = () =>
+    document.querySelectorAll<HTMLElement>('[data-dropdown="component"]').forEach(initOne);
+
+  initAll();
+  document.addEventListener("astro:page-load", initAll);
+</script>

@@ -1,0 +1,198 @@
+---
+title: FilterBar
+description: Reusable, content-agnostic category filter with optional search. AND-combines both, syncs to the URL, and works on any list of items via data-* attributes.
+category: pattern
+order: 75
+sourceFile: src/components/FilterBar.astro
+status: stable
+related: []
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import FilterBar from "@components/FilterBar.astro";
+
+A reusable filter bar that drives category buttons + an optional search input. It is **content-agnostic**: it does not own the items it filters. Instead, items elsewhere in the DOM opt in via `data-filter-group` / `data-filter-value` (and an optional `data-search` haystack), and the bar shows/hides them. Category and search are AND-combined, and both are synced to the URL (`?filter-<group>=…&q-<group>=…`) so links and refreshes preserve state.
+
+This is a good fit for blog/news lists, resource libraries, integration directories, case-study grids — anywhere a static or CMS-rendered list needs lightweight client-side filtering with no framework.
+
+## Preview
+
+<Preview label="Category filter — mocked blog post list" align="stretch">
+  <div class="w-full flex flex-col gap-6">
+    <FilterBar
+      group="docs-blog"
+      options={[
+        { value: "Blog",     label: "Blog",     count: 3 },
+        { value: "Tutorial", label: "Tutorial", count: 2 },
+        { value: "Release",  label: "Release",  count: 1 },
+      ]}
+    />
+    <ul class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <li data-filter-group="docs-blog" data-filter-value="Blog" data-search="welcome to the blog astro" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Blog</span>
+        <p class="mt-1 text-sm">Welcome to the blog</p>
+      </li>
+      <li data-filter-group="docs-blog" data-filter-value="Tutorial" data-search="building a filter bar tutorial" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Tutorial</span>
+        <p class="mt-1 text-sm">Building a filter bar</p>
+      </li>
+      <li data-filter-group="docs-blog" data-filter-value="Release" data-search="v1.4 changelog release" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Release</span>
+        <p class="mt-1 text-sm">v1.4 changelog</p>
+      </li>
+      <li data-filter-group="docs-blog" data-filter-value="Blog" data-search="design tokens recap blog" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Blog</span>
+        <p class="mt-1 text-sm">Design tokens recap</p>
+      </li>
+      <li data-filter-group="docs-blog" data-filter-value="Tutorial" data-search="island hydration patterns tutorial" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Tutorial</span>
+        <p class="mt-1 text-sm">Island hydration patterns</p>
+      </li>
+      <li data-filter-group="docs-blog" data-filter-value="Blog" data-search="why we picked astro blog" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Blog</span>
+        <p class="mt-1 text-sm">Why we picked Astro</p>
+      </li>
+    </ul>
+    <p data-filter-empty="docs-blog" hidden class="text-sm text-fg-subtle">No posts match.</p>
+  </div>
+</Preview>
+
+<Preview label="Category + search" align="stretch">
+  <div class="w-full flex flex-col gap-6">
+    <FilterBar
+      group="docs-blog-search"
+      searchable
+      searchPlaceholder="Search posts…"
+      options={[
+        { value: "Blog",     label: "Blog",     count: 2 },
+        { value: "Tutorial", label: "Tutorial", count: 2 },
+        { value: "Release",  label: "Release",  count: 1 },
+      ]}
+    />
+    <ul class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <li data-filter-group="docs-blog-search" data-filter-value="Blog,Tutorial" data-search="why we picked astro blog tutorial" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Blog · Tutorial</span>
+        <p class="mt-1 text-sm">Why we picked Astro</p>
+      </li>
+      <li data-filter-group="docs-blog-search" data-filter-value="Tutorial" data-search="evals workflow tutorial" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Tutorial</span>
+        <p class="mt-1 text-sm">Evals workflow</p>
+      </li>
+      <li data-filter-group="docs-blog-search" data-filter-value="Release" data-search="v1.4 changelog release" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Release</span>
+        <p class="mt-1 text-sm">v1.4 changelog</p>
+      </li>
+      <li data-filter-group="docs-blog-search" data-filter-value="Blog" data-search="welcome to the blog astro" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Blog</span>
+        <p class="mt-1 text-sm">Welcome to the blog</p>
+      </li>
+      <li data-filter-group="docs-blog-search" data-filter-value="Tutorial" data-search="island hydration patterns tutorial" class="border border-stroke p-4">
+        <span class="font-mono text-[10px] uppercase tracking-wider opacity-60">Tutorial</span>
+        <p class="mt-1 text-sm">Island hydration patterns</p>
+      </li>
+    </ul>
+    <p data-filter-empty="docs-blog-search" hidden class="text-sm text-fg-subtle">No posts match.</p>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "group", type: "string", required: true, description: "Identifier shared by the bar and the items it controls. Drives data-filter-bar on the bar and matches data-filter-group on each item." },
+  { name: "options", type: "FilterOption[]", required: true, description: "Category buttons (excluding 'All'). Each is { value, label, count? }." },
+  { name: "allLabel", type: "string", default: '"All"', description: "Label for the implicit 'All' button." },
+  { name: "showCounts", type: "boolean", default: "true", description: "Render counts in parentheses next to each label." },
+  { name: "searchable", type: "boolean", default: "false", description: "Render a search input that filters items by their data-search attribute." },
+  { name: "searchPlaceholder", type: "string", default: '"Search…"', description: "Placeholder for the search input." },
+  { name: "paramKey", type: "string", default: "filter-<group>", description: "URL search-param name for the active category." },
+  { name: "queryParamKey", type: "string", default: "q-<group>", description: "URL search-param name for the search query." },
+  { name: "class", type: "string", default: '""', description: "Extra classes on the root." },
+]} />
+
+The `FilterOption` shape:
+
+```ts
+type FilterOption = {
+  value: string;     // matches data-filter-value on items
+  label: string;     // visible label on the button
+  count?: number;    // optional badge
+};
+```
+
+## Contract
+
+The bar does not render the items — it just shows/hides them. Each filterable item must declare:
+
+| Attribute            | Required | Purpose                                                                 |
+|----------------------|----------|-------------------------------------------------------------------------|
+| `data-filter-group`  | yes      | Must equal the bar's `group` prop.                                      |
+| `data-filter-value`  | yes      | The category. Comma-separated list for items with multiple tags.        |
+| `data-search`        | only when `searchable` | Lowercased haystack the search input matches against (substring). |
+
+You can also place an empty-state element anywhere in the document with `data-filter-empty="<group>"` — the bar toggles its `hidden` attribute when the visible count drops to zero.
+
+## Usage
+
+```astro
+---
+import FilterBar from "@components/FilterBar.astro";
+import { getCollection } from "astro:content";
+
+const posts = await getCollection("blog");
+
+const counts = posts.reduce<Record<string, number>>((acc, p) => {
+  acc[p.data.category] = (acc[p.data.category] ?? 0) + 1;
+  return acc;
+}, {});
+
+const options = Object.entries(counts).map(([value, count]) => ({
+  value,
+  label: value,
+  count,
+}));
+---
+
+<FilterBar group="blog" options={options} searchable />
+
+<ul>
+  {posts.map((p) => (
+    <li
+      data-filter-group="blog"
+      data-filter-value={p.data.category}
+      data-search={`${p.data.title} ${p.data.summary}`.toLowerCase()}
+    >
+      <a href={`/blog/${p.id}/`}>{p.data.title}</a>
+    </li>
+  ))}
+</ul>
+
+<p data-filter-empty="blog" hidden>No posts match.</p>
+```
+
+For multi-tag items, comma-join the values:
+
+```astro
+<li data-filter-group="blog" data-filter-value="Tutorial,Release">…</li>
+```
+
+## Behavior
+
+- **Click a category.** The bar toggles `is-active` / `aria-pressed` on its buttons, walks every `[data-filter-group="…"]`, and sets `el.hidden` based on whether `data-filter-value` matches (with comma-separated values treated as a set).
+- **Type in the search input.** The query is lowercased and trimmed, then substring-matched against each item's `data-search`. Category and search are AND-combined.
+- **URL sync.** Both filter and query are written to the URL with `history.replaceState` (no reload, no history pollution). Loading the page or following a link reads them back.
+- **Empty state.** If a `[data-filter-empty="<group>"]` element exists, it is shown when zero items remain visible and hidden otherwise.
+
+## A11y
+
+- Buttons sit in a `role="toolbar"` with an `aria-label` of `"Filter <group> by category"`, and each button reflects state via `aria-pressed`.
+- The search input has a visually-hidden `<span class="sr-only">` label tied to the group name.
+- Items are hidden via the native `hidden` attribute, so screen readers and tab order skip them — no `display: none` / `visibility: hidden` ambiguity.
+
+## Gotchas
+
+1. **`group` must be unique per page.** The script scans the whole document for `[data-filter-group="…"]`, so two bars with the same `group` would each control all matching items. Use distinct names (e.g. `blog`, `case-studies`).
+2. **Items live anywhere in the document, not inside the bar.** That is the point — but it means the bar will not filter items that haven't yet been rendered (e.g. an island that hydrates later). For static + content-collection lists this is ideal; for dynamic lists, re-call `apply` after they appear.
+3. **`data-search` is not built for you.** The component does not normalize accents or lowercase your strings — pass an already-lowercased haystack. The query input is lowercased before matching.
+4. **Counts are static.** The number in parentheses is whatever you pass in `options[i].count`; it is not recomputed as items are filtered. Display total-per-category, not visible-per-category.
+5. **`history.replaceState`, not `pushState`.** Filtering does not create back-button entries — refreshing or sharing the URL preserves state, but the back button leaves the page entirely. Swap to `pushState` if you want each filter change in history.

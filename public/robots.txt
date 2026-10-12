@@ -1,0 +1,81 @@
+# robots.txt
+#
+# ============================================================================
+# STARTER DEFAULT: EVERYTHING BLOCKED.
+#
+# This is a template. Its preview deployment has no reason to be crawled,
+# indexed, or used as training data, so nothing is allowed. Client repos flip
+# this at scaffold time — see the block below.
+#
+# NOTE: `Disallow: /` alone does not guarantee a URL stays out of search
+# results — a blocked URL can still be indexed from external links, and a
+# blocked crawler never reads a page-level noindex. This file is a secondary
+# signal. The starter's preview also relies on its URL not being linked
+# publicly. If that preview is ever linked or shared widely, add host-level
+# access control or an X-Robots-Tag response header in the Cloudflare
+# dashboard. See the staging indexing rule in docs/rules/seo.md.
+# ============================================================================
+
+User-agent: *
+Disallow: /
+
+# ============================================================================
+# AT SCAFFOLD TIME — replace everything above with the block below, and set
+# the Sitemap host to the client's real domain.
+#
+# HOUSE POLICY: AI crawlers are allowed on client sites. Clients want to be
+# found and cited in LLM answers, so answer engines and training crawlers are
+# both permitted. The named groups are redundant against `User-agent: *` —
+# they exist so the decision is written down rather than inferred.
+#
+# GOTCHA: a crawler with its own named group ignores the `*` group entirely.
+# A Disallow added to `*` will NOT apply to any bot named below — add it to
+# each group you mean it for.
+#
+# To opt a client out, swap that bot's `Allow: /` for `Disallow: /` and record
+# why. The meaningful split is answer engines (being cited in AI answers) vs
+# training crawlers (content used to train models); a client can allow the
+# first and refuse the second.
+#
+# User-agent: *
+# Allow: /
+#
+# --- Answer engines: what gets a client cited in AI answers ---
+# User-agent: OAI-SearchBot
+# Allow: /
+#
+# User-agent: ChatGPT-User
+# Allow: /
+#
+# User-agent: PerplexityBot
+# Allow: /
+#
+# User-agent: Claude-SearchBot
+# Allow: /
+#
+# User-agent: Claude-User
+# Allow: /
+#
+# Not a crawler — a control token for whether content grounds Gemini and AI
+# Overviews. Allowing it opts in to that surface.
+# User-agent: Google-Extended
+# Allow: /
+#
+# User-agent: Applebot-Extended
+# Allow: /
+#
+# --- Training crawlers ---
+# User-agent: GPTBot
+# Allow: /
+#
+# User-agent: ClaudeBot
+# Allow: /
+#
+# User-agent: CCBot
+# Allow: /
+#
+# User-agent: Meta-ExternalAgent
+# Allow: /
+#
+# Sitemap: https://<client-domain>/sitemap-index.xml
+# ============================================================================

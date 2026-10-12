@@ -1,0 +1,401 @@
+---
+// ComboboxGrouped — searchable dropdown with grouped options.
+//
+// Behavior:
+//  * Trigger button toggles a popover containing a search input + grouped list.
+//  * Typing in the input filters items live (matches label + description).
+//  * ↑/↓ moves the highlighted item across all visible items, jumping group
+//    headings; Enter selects; Esc closes; click outside closes.
+//  * Selected option gets a check icon and writes its value into a hidden
+//    <input> so the combobox works inside a normal <form>.
+//
+// A11y:
+//  * Trigger has aria-haspopup="listbox", aria-expanded, aria-controls.
+//  * Search input is the focused element while open; it carries
+//    aria-activedescendant pointing to the highlighted option (so screen
+//    readers announce the option without moving DOM focus).
+//  * Each option is role="option" with aria-selected; group headings are
+//    role="presentation" so they're skipped by AT navigation.
+
+import { Icon } from "astro-icon/components";
+
+type Item = {
+  value: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+};
+type Group = {
+  heading: string;
+  items: Item[];
+};
+
+interface Props {
+  id?: string;
+  name?: string;                 // form field name (writes selected value)
+  groups: Group[];
+  value?: string;                // initial selected value
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
+  ariaLabel?: string;
+  class?: string;
+}
+
+const {
+  id = `combobox-${Math.random().toString(36).slice(2, 9)}`,
+  name,
+  groups,
+  value,
+  placeholder = "Select an option…",
+  searchPlaceholder = "Search…",
+  emptyText = "No results found.",
+  ariaLabel = "Select an option",
+  class: className = "",
+} = Astro.props;
+
+const listboxId = `${id}-listbox`;
+const inputId = `${id}-input`;
+
+// Pre-compute the initial label so SSR shows the right text without JS.
+const initialLabel =
+  value !== undefined
+    ? groups
+        .flatMap((g) => g.items)
+        .find((i) => i.value === value)?.label ?? placeholder
+    : placeholder;
+---
+
+<div data-combobox class:list={["relative", className]} id={id}>
+  {/* Hidden field — keeps the combobox usable inside <form>. */}
+  {name && <input type="hidden" name={name} value={value ?? ""} data-combobox-value />}
+
+  {/* Trigger button. Shows the selected option's label or the placeholder. */}
+  <button
+    type="button"
+    data-combobox-trigger
+    aria-haspopup="listbox"
+    aria-expanded="false"
+    aria-controls={listboxId}
+    aria-label={ariaLabel}
+    class="flex w-full items-center justify-between gap-2 border border-stroke bg-canvas px-3 py-2 text-left text-sm text-fg transition hover:border-stroke-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas cursor-pointer"
+  >
+    <span
+      data-combobox-label
+      class:list={[
+        "truncate",
+        value === undefined && "text-fg-muted",
+      ]}
+    >
+      {initialLabel}
+    </span>
+    <Icon
+      name="lucide:chevrons-up-down"
+      class="h-4 w-4 shrink-0 text-fg-muted"
+      aria-hidden="true"
+    />
+  </button>
+
+  {/* Popover panel. Hidden by default; JS toggles `data-open`. */}
+  <div
+    data-combobox-panel
+    data-open="false"
+    class="absolute left-0 right-0 top-full z-40 mt-1 hidden border border-stroke bg-panel shadow-popover"
+  >
+    {/* Search input. Always focused while panel is open. */}
+    <div class="flex items-center gap-2 border-b border-stroke px-3">
+      <Icon name="lucide:search" class="h-4 w-4 text-fg-muted shrink-0" aria-hidden="true" />
+      <input
+        type="text"
+        id={inputId}
+        data-combobox-search
+        role="combobox"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-expanded="true"
+        aria-controls={listboxId}
+        placeholder={searchPlaceholder}
+        class="w-full bg-transparent py-2.5 text-sm text-fg placeholder:text-fg-muted outline-none"
+      />
+    </div>
+
+    <ul
+      id={listboxId}
+      role="listbox"
+      aria-label={ariaLabel}
+      data-combobox-list
+      class="max-h-64 overflow-y-auto py-1"
+    >
+      {groups.map((group, gi) => (
+        <li
+          role="presentation"
+          data-combobox-group
+          class:list={[gi > 0 && "mt-1 border-t border-stroke pt-1"]}
+        >
+          <div
+            data-combobox-heading
+            class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-fg-subtle"
+          >
+            {group.heading}
+          </div>
+          <ul role="presentation" class="flex flex-col">
+            {group.items.map((item, ii) => {
+              const optionId = `${id}-opt-${gi}-${ii}`;
+              const isSelected = value === item.value;
+              return (
+                <li
+                  role="option"
+                  id={optionId}
+                  data-combobox-option
+                  data-value={item.value}
+                  data-disabled={item.disabled ? "true" : "false"}
+                  aria-selected={isSelected ? "true" : "false"}
+                  aria-disabled={item.disabled ? "true" : "false"}
+                  tabindex="-1"
+                  class="flex cursor-pointer items-start gap-2 px-3 py-2 text-sm text-fg-muted transition aria-disabled:cursor-not-allowed aria-disabled:opacity-50 hover:bg-panel-muted hover:text-fg [&[data-active='true']]:bg-panel-muted [&[data-active='true']]:text-fg [&[aria-selected='true']]:text-fg"
+                >
+                  <Icon
+                    name="lucide:check"
+                    class:list={[
+                      "h-4 w-4 mt-0.5 shrink-0 text-intent",
+                      !isSelected && "invisible",
+                    ]}
+                    data-combobox-check
+                    aria-hidden="true"
+                  />
+                  <span class="flex flex-col gap-0.5 min-w-0">
+                    <span class="truncate text-fg">{item.label}</span>
+                    {item.description && (
+                      <span class="truncate text-xs text-fg-muted">{item.description}</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </li>
+      ))}
+    </ul>
+
+    {/* Empty state — shown when the filter hides every option. */}
+    <div
+      data-combobox-empty
+      class="hidden px-3 py-6 text-center text-sm text-fg-muted"
+    >
+      {emptyText}
+    </div>
+  </div>
+</div>
+
+<script>
+  type Els = {
+    root: HTMLElement;
+    trigger: HTMLButtonElement;
+    label: HTMLElement;
+    panel: HTMLElement;
+    search: HTMLInputElement;
+    list: HTMLElement;
+    empty: HTMLElement | null;
+    valueInput: HTMLInputElement | null;
+    options: HTMLElement[];
+    headings: HTMLElement[];
+  };
+
+  const init = (root: HTMLElement) => {
+    const trigger = root.querySelector<HTMLButtonElement>("[data-combobox-trigger]");
+    const label = root.querySelector<HTMLElement>("[data-combobox-label]");
+    const panel = root.querySelector<HTMLElement>("[data-combobox-panel]");
+    const search = root.querySelector<HTMLInputElement>("[data-combobox-search]");
+    const list = root.querySelector<HTMLElement>("[data-combobox-list]");
+    if (!trigger || !label || !panel || !search || !list) return;
+
+    const els: Els = {
+      root,
+      trigger,
+      label,
+      panel,
+      search,
+      list,
+      empty: root.querySelector<HTMLElement>("[data-combobox-empty]"),
+      valueInput: root.querySelector<HTMLInputElement>("[data-combobox-value]"),
+      options: Array.from(root.querySelectorAll<HTMLElement>("[data-combobox-option]")),
+      headings: Array.from(root.querySelectorAll<HTMLElement>("[data-combobox-group]")),
+    };
+
+    // --- helpers ---------------------------------------------------------
+    const visibleOptions = () =>
+      els.options.filter(
+        (o) => o.dataset.hidden !== "true" && o.dataset.disabled !== "true"
+      );
+
+    const setActive = (option: HTMLElement | null) => {
+      els.options.forEach((o) => (o.dataset.active = "false"));
+      if (!option) {
+        els.search.removeAttribute("aria-activedescendant");
+        return;
+      }
+      option.dataset.active = "true";
+      els.search.setAttribute("aria-activedescendant", option.id);
+      // Keep highlighted option in view inside the scrollable list.
+      const listRect = els.list.getBoundingClientRect();
+      const optRect = option.getBoundingClientRect();
+      if (optRect.top < listRect.top) {
+        els.list.scrollTop -= listRect.top - optRect.top;
+      } else if (optRect.bottom > listRect.bottom) {
+        els.list.scrollTop += optRect.bottom - listRect.bottom;
+      }
+    };
+
+    // --- open / close ----------------------------------------------------
+    const open = () => {
+      if (els.panel.dataset.open === "true") return;
+      els.panel.classList.remove("hidden");
+      els.panel.dataset.open = "true";
+      els.trigger.setAttribute("aria-expanded", "true");
+      els.search.value = "";
+      filter("");
+      // First visible option gets the active highlight on open.
+      setActive(visibleOptions()[0] ?? null);
+      requestAnimationFrame(() => els.search.focus());
+    };
+
+    const close = () => {
+      if (els.panel.dataset.open !== "true") return;
+      els.panel.classList.add("hidden");
+      els.panel.dataset.open = "false";
+      els.trigger.setAttribute("aria-expanded", "false");
+      setActive(null);
+    };
+
+    const toggle = () => (els.panel.dataset.open === "true" ? close() : open());
+
+    // --- filter ----------------------------------------------------------
+    const filter = (q: string) => {
+      const needle = q.trim().toLowerCase();
+      let anyVisible = false;
+      els.options.forEach((opt) => {
+        if (!needle) {
+          opt.dataset.hidden = "false";
+          opt.removeAttribute("hidden");
+          anyVisible = true;
+          return;
+        }
+        const text = opt.textContent?.toLowerCase() ?? "";
+        const match = text.includes(needle);
+        opt.dataset.hidden = match ? "false" : "true";
+        if (match) {
+          opt.removeAttribute("hidden");
+          anyVisible = true;
+        } else {
+          opt.setAttribute("hidden", "");
+        }
+      });
+      // Hide group headings whose items are all filtered out.
+      els.headings.forEach((group) => {
+        const groupOpts = Array.from(
+          group.querySelectorAll<HTMLElement>("[data-combobox-option]")
+        );
+        const groupVisible = groupOpts.some((o) => o.dataset.hidden !== "true");
+        group.style.display = groupVisible ? "" : "none";
+      });
+      if (els.empty) {
+        els.empty.classList.toggle("hidden", anyVisible);
+      }
+      els.list.classList.toggle("hidden", !anyVisible);
+    };
+
+    // --- selection -------------------------------------------------------
+    const select = (option: HTMLElement) => {
+      if (option.dataset.disabled === "true") return;
+      const value = option.dataset.value ?? "";
+      const labelText =
+        option.querySelector("span > span")?.textContent ?? value;
+
+      els.options.forEach((o) => {
+        const selected = o === option;
+        o.setAttribute("aria-selected", selected ? "true" : "false");
+        const check = o.querySelector<HTMLElement>("[data-combobox-check]");
+        if (check) check.classList.toggle("invisible", !selected);
+      });
+
+      els.label.textContent = labelText;
+      els.label.classList.remove("text-fg-muted");
+      if (els.valueInput) els.valueInput.value = value;
+
+      // Emit a `change` event so consumers can react without polling DOM.
+      els.root.dispatchEvent(
+        new CustomEvent("combobox:change", {
+          bubbles: true,
+          detail: { value, label: labelText },
+        })
+      );
+
+      close();
+      els.trigger.focus();
+    };
+
+    // --- wiring ----------------------------------------------------------
+    els.trigger.addEventListener("click", toggle);
+
+    els.search.addEventListener("input", () => {
+      filter(els.search.value);
+      setActive(visibleOptions()[0] ?? null);
+    });
+
+    els.search.addEventListener("keydown", (e) => {
+      const visible = visibleOptions();
+      const activeIdx = visible.findIndex((o) => o.dataset.active === "true");
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (visible.length === 0) return;
+        setActive(visible[(activeIdx + 1) % visible.length]);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (visible.length === 0) return;
+        setActive(visible[(activeIdx - 1 + visible.length) % visible.length]);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setActive(visible[0] ?? null);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        setActive(visible[visible.length - 1] ?? null);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const active = visible[activeIdx];
+        if (active) select(active);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+        els.trigger.focus();
+      } else if (e.key === "Tab") {
+        // Let Tab close the panel naturally — don't trap focus.
+        close();
+      }
+    });
+
+    // Mouse selection.
+    els.options.forEach((opt) => {
+      opt.addEventListener("click", () => select(opt));
+      opt.addEventListener("mousemove", () => {
+        if (opt.dataset.active !== "true") setActive(opt);
+      });
+    });
+
+    // Click outside closes the panel.
+    document.addEventListener("click", (e) => {
+      const target = e.target as Node | null;
+      if (!target || els.root.contains(target)) return;
+      close();
+    });
+
+    // Trigger keyboard shortcut: ArrowDown / Enter / Space opens the panel.
+    els.trigger.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    });
+  };
+
+  document.querySelectorAll<HTMLElement>("[data-combobox]").forEach(init);
+</script>

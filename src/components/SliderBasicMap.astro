@@ -1,0 +1,116 @@
+---
+// SliderBasicMap — convenience wrapper around SliderBasic that maps an array
+// of items (typically from a content collection) into default CardFeatured slides.
+//
+// Usage with a content collection:
+//   ---
+//   import { getCollection } from "astro:content";
+//   const posts = await getCollection("posts");
+//   ---
+//   <SliderBasicMap
+//     items={posts.map((p) => ({
+//       title: p.data.title,
+//       description: p.data.excerpt,
+//       eyebrow: p.data.category,
+//     }))}
+//     perView={1}
+//     perViewMd={2}
+//     perViewLg={3}
+//   />
+//
+// You can still drop manual children inside (they render after the mapped items).
+
+import type { ImageMetadata } from "astro";
+import { Image } from "astro:assets";
+import SliderBasic from "./SliderBasic.astro";
+import CardFeatured from "./CardFeatured.astro";
+
+type TitleTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+
+type SlideItem = {
+  title?: string;
+  description?: string;
+  eyebrow?: string;
+  href?: string;
+  imageSrc?: string | ImageMetadata;
+  imageAlt?: string;
+  // Optional per-item overrides — useful when one slide needs a different
+  // heading size from the rest.
+  titleClass?: string;
+  titleTag?: TitleTag;
+};
+
+type PerView = 1 | 2 | 3 | 4 | 5 | 6;
+type Gap = "none" | "sm" | "md" | "lg";
+
+interface Props {
+  /**
+   * Slides to render. Optional — the destructure defaults to `[]`, and the
+   * component also accepts manual children, so requiring this contradicted
+   * both the default and the documented usage.
+   */
+  items?: SlideItem[];
+  id?: string;
+  ariaLabel?: string;
+  mobile?: PerView;
+  mobileLandscape?: PerView;
+  tablet?: PerView;
+  desktop?: PerView;
+  gap?: Gap;
+  showArrows?: boolean;
+  showDots?: boolean;
+  draggable?: boolean;
+  cardClass?: string;
+  // Forwarded to every CardFeatured. Per-item `titleClass`/`titleTag` on a
+  // SlideItem wins over these defaults.
+  titleClass?: string;
+  titleTag?: TitleTag;
+  class?: string;
+}
+
+const {
+  items = [],
+  // Don't add `h-full` here — the slider track uses `items-stretch`, which
+  // equalizes heights to the tallest card. `height: 100%` on a flex item with
+  // an indefinite parent height resolves to auto and overrides stretch.
+  cardClass = "bg-canvas",
+  titleClass,
+  titleTag,
+  ...sliderProps
+} = Astro.props;
+---
+
+<SliderBasic {...sliderProps}>
+  {items.map((item) => (
+    <CardFeatured
+      title={item.title}
+      description={item.description}
+      border="all"
+      class={cardClass}
+      titleClass={item.titleClass ?? titleClass}
+      titleTag={item.titleTag ?? titleTag}
+    >
+      {item.eyebrow && <span slot="eyebrow">{item.eyebrow}</span>}
+      {item.imageSrc && (typeof item.imageSrc === "string"
+        ? (
+          <img
+            slot="media"
+            src={item.imageSrc}
+            alt={item.imageAlt ?? ""}
+            class="w-full h-auto mt-4 mask-b-from-30% mask-b-to-95%"
+          />
+        ) : (
+          <Image
+            slot="media"
+            src={item.imageSrc}
+            alt={item.imageAlt ?? ""}
+            class="w-full h-auto mt-4 mask-b-from-30% mask-b-to-95%"
+            loading="lazy"
+            decoding="async"
+          />
+        ))}
+    </CardFeatured>
+  ))}
+  {/* Pass-through slot — manually placed slides render alongside mapped items. */}
+  <slot />
+</SliderBasic>

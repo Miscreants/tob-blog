@@ -1,0 +1,113 @@
+---
+// A layout is a reusable wrapper for your pages.
+// Anything you put between <Layout>...</Layout> in a page lands in <slot />.
+//
+// Props are declared via an interface and read from Astro.props.
+// One variable font per role (§10.2). --font-heading / --font-sans / --font-mono
+// in global.css name these families, so all three must actually be loaded —
+// otherwise the stack silently falls through to system-ui/Menlo and renders
+// differently on machines that happen to have the font installed locally.
+import "@fontsource-variable/archivo";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/jetbrains-mono";
+import "../styles/global.css";
+import { getCollection, render } from "astro:content";
+import Nav from "../components/NavMorph.astro";
+import AnnouncementBanner from "../components/AnnouncementBanner.astro";
+import Seo from "../components/Seo.astro";
+interface Props {
+  title?: string;
+  /** Meta description for SEO + social cards. */
+  description?: string;
+  /** Social share image (root-relative or absolute). */
+  image?: string;
+  /** og:type — "article" for posts. */
+  ogType?: "website" | "article";
+  /** Ask crawlers not to index this page. */
+  noindex?: boolean;
+  /** JSON-LD structured data graph(s). See src/lib/schema.ts. */
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  /** Theme attribute applied at the document root — flips tokens for the whole page (nav included). */
+  theme?: "light" | "dark" | "brand";
+  /** Frontmatter object, present when this layout is used from a Markdown/MDX page. */
+  frontmatter?: { title?: string; theme?: "light" | "dark" | "brand"; description?: string };
+}
+
+// MDX/Markdown pages with `layout:` pass their frontmatter under `frontmatter`,
+// while `.astro` pages pass props flat. Fall back so both work.
+const fm = Astro.props.frontmatter ?? {};
+const {
+  title = fm.title ?? "Astro Playground",
+  description = fm.description,
+  image,
+  ogType,
+  noindex,
+  jsonLd,
+  theme = fm.theme ?? "light",
+} = Astro.props;
+const gtagId = import.meta.env.PUBLIC_GTAG_ID;
+
+// Pick the currently-active announcement, if any.
+// Filters by enabled flag and schedule window. Highest priority wins;
+// ties broken by most recent startsAt. Evaluated at build time.
+const now = new Date();
+const active = (await getCollection("announcements"))
+  .filter((a) => a.data.enabled)
+  .filter((a) => !a.data.startsAt || a.data.startsAt <= now)
+  .filter((a) => !a.data.endsAt || a.data.endsAt >= now)
+  .sort((a, b) => {
+    if (a.data.priority !== b.data.priority)
+      return b.data.priority - a.data.priority;
+    const aStart = a.data.startsAt?.getTime() ?? 0;
+    const bStart = b.data.startsAt?.getTime() ?? 0;
+    return bStart - aStart;
+  });
+
+const announcement = active[0];
+const AnnouncementContent = announcement
+  ? (await render(announcement)).Content
+  : null;
+
+---
+
+<html lang="en" data-theme={theme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <Seo title={title} description={description} ogType={ogType} image={image} noindex={noindex} jsonLd={jsonLd} />
+
+    {gtagId && (
+      <>
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${gtagId}`}></script>
+        <script define:vars={{ gtagId }}>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){ dataLayer.push(arguments); }
+          gtag('js', new Date());
+          gtag('config', gtagId);
+        </script>
+      </>
+    )}
+  </head>
+  <body>
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-intent focus:text-fg-on-intent focus:rounded-sm"
+    >
+      Skip to main content
+    </a>
+    <Nav>
+      {announcement && AnnouncementContent && (
+        <AnnouncementBanner
+          slot="announcement"
+          href={announcement.data.href}
+          dismissible={announcement.data.dismissible}
+          class="bg-intent text-fg-on-intent text-sm"
+        >
+          <AnnouncementContent />
+        </AnnouncementBanner>
+      )}
+    </Nav>
+    <slot />
+  </body>
+</html>

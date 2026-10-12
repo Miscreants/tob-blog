@@ -1,0 +1,261 @@
+---
+import { Icon } from "astro-icon/components";
+import Logo from "./Logo.astro";
+
+type ActionItem = { type: "action"; label: string; action: "copy-svg" };
+type LinkItem = {
+  type?: "link";
+  label: string;
+  href: string;
+  target?: string;
+};
+type Item = ActionItem | LinkItem;
+
+interface Props {
+  href?: string;
+  ariaLabel?: string;
+  items?: Item[];
+  class?: string;
+  logoClass?: string;
+}
+
+const {
+  href = "/",
+  ariaLabel = "Home",
+  class: className = "",
+  logoClass = "h-5 w-auto",
+  // Copy-as-SVG is the only default: it works on every build with no setup.
+  // The link items that used to sit here pointed at /brand/ routes the starter
+  // doesn't ship, and they shipped to production more than once. Pass `items`
+  // to add them back on a project that actually has those pages.
+  items = [
+    { type: "action", label: "Copy logo as SVG", action: "copy-svg" },
+  ] as Item[],
+} = Astro.props;
+---
+
+<div data-logo-menu class:list={["relative inline-block", className]}>
+  <a
+    href={href}
+    aria-label={ariaLabel}
+    aria-haspopup="menu"
+    aria-expanded="false"
+    data-logo-trigger
+    class="inline-flex items-center text-fg transition hover:text-intent outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+  >
+    <span data-logo-svg class="contents">
+      <Logo class={logoClass} />
+    </span>
+  </a>
+
+  <div
+    data-logo-panel
+    role="menu"
+    aria-label={`${ariaLabel} options`}
+    tabindex="-1"
+    class="absolute left-0 top-full z-50 mt-2 hidden min-w-56 border border-stroke bg-panel py-1 shadow-popover"
+  >
+    {
+      items.map((item) => {
+        if (item.type === "action") {
+          return (
+            <button
+              type="button"
+              role="menuitem"
+              data-logo-item
+              data-action={item.action}
+              class="block w-full text-left px-3 py-2 text-sm text-fg-muted transition hover:bg-panel-muted hover:text-fg focus-visible:bg-panel-muted focus-visible:text-fg outline-none"
+            >
+              {item.label}
+            </button>
+          );
+        }
+        const link = item as LinkItem;
+        return (
+          <a
+            href={link.href}
+            target={link.target}
+            rel={link.target === "_blank" ? "noopener noreferrer" : undefined}
+            role="menuitem"
+            data-logo-item
+            class="block px-3 py-2 text-sm text-fg-muted transition hover:bg-panel-muted hover:text-fg focus-visible:bg-panel-muted focus-visible:text-fg outline-none"
+          >
+            {link.label}
+          </a>
+        );
+      })
+    }
+  </div>
+
+  <div
+    data-logo-toast
+    role="status"
+    aria-live="polite"
+    class="pointer-events-none fixed bottom-4 right-4 z-[60] hidden items-center gap-2 border border-stroke bg-panel px-3 py-2 text-xs text-fg-muted shadow-popover"
+    data-theme="dark"
+  >
+    <Icon name="lucide:check" class="h-3.5 w-3.5 text-intent" aria-hidden="true" />
+    <span data-logo-toast-text>Copied</span>
+  </div>
+</div>
+
+<style>
+  [data-logo-toast] {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+  [data-logo-toast].is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-logo-toast] {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  type Root = HTMLElement;
+
+  const init = (root: Root) => {
+    const trigger = root.querySelector<HTMLElement>("[data-logo-trigger]");
+    const panel = root.querySelector<HTMLElement>("[data-logo-panel]");
+    const svgWrap = root.querySelector<HTMLElement>("[data-logo-svg]");
+    const toast = root.querySelector<HTMLElement>("[data-logo-toast]");
+    const toastText = root.querySelector<HTMLElement>("[data-logo-toast-text]");
+    if (!trigger || !panel) return;
+
+    let toastTimer: ReturnType<typeof setTimeout> | null = null;
+    let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
+    const showToast = (msg: string) => {
+      if (!toast) return;
+      if (toastText) toastText.textContent = msg;
+      if (toastTimer) clearTimeout(toastTimer);
+      if (toastHideTimer) clearTimeout(toastHideTimer);
+      toast.classList.remove("hidden");
+      toast.classList.add("flex");
+      requestAnimationFrame(() => toast.classList.add("is-visible"));
+      toastTimer = setTimeout(() => {
+        toast.classList.remove("is-visible");
+        toastHideTimer = setTimeout(() => {
+          toast.classList.add("hidden");
+          toast.classList.remove("flex");
+        }, 200);
+      }, 1800);
+    };
+
+    const items = () =>
+      Array.from(panel.querySelectorAll<HTMLElement>("[data-logo-item]"));
+
+    const isOpen = () => !panel.classList.contains("hidden");
+
+    const open = (focusFirst = false) => {
+      panel.classList.remove("hidden");
+      trigger.setAttribute("aria-expanded", "true");
+      if (focusFirst) items()[0]?.focus();
+    };
+
+    const close = (returnFocus = false) => {
+      if (!isOpen()) return;
+      panel.classList.add("hidden");
+      trigger.setAttribute("aria-expanded", "false");
+      if (returnFocus) trigger.focus();
+    };
+
+    trigger.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (isOpen()) close();
+      else open();
+    });
+
+    panel.addEventListener("click", (e) => {
+      const target = (e.target as HTMLElement).closest<HTMLElement>(
+        "[data-logo-item]"
+      );
+      if (!target) return;
+      const action = target.getAttribute("data-action");
+      if (action === "copy-svg") {
+        e.preventDefault();
+        copySvg(svgWrap).then((ok) =>
+          showToast(ok ? "Logo copied to clipboard" : "Copy failed")
+        );
+        close(true);
+      } else {
+        // link items navigate naturally
+        close();
+      }
+    });
+
+    panel.addEventListener("keydown", (e) => {
+      const list = items();
+      if (list.length === 0) return;
+      const current = document.activeElement as HTMLElement | null;
+      const idx = current ? list.indexOf(current) : -1;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        list[(idx + 1) % list.length]?.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        list[(idx - 1 + list.length) % list.length]?.focus();
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        list[0]?.focus();
+      } else if (e.key === "End") {
+        e.preventDefault();
+        list[list.length - 1]?.focus();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === "Tab") {
+        close();
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (root.contains(target)) return;
+      close();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isOpen()) close(true);
+    });
+  };
+
+  const copySvg = async (wrap: HTMLElement | null): Promise<boolean> => {
+    if (!wrap) return false;
+    const svg = wrap.querySelector("svg");
+    if (!svg) return false;
+    const clone = svg.cloneNode(true) as SVGElement;
+    if (!clone.getAttribute("xmlns"))
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const markup = new XMLSerializer().serializeToString(clone);
+    try {
+      await navigator.clipboard.writeText(markup);
+      return true;
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = markup;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch {
+        return false;
+      }
+    }
+  };
+
+  document
+    .querySelectorAll<HTMLElement>("[data-logo-menu]")
+    .forEach((root) => init(root));
+</script>

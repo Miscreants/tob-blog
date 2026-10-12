@@ -1,0 +1,158 @@
+---
+interface Props {
+  /** Close other items when one opens. Default: true */
+  closePrevious?: boolean;
+  /** Allow closing an open item by clicking it again. Default: true */
+  closeOnSecondClick?: boolean;
+  /** 1-based index of item to open by default */
+  openByDefault?: number;
+  class?: string;
+}
+
+const {
+  closePrevious = true,
+  closeOnSecondClick = true,
+  openByDefault,
+  class: className,
+} = Astro.props;
+---
+
+<div
+  data-accordion="component"
+  data-close-previous={closePrevious}
+  data-close-on-second-click={closeOnSecondClick}
+  data-open-by-default={openByDefault}
+  class:list={[className]}
+>
+  <slot />
+</div>
+
+<style is:global>
+  /* Height animation via CSS grid */
+  [data-accordion="content"] {
+    display: grid;
+    grid-template-rows: minmax(0, 0fr);
+    overflow: hidden;
+    transition: grid-template-rows 0.3s ease;
+  }
+  [data-accordion="content"] > * {
+    min-height: 0;
+  }
+  [data-accordion="item"].is-active [data-accordion="content"] {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  /* Icon rotation */
+  [data-accordion="icon"] {
+    transition: transform 0.3s ease;
+  }
+  [data-accordion="item"].is-active [data-accordion="icon"] {
+    transform: rotate(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-accordion="content"],
+    [data-accordion="icon"] {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-accordion="component"]').forEach((component) => {
+    if (component.dataset.scriptInitialized) return;
+    component.dataset.scriptInitialized = "true";
+
+    const closePrevious = component.getAttribute("data-close-previous") !== "false";
+    const closeOnSecondClick = component.getAttribute("data-close-on-second-click") !== "false";
+    const openByDefault = Number(component.getAttribute("data-open-by-default")) || 0;
+
+    const items = Array.from(component.querySelectorAll<HTMLElement>(':scope [data-accordion="item"]'));
+    const buttons = items.map((item) => item.querySelector<HTMLElement>('[data-accordion="button"]')!);
+
+    // ARIA setup
+    items.forEach((item, i) => {
+      const button = buttons[i];
+      const content = item.querySelector<HTMLElement>('[data-accordion="content"]');
+      if (!button || !content) return;
+
+      const buttonId = `accordion-btn-${Math.random().toString(36).slice(2, 8)}`;
+      const contentId = `accordion-content-${Math.random().toString(36).slice(2, 8)}`;
+
+      button.setAttribute("role", "button");
+      button.setAttribute("aria-expanded", "false");
+      button.setAttribute("id", buttonId);
+      button.setAttribute("aria-controls", contentId);
+      button.setAttribute("tabindex", i === 0 ? "0" : "-1");
+      content.setAttribute("role", "region");
+      content.setAttribute("id", contentId);
+      content.setAttribute("aria-labelledby", buttonId);
+    });
+
+    function close(index: number) {
+      const item = items[index];
+      if (!item.classList.contains("is-active")) return;
+      item.classList.remove("is-active");
+      buttons[index].setAttribute("aria-expanded", "false");
+    }
+
+    function open(index: number) {
+      if (closePrevious) {
+        items.forEach((_, i) => { if (i !== index) close(i); });
+      }
+      items[index].classList.add("is-active");
+      buttons[index].setAttribute("aria-expanded", "true");
+    }
+
+    function toggle(index: number) {
+      if (items[index].classList.contains("is-active")) {
+        if (closeOnSecondClick) close(index);
+      } else {
+        open(index);
+      }
+    }
+
+    // Open default item
+    if (openByDefault > 0 && openByDefault <= items.length) {
+      open(openByDefault - 1);
+    }
+
+    // Click handlers
+    buttons.forEach((btn, i) => {
+      btn.addEventListener("click", () => toggle(i));
+    });
+
+    // Keyboard navigation
+    component.addEventListener("keydown", (e) => {
+      const focusedIndex = buttons.indexOf(document.activeElement as HTMLElement);
+      if (focusedIndex === -1) return;
+
+      let newIndex: number | null = null;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        newIndex = (focusedIndex + 1) % items.length;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        newIndex = (focusedIndex - 1 + items.length) % items.length;
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        newIndex = 0;
+      } else if (e.key === "End") {
+        e.preventDefault();
+        newIndex = items.length - 1;
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggle(focusedIndex);
+      }
+
+      if (newIndex !== null) {
+        buttons[newIndex].setAttribute("tabindex", "0");
+        buttons[newIndex].focus();
+        if (focusedIndex !== newIndex) {
+          buttons[focusedIndex].setAttribute("tabindex", "-1");
+        }
+      }
+    });
+  });
+</script>

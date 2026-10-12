@@ -1,0 +1,94 @@
+---
+title: TableOfContents
+description: Auto-generated table of contents with active-section highlighting via IntersectionObserver. Server-renders from MDX getHeadings() or scans the DOM client-side.
+category: layout
+order: 70
+sourceFile: src/components/TableOfContents.astro
+status: stable
+related: [Breadcrumbs]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import TableOfContents from "@components/TableOfContents.astro";
+
+## Preview
+
+<Preview label="Live TOC scanning this page" align="stretch">
+  <div class="w-full max-w-xs not-prose">
+    <TableOfContents selector="article" minLevel={2} maxLevel={3} stickyOffset={0} />
+  </div>
+</Preview>
+
+A sticky in-page navigation panel for long documents. Two render modes:
+
+1. **Server-side** — pass headings from MDX's `getHeadings()`. The list is rendered during SSR (no flash, no DOM scan).
+2. **Client-side scan** — omit `headings` and provide a `selector`. The script reads headings from the DOM at page load.
+
+Active-section tracking is always client-side via `IntersectionObserver`, so the highlighted entry follows the reader as they scroll.
+
+## Server-side usage (recommended for MDX docs)
+
+```astro
+---
+import { getEntry, render } from "astro:content";
+import TableOfContents from "@components/TableOfContents.astro";
+
+const entry = await getEntry("docs", "intro");
+const { Content, headings } = await render(entry);
+---
+
+<div class="grid grid-cols-[1fr_16rem] gap-12">
+  <article class="prose-doc">
+    <Content />
+  </article>
+  <TableOfContents headings={headings} minLevel={2} maxLevel={3} />
+</div>
+```
+
+## Client-side scan
+
+```astro
+<TableOfContents selector="main" minLevel={2} maxLevel={3} />
+```
+
+The script auto-generates IDs on any heading that doesn't already have one (slugified from text content), so it works on plain HTML pages where rehype-slug isn't running.
+
+## Props
+
+<PropsTable props={[
+  { name: "headings", type: "{ depth: number; slug: string; text: string }[]", description: "Pre-computed headings from MDX getHeadings(). When provided, the list renders during SSR." },
+  { name: "selector", type: "string", default: '"main"', description: "CSS selector scanned client-side when `headings` is not provided." },
+  { name: "minLevel", type: "number", default: "2", description: "Minimum heading level to include (1–6)." },
+  { name: "maxLevel", type: "number", default: "3", description: "Maximum heading level to include (1–6)." },
+  { name: "title", type: "string", default: '"On this page"', description: "Heading text above the list (and the nav aria-label)." },
+  { name: "stickyOffset", type: "number", default: "96", description: "Sticky position offset in pixels — accounts for fixed top nav." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Mechanism
+
+### Active-section selection
+
+Headings are observed with `IntersectionObserver` using a tight reading band (`rootMargin: "-20% 0px -70% 0px"`). When at least one heading is inside the band, the topmost one wins. When the band is empty (e.g. mid-content with no heading nearby), the script falls back to "the last heading above the viewport top" — so the active state never disappears mid-scroll.
+
+### Heading IDs
+
+If a heading lacks an `id`, the script slugifies its text content and assigns one (with a `-2`, `-3` suffix on collisions). This is a fallback — for MDX-driven docs you'll typically get IDs from `rehype-slug` automatically, in which case the script just leaves them alone.
+
+### Sticky positioning
+
+The component uses `position: sticky` with a `--toc-sticky-offset` CSS variable so it pins to the top of its container while scrolling, leaving room for any fixed page header.
+
+## Accessibility
+
+- `<aside>` element with a `<nav>` inside — both naturally announced by screen readers.
+- The `nav` carries `aria-label` from the `title` prop.
+- Active item gets `aria-current="true"` (matches WAI-ARIA's authoring practice for current location in a navigation list).
+- Anchor jumps respect the project's `scroll-padding-top: 6rem` so the target heading lands below the fixed nav.
+
+## Notes
+
+- Multi-instance safe: each TOC reads its own selector / heading set.
+- Re-initialized on `astro:page-load` for view-transition navigation.
+- For very long pages, consider tightening to `maxLevel={2}` — `h3`s often produce a noisy list.

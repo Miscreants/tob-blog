@@ -1,0 +1,129 @@
+---
+title: Image & Picture
+description: Optimized images via astro:assets — build-time Sharp transforms, hashed cacheable output, responsive sources, and the Cloudflare-static rules to follow.
+category: primitive
+order: 6
+sourceFile: src/pages/index.astro
+status: stable
+related: [CardFeatured, Media, Avatar, SliderBasicMap]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import { Image, Picture } from "astro:assets";
+import demo from "@images/feature-1.webp";
+
+`<Image>` and `<Picture>` are Astro's built-in image components (from `astro:assets`). They run the source through **Sharp at build time** — resizing, transcoding, and emitting hashed files into `dist/_astro/*` — then output an `<img>`/`<picture>` with intrinsic `width`/`height` so the layout never shifts (CLS). This is the **standard** for every content/decorative image in the starter; raw `<img>` is reserved for `/public` assets (SVG logos, favicons) and runtime/CMS URL strings.
+
+> **Works on Cloudflare with no adapter.** The starter is pure-static (`output: 'static'`, no adapter), so Sharp runs during `npm run build` and Cloudflare just serves the static `/_astro/*` output. Do **not** add `@astrojs/cloudflare` for images — its image service is a passthrough that ships unoptimized/broken AVIF.
+
+## Preview
+
+<Preview label="<Image> — single optimized source" align="start">
+  <div class="w-full max-w-md">
+    <Image src={demo} alt="Schema builder screenshot" loading="lazy" decoding="async" class="w-full h-auto" />
+  </div>
+</Preview>
+
+<Preview label="<Picture> — multi-format (AVIF → WebP), responsive widths" align="start">
+  <div class="w-full max-w-md">
+    <Picture
+      src={demo}
+      alt="Schema builder screenshot"
+      widths={[400, 800]}
+      sizes="(min-width: 768px) 400px, 100vw"
+      formats={["avif", "webp"]}
+      fallbackFormat="webp"
+      quality={70}
+      loading="lazy"
+      decoding="async"
+      class="w-full h-auto"
+    />
+  </div>
+</Preview>
+
+## Usage
+
+```astro
+---
+import { Image, Picture } from "astro:assets";
+// Import the asset — this is what unlocks optimization + dimension inference.
+import hero from "@images/hero.webp";
+import shot from "@images/screenshot.webp";
+---
+
+{/* Single optimized image. width/height inferred from the import. */}
+<Image src={shot} alt="Schema builder" loading="lazy" decoding="async" />
+
+{/* Above-the-fold / LCP image — never lazy-load it. */}
+<Image src={hero} alt="" widths={[800, 1600]} sizes="100vw"
+       loading="eager" fetchpriority="high" />
+
+{/* Multi-format + responsive: emits <picture> with AVIF then WebP. */}
+<Picture
+  src={hero}
+  alt="Product hero"
+  widths={[600, 1200, 1800]}
+  sizes="(min-width: 1024px) 1100px, 100vw"
+  formats={["avif", "webp"]}
+  fallbackFormat="webp"
+  quality={70}
+/>
+```
+
+## `<Image>` vs `<Picture>`
+
+| Use | When |
+|---|---|
+| **`<Image>`** | The default. One source, one output format. Add `widths` + `sizes` for a responsive `srcset`. |
+| **`<Picture>`** | You want **multiple formats** (AVIF with a WebP fallback) or art-direction. Emits a `<picture>` with `<source>` per format. Best for large hero/banner images where AVIF's extra savings matter. |
+
+## Rules (the ones that actually bite)
+
+- **Pass the imported asset, not its `.src`.** `src={img}` ✅ — `src={img.src}` ❌. The string form is just a URL and silently skips optimization *and* the `width`/`height` inference that prevents CLS.
+- **Import from `src/images/`** (aliased `@images/*`). Only un-optimizable assets (SVGs, favicons, OG/social images) belong in `public/` and stay as raw `<img>`.
+- **Don't lazy-load the LCP image.** The hero / first above-the-fold image gets `loading="eager"` + `fetchpriority="high"`. Everything below the fold gets `loading="lazy"` + `decoding="async"`. Lazy-loading the LCP element directly tanks the LCP metric.
+- **`alt` is required.** Use a real description for meaningful images, `alt=""` (+ `aria-hidden="true"`) for decorative ones.
+- **The same imported asset is deduped.** Reusing one import across a page emits a single `/_astro/*` file referenced everywhere.
+
+## Accepting images in your own components
+
+When a component renders an image it owns, type the prop as **`ImageMetadata`** and render `<Image>`:
+
+```astro
+---
+import type { ImageMetadata } from "astro";
+import { Image } from "astro:assets";
+
+interface Props {
+  src: ImageMetadata;   // an imported asset, not a string
+  alt: string;
+}
+const { src, alt } = Astro.props;
+---
+<Image src={src} alt={alt} loading="lazy" decoding="async" />
+```
+
+For primitives that must also accept **runtime/CMS URL strings** (`Avatar`, `Media`, `SliderBasicMap`), the starter pattern is a union prop that branches on the type — imported assets get optimized, strings fall through to a plain `<img>`:
+
+```astro
+---
+import type { ImageMetadata } from "astro";
+import { Image } from "astro:assets";
+
+interface Props {
+  src?: string | ImageMetadata;
+  alt: string;
+}
+const { src, alt } = Astro.props;
+---
+{src && (typeof src === "string"
+  ? <img src={src} alt={alt} loading="lazy" decoding="async" />
+  : <Image src={src} alt={alt} loading="lazy" decoding="async" />)}
+```
+
+## Notes
+
+- **Content-collection images** go through `astro:assets` too: use `image()` in the Zod schema (`heroImage: image().optional()`) so frontmatter image paths resolve to `ImageMetadata` and optimize on build.
+- **Remote images** (a literal URL string to `<Image>`) require explicit `width`/`height` and need the domain allow-listed in `image.domains`/`image.remotePatterns`; they aren't downloaded and re-encoded the way local imports are.
+- **`quality`** accepts a number (`0–100`) or a preset (`"low" | "mid" | "high" | "max"`). 70 is a good default for photographic content.
+- **SVGs** don't benefit from Sharp — keep them as inline `<svg>`, an `astro-icon` `<Icon>`, or a `/public` `<img>`.

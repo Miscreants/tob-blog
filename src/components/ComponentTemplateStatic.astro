@@ -1,0 +1,46 @@
+---
+/**
+ * ComponentTemplateStatic — the default starting point.
+ *
+ * Most components are not interactive. Starting from this file keeps them free
+ * of a script, a style block and a lifecycle they never use. Reach for
+ * ComponentTemplateInteractive only once there is real behavior, and
+ * ComponentTemplatePolymorphic only when the rendered element varies.
+ *
+ * Copy, rename, delete what you don't need.
+ */
+interface Props {
+  /** Visible text, and the accessible name when no children are passed. */
+  label: string;
+  variant?: "primary" | "secondary";
+  /** Hide the label visually but keep it for screen readers. */
+  hideLabel?: boolean;
+  /** Always accept a class passthrough so callers can extend without forking. */
+  class?: string;
+}
+
+// Defaults live in the destructure, not scattered through the template.
+// `class` is a reserved word, so alias it.
+const { label, variant = "primary", hideLabel = false, class: className } = Astro.props;
+
+// Variant → classes as a lookup. Adding a variant is one line here plus one
+// entry in the union above, and the template stays free of conditionals.
+// Semantic tokens only — never a raw hex or a Tailwind neutral.
+const variantClasses = {
+  primary: "bg-intent text-fg-on-intent",
+  secondary: "bg-panel text-fg border border-stroke",
+};
+
+// Slot introspection at build time. `has()` is the cheap check; when a slot
+// might be passed but render empty, render it and inspect the string instead.
+const hasIcon = Astro.slots.has("icon");
+---
+
+<div class:list={["inline-flex items-center gap-2 px-4 py-2", variantClasses[variant], className]}>
+  {hasIcon && (
+    <span aria-hidden="true"><slot name="icon" /></span>
+  )}
+  <span class:list={[hideLabel && "sr-only"]}>
+    <slot>{label}</slot>
+  </span>
+</div>

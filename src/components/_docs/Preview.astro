@@ -1,0 +1,43 @@
+---
+// Preview — wraps a live component example in a labelled, framed container
+// so it stands out from surrounding doc prose. Underscore-prefixed folder
+// (`_docs/`) keeps these components out of the public list.
+//
+// Usage (inside an MDX doc):
+//   import Preview from "@components/_docs/Preview.astro";
+//   import Button from "@components/Button.astro";
+//
+//   <Preview label="Default">
+//     <Button label="Click me" />
+//   </Preview>
+//
+// Optional `align` controls how children sit inside the frame.
+
+interface Props {
+  label?: string;
+  align?: "start" | "center" | "stretch";
+  class?: string;
+}
+
+const { label, align = "center", class: className = "" } = Astro.props;
+
+const alignClass = {
+  start: "items-start justify-start",
+  center: "items-center justify-center",
+  stretch: "items-stretch justify-stretch",
+}[align];
+---
+
+<figure
+  data-doc-preview
+  class:list={["not-prose my-6 border border-stroke bg-canvas", className]}
+>
+  {label && (
+    <figcaption class="border-b border-stroke px-4 py-2 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+      {label}
+    </figcaption>
+  )}
+  <div class:list={["flex w-full p-8 min-h-32", alignClass]}>
+    <slot />
+  </div>
+</figure>

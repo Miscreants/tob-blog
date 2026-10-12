@@ -1,0 +1,65 @@
+---
+// PropsTable — renders a consistent props table from a structured `props`
+// array. Replaces hand-rolled markdown tables with predictable formatting,
+// alignment, and styling.
+//
+// Usage (inside an MDX doc):
+//   import PropsTable from "@components/_docs/PropsTable.astro";
+//
+//   <PropsTable props={[
+//     { name: "label", type: "string", default: '"Submit"', description: "Button text" },
+//     { name: "variant", type: '"primary" | "secondary"', default: '"primary"' },
+//     { name: "disabled", type: "boolean", default: "false", required: false },
+//   ]} />
+
+type Prop = {
+  name: string;
+  type: string;
+  default?: string;
+  description?: string;
+  required?: boolean;
+};
+
+interface Props {
+  props: Prop[];
+  class?: string;
+}
+
+const { props, class: className = "" } = Astro.props;
+---
+
+<div class:list={["not-prose my-6 overflow-x-auto border border-stroke", className]}>
+  <table class="w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-stroke bg-panel-muted text-left text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+        <th class="px-4 py-3">Prop</th>
+        <th class="px-4 py-3">Type</th>
+        <th class="px-4 py-3">Default</th>
+        <th class="px-4 py-3 w-2/5">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {props.map((p, i) => (
+        <tr class:list={[i > 0 && "border-t border-stroke"]}>
+          <td class="px-4 py-3 align-top">
+            <code class="font-mono text-xs text-fg">{p.name}</code>
+            {p.required && <span class="ml-1 text-xs text-intent">*</span>}
+          </td>
+          <td class="px-4 py-3 align-top">
+            <code class="font-mono text-xs text-fg-muted whitespace-pre-wrap">{p.type}</code>
+          </td>
+          <td class="px-4 py-3 align-top">
+            {p.default ? (
+              <code class="font-mono text-xs text-fg-muted">{p.default}</code>
+            ) : (
+              <span class="text-fg-subtle">—</span>
+            )}
+          </td>
+          <td class="px-4 py-3 align-top text-fg-muted">
+            {p.description ?? ""}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>

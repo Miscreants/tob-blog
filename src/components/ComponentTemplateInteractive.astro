@@ -1,0 +1,117 @@
+---
+/**
+ * ComponentTemplateInteractive — for components with real behavior.
+ *
+ * Adds state, ARIA, keyboard handling and the script lifecycle to the static
+ * template. Everything here is load-bearing; if a component doesn't need the
+ * script, start from ComponentTemplateStatic instead.
+ *
+ * Copy, rename, delete what you don't need.
+ */
+interface Props {
+  /**
+   * Stable id. Passed in rather than generated: a random id changes on every
+   * build, churning the output diff, and a caller can't target it.
+   */
+  id?: string;
+  label: string;
+  /** Open on first render. */
+  open?: boolean;
+  class?: string;
+}
+
+const { id = "disclosure", label, open = false, class: className } = Astro.props;
+
+// Derive related ids from the one stable id so the ARIA wiring can't drift.
+const panelId = `${id}-panel`;
+---
+
+<div id={id} class:list={["relative", className]} data-disclosure>
+  <button
+    type="button"
+    class="inline-flex items-center gap-2 px-4 py-2 border border-stroke
+           focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+    aria-expanded={open ? "true" : "false"}
+    aria-controls={panelId}
+    data-disclosure-trigger
+  >
+    {label}
+  </button>
+
+  <div id={panelId} hidden={!open} data-disclosure-panel>
+    <slot />
+  </div>
+</div>
+
+<style>
+  /* Only when a utility can't express it. Tokens via var() — @theme tokens
+     don't resolve through @apply in a scoped block, but custom properties
+     cascade in fine. */
+  [data-disclosure-panel] {
+    border-top: 1px solid var(--color-stroke);
+    transition: opacity var(--timing-default-quarter);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-disclosure-panel] {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  // Per-behavior init guard. A WeakSet rather than a shared data attribute:
+  // one flag on the element would let whichever behavior ran first block
+  // every other behavior bound to the same root, silently.
+  const initialized = new WeakSet<HTMLElement>();
+
+  function initDisclosure() {
+    document.querySelectorAll<HTMLElement>("[data-disclosure]").forEach((root) => {
+      if (initialized.has(root)) return;
+      initialized.add(root);
+
+      const trigger = root.querySelector<HTMLButtonElement>("[data-disclosure-trigger]");
+      const panel = root.querySelector<HTMLElement>("[data-disclosure-panel]");
+      if (!trigger || !panel) return;
+
+      // One controller per instance: aborting it removes every listener at
+      // once, so teardown can't miss one.
+      const controller = new AbortController();
+      const { signal } = controller;
+
+      const setOpen = (next: boolean) => {
+        trigger.setAttribute("aria-expanded", String(next));
+        panel.hidden = !next;
+      };
+
+      trigger.addEventListener(
+        "click",
+        () => setOpen(trigger.getAttribute("aria-expanded") !== "true"),
+        { signal },
+      );
+
+      // Escape closes and returns focus to the trigger — never leave focus
+      // stranded on a hidden element.
+      root.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key !== "Escape") return;
+          if (trigger.getAttribute("aria-expanded") !== "true") return;
+          setOpen(false);
+          trigger.focus();
+        },
+        { signal },
+      );
+
+      // Observers and timers aren't covered by the signal — disconnect and
+      // cancel them here too if this component grows any.
+      root.addEventListener("disclosure:destroy", () => controller.abort(), { signal });
+    });
+  }
+
+  initDisclosure();
+
+  // No-op unless a project enables Astro's client router; the direct call above
+  // is what actually initializes on a normal page load.
+  document.addEventListener("astro:page-load", initDisclosure);
+</script>

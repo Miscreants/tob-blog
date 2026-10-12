@@ -1,0 +1,235 @@
+---
+title: Contact form
+description: Reusable pattern — simple form (first name, last name, email) captured by an Astro Action and emailed via Cloudflare's native send_email binding. No third-party email API.
+category: form
+order: 12
+sourceFile: src/pages/contact.astro
+status: per-project
+related: [Form, Field, Button]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import Form from "@components/Form.astro";
+import Field from "@components/Field.astro";
+import Button from "@components/Button.astro";
+
+End-to-end pattern that ties together four moving parts: a static page with the
+existing `<Form>` / `<Field>` / `<Button>` components, an Astro Action that
+validates input with Zod, a Cloudflare Worker `send_email` binding, and Email
+Routing on a Cloudflare-managed zone.
+
+The user-facing flow is unremarkable — fill three fields, hit Send, get a
+confirmation. The interesting part is what's *not* there: no Resend, no
+SendGrid, no SMTP credentials, no third-party SDK. The whole notification
+path is native Cloudflare.
+
+## Preview
+
+<Preview label="Contact form (preview only — submit posts to /_actions/contact in a real build)" align="stretch">
+  <div class="w-full max-w-md">
+    <Form action="/_actions/contact" method="POST" noEnhance>
+      <Field label="First name" name="firstName" required autocomplete="given-name" maxlength={100} />
+      <Field label="Last name" name="lastName" required autocomplete="family-name" maxlength={100} />
+      <Field label="Email" name="email" type="email" required autocomplete="email" maxlength={254} />
+      <Button type="submit" variant="primary" withArrow={false}>Send</Button>
+    </Form>
+  </div>
+</Preview>
+
+## Files involved
+
+| File | Role |
+| --- | --- |
+| `astro.config.mjs` | `output: 'static'` + `@astrojs/cloudflare` adapter. The adapter mounts actions at `/_actions/<name>` as on-demand endpoints alongside prerendered pages. |
+| `wrangler.jsonc` | Worker config — declares the `NOTIFY_EMAIL` send_email binding plus `FROM_EMAIL` / `FROM_NAME` / `NOTIFY_TO` vars. |
+| `src/env.d.ts` | Module-augments the `cloudflare:workers` `Env` interface so `import { env }` is fully typed. |
+| `src/actions/index.ts` | The `contact` action — Zod input, MIME message via `mimetext`, send via the binding. |
+| `src/pages/contact.astro` | The example page — uses `<Form>`, `<Field>`, `<Button>`, posts to `/_actions/contact`. |
+
+## How the wiring works
+
+1. The form posts `multipart/form-data` to `/_actions/contact`. With JS,
+   `Form.astro` intercepts and `fetch()`s; without JS the browser does a native
+   form POST. Both paths hit the same endpoint.
+2. The adapter routes that path to `server.contact` in `src/actions/index.ts`.
+3. Zod validates the payload. The honeypot field (`website`) silently 200s if
+   filled.
+4. The handler imports `env` from `cloudflare:workers` (the Astro 6 API —
+   `Astro.locals.runtime.env` was removed) and calls
+   `env.NOTIFY_EMAIL.send(new EmailMessage(from, to, mime))`.
+
+## Action shape
+
+```ts
+// src/actions/index.ts
+import { defineAction, ActionError } from "astro:actions";
+import { z } from "astro:schema";
+import { EmailMessage } from "cloudflare:email";
+import { env } from "cloudflare:workers";
+import { createMimeMessage } from "mimetext";
+
+export const server = {
+  contact: defineAction({
+    accept: "form",
+    input: z.object({
+      firstName: z.string().trim().min(1).max(100),
+      lastName: z.string().trim().min(1).max(100),
+      email: z.string().trim().email().max(254),
+      website: z.string().max(0).optional(), // honeypot
+    }),
+    handler: async (input) => {
+      if (input.website) return { ok: true };
+
+      // DEV / no-binding short-circuit lets `astro dev` run without
+      // provisioning Email Routing.
+      if (import.meta.env.DEV || !env.NOTIFY_EMAIL) {
+        console.log("[contact] would send", input);
+        return { ok: true };
+      }
+
+      const mime = createMimeMessage();
+      mime.setSender({ name: env.FROM_NAME, addr: env.FROM_EMAIL });
+      mime.setRecipient(env.NOTIFY_TO);
+      mime.setSubject(`New contact: ${input.firstName} ${input.lastName}`);
+      mime.addMessage({
+        contentType: "text/plain",
+        data: `Name: ${input.firstName} ${input.lastName}\nEmail: ${input.email}`,
+      });
+
+      try {
+        await env.NOTIFY_EMAIL.send(
+          new EmailMessage(env.FROM_EMAIL, env.NOTIFY_TO, mime.asRaw())
+        );
+      } catch (err) {
+        console.error("send_email failed", err);
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not send notification.",
+        });
+      }
+      return { ok: true };
+    },
+  }),
+};
+```
+
+## Binding shape
+
+```jsonc
+// wrangler.jsonc — relevant fields only
+{
+  "compatibility_date": "2026-04-04",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "send_email": [
+    { "name": "NOTIFY_EMAIL", "destination_address": "you@example.com" }
+  ],
+
+  "vars": {
+    "FROM_EMAIL": "noreply@yourdomain.tld",
+    "FROM_NAME":  "Your App",
+    "NOTIFY_TO":  "you@example.com"
+  }
+}
+```
+
+`destination_address` locks the binding to a single verified inbox — exactly
+the "notify me" use case. To allow multiple recipients, use `allowed_destination_addresses` instead.
+
+**Don't put a `main` field** in `wrangler.jsonc` — the new Cloudflare Vite
+plugin checks it at sync time before the build exists. The adapter writes its
+own `dist/server/wrangler.json` with the right entry on build.
+
+## Page wiring
+
+```astro
+---
+import Layout from "../layouts/Layout.astro";
+import Form from "@components/Form.astro";
+import Field from "@components/Field.astro";
+import Button from "@components/Button.astro";
+
+// Astro mounts every action at /_actions/<name>.
+const contactUrl = "/_actions/contact";
+---
+
+<Layout title="Contact">
+  <Form action={contactUrl} method="POST">
+    <Field name="firstName" label="First name" required autocomplete="given-name" />
+    <Field name="lastName"  label="Last name"  required autocomplete="family-name" />
+    <Field name="email"     label="Email"      type="email" required autocomplete="email" />
+    <Button type="submit" withArrow={false}>Send</Button>
+    <p slot="success">Thanks — we'll be in touch shortly.</p>
+    <p slot="error">Something went wrong. Please try again.</p>
+  </Form>
+</Layout>
+```
+
+The existing `<Form>` accepts `action` as a string URL, so we pass
+`"/_actions/contact"` directly. (`String(actions.contact)` does **not** return
+the action URL — it stringifies the action proxy and posts to the wrong place.)
+
+## Local dev — two modes
+
+### `npm run dev` — fast UI iteration
+
+Standard Astro dev server. The action's DEV branch logs the payload and
+returns success without touching the binding, so the form's success state
+still renders correctly. **Don't enable `platformProxy`** in the adapter
+config — it makes Astro run SSR through workerd, which breaks `astro-icon`
+(used across this project) with `module is not defined`.
+
+### `wrangler dev` — exercise the real binding
+
+```sh
+npm run build
+npx wrangler dev --config dist/server/wrangler.json --port 4400
+```
+
+Miniflare doesn't actually deliver email — it writes each sent message to a
+`.eml` file under `%TEMP%/miniflare-*/email/email/<uuid>.eml` and logs the
+path. Open that file to verify subject/body/headers.
+
+## Production setup (one-time)
+
+The binding only works against a domain on Cloudflare with Email Routing
+enabled, sending to verified destination addresses.
+
+1. Buy or transfer a domain into Cloudflare Registrar (at-cost).
+2. Dashboard → the zone → **Email** → **Email Routing** → enable.
+3. **Destination addresses** → add your inbox and click the verification link.
+4. (Optional) Add a routing rule like `hello@yourdomain.tld → you@example.com`
+   so replies work.
+5. Update `wrangler.jsonc`: `FROM_EMAIL` to an address on the Cloudflare zone,
+   `NOTIFY_TO` and `destination_address` to the verified inbox.
+6. `npx wrangler deploy --config dist/server/wrangler.json`.
+
+## Reuse checklist
+
+To drop this pattern into another Astro 6 project:
+
+1. `npm i @astrojs/cloudflare mimetext`.
+2. `astro.config.mjs`: `output: 'static'` + `adapter: cloudflare()` (no `platformProxy`).
+3. Copy `wrangler.jsonc`, `src/env.d.ts`, `src/actions/index.ts`, `src/pages/contact.astro`.
+4. Update `name`, `FROM_EMAIL`, `NOTIFY_TO`, and `destination_address` in `wrangler.jsonc`.
+5. If the project doesn't already have `Form` / `Field` / `Button`, copy those over.
+
+## Status field — why "per-project"
+
+Marked `per-project` (not `stable`) because the pattern requires environment
+config (`wrangler.jsonc`, Email Routing on a Cloudflare zone) that the
+component itself can't carry. It's a *recipe* you reproduce in each project,
+not a drop-in component.
+
+## Things to add later
+
+- Rate limiting (Turnstile, or a KV-backed per-IP counter).
+- `Reply-To` header set to the submitter's email so you can reply directly.
+- HTML body alongside the plain-text one.
+- Persistence to D1 if submissions need to be auditable beyond email.
+
+## Notes
+
+- The action has a DEV short-circuit (`import.meta.env.DEV || !env.NOTIFY_EMAIL`) so the form works in `astro dev` without the binding. Remove or tighten it if you want dev to require the real binding (run `wrangler dev` instead).
+- Astro 6 removed `Astro.locals.runtime.env`. Use `import { env } from "cloudflare:workers"` and module-augment its `Env` interface in `src/env.d.ts` for typed bindings.
+- The honeypot is provided by `<Form>` itself (hidden `website` input). The action's Zod schema mirrors that name and rejects any non-empty value.

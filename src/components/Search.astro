@@ -1,0 +1,358 @@
+---
+// Search — type-to-filter input with a fuzzy scorer that hides non-matching
+// items already on the page. Pure DOM filtering: no client-side rendering,
+// no virtual list. Drop the input above any list of items that have a
+// `data-search-text` attribute (or just plain text content), point it at
+// them with a selector, and the script does the rest.
+//
+// Usage:
+//   <Search
+//     targetSelector="[data-search-item]"
+//     groupSelector="[data-search-group]"
+//     emptySelector="[data-search-empty]"
+//     placeholder="Search components…"
+//   />
+//
+//   <ul>
+//     <li data-search-item data-search-text="Button primary action">…</li>
+//     <li data-search-item data-search-text="Tooltip hint popover">…</li>
+//   </ul>
+//   <p data-search-empty hidden>No results.</p>
+
+interface Props {
+  /** CSS selector for items to filter. Required. */
+  targetSelector: string;
+  /** CSS selector for group containers — hidden when all their items are hidden. */
+  groupSelector?: string;
+  /** CSS selector for the "no results" element — shown when nothing matches. */
+  emptySelector?: string;
+  /** Placeholder text. */
+  placeholder?: string;
+  /** Visible label (defaults to visually-hidden "Search"). */
+  label?: string;
+  /** Hide the visible label (it stays for screen readers). Default true. */
+  labelHidden?: boolean;
+  /** Stable input id. Auto-generated otherwise. */
+  id?: string;
+  /** Initial value. */
+  value?: string;
+  /** Debounce in ms (input → filter). Default 80. */
+  debounce?: number;
+  /** Minimum score to keep an item visible. Lower = looser matching.
+   *  Default 0.05 keeps tight fuzzy matches and substring hits while
+   *  filtering out noisy cross-word coincidences. */
+  minScore?: number;
+  /** Auto-focus the input on mount. */
+  autofocus?: boolean;
+  class?: string;
+}
+
+const {
+  targetSelector,
+  groupSelector,
+  emptySelector,
+  placeholder = "Search…",
+  label = "Search",
+  labelHidden = true,
+  id,
+  value = "",
+  debounce = 80,
+  minScore = 0.08,
+  autofocus = false,
+  class: className,
+} = Astro.props;
+
+const inputId = id ?? `search-${Math.random().toString(36).slice(2, 10)}`;
+---
+
+<div
+  data-search="component"
+  data-target-selector={targetSelector}
+  data-group-selector={groupSelector}
+  data-empty-selector={emptySelector}
+  data-debounce={debounce}
+  data-min-score={minScore}
+  class:list={["search", className]}
+>
+  <label for={inputId} class:list={["search__label", labelHidden && "sr-only"]}>
+    {label}
+  </label>
+  <div class="search__field">
+    <svg
+      class="search__icon"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+    <input
+      id={inputId}
+      type="search"
+      class="search__input"
+      placeholder={placeholder}
+      value={value}
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      autofocus={autofocus}
+      aria-controls={emptySelector ? undefined : undefined}
+    />
+    <button
+      type="button"
+      class="search__clear"
+      data-search-clear
+      aria-label="Clear search"
+      hidden
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+  <p class="search__status sr-only" role="status" aria-live="polite" data-search-status></p>
+</div>
+
+<style is:global>
+  [data-search="component"] {
+    position: relative;
+    display: block;
+  }
+
+  .search__field {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search__icon {
+    position: absolute;
+    left: 0.75rem;
+    color: var(--color-fg-subtle);
+    pointer-events: none;
+  }
+
+  .search__input {
+    width: 100%;
+    padding: 0.5rem 2.25rem;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    color: var(--color-fg);
+    background: var(--color-panel);
+    border: 1px solid var(--color-stroke);
+    transition: border-color 100ms ease, box-shadow 100ms ease;
+  }
+  .search__input::placeholder {
+    color: var(--color-fg-subtle);
+  }
+  .search__input:focus-visible {
+    outline: none;
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 20%, transparent);
+  }
+  /* Strip the browser-supplied search clear UI — we render our own. */
+  .search__input::-webkit-search-cancel-button,
+  .search__input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .search__clear {
+    position: absolute;
+    right: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-fg-muted);
+    cursor: pointer;
+  }
+  .search__clear:hover { color: var(--color-fg); }
+  .search__clear:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .search__clear[hidden] { display: none; }
+
+  /* Highlight inside item text — opt-in by wrapping in <mark data-search-mark>. */
+  [data-search-mark] {
+    background: color-mix(in srgb, var(--color-intent) 22%, transparent);
+    color: inherit;
+    padding: 0 1px;
+  }
+</style>
+
+<script>
+  type Score = { score: number; positions: number[] };
+
+  /** Fuzzy subsequence scorer.
+   *
+   *  Returns a normalized score in [0..1]:
+   *    - 1.0  → full prefix match
+   *    - 0.9  → word-boundary substring match
+   *    - 0.7  → mid-word substring match
+   *    - 0.0–0.6 → fuzzy subsequence (chars in order, gaps allowed)
+   *    - 0    → at least one query char missing
+   *
+   *  Higher is more relevant; consumers compare against `minScore` to filter.
+   */
+  function fuzzyScore(rawQuery: string, rawTarget: string): Score {
+    const q = rawQuery.toLowerCase();
+    const t = rawTarget.toLowerCase();
+    if (!q) return { score: 1, positions: [] };
+    if (!t) return { score: 0, positions: [] };
+
+    // Substring match — strong signal.
+    const idx = t.indexOf(q);
+    if (idx !== -1) {
+      const positions = Array.from({ length: q.length }, (_, i) => idx + i);
+      if (idx === 0) return { score: 1, positions };
+      const prev = t[idx - 1];
+      const wordBoundary = prev === " " || prev === "-" || prev === "_" || prev === "/";
+      return { score: wordBoundary ? 0.9 : 0.7, positions };
+    }
+
+    // Fuzzy subsequence. The naive "first occurrence wins" walk produces
+    // false positives on long descriptions where stray characters happen to
+    // appear in the right order. Penalizing by match span (last - first)
+    // collapses sparse hits to ~0 while keeping tight matches strong.
+    let qi = 0;
+    let raw = 0;
+    let lastMatch = -2;
+    const positions: number[] = [];
+    for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+      if (t[ti] === q[qi]) {
+        const consecutive = ti === lastMatch + 1;
+        const prev = ti === 0 ? " " : t[ti - 1];
+        const wordStart = prev === " " || prev === "-" || prev === "_" || prev === "/";
+        raw += consecutive ? 0.5 : 0.2;
+        if (wordStart) raw += 0.3;
+        positions.push(ti);
+        lastMatch = ti;
+        qi++;
+      }
+    }
+    if (qi < q.length) return { score: 0, positions: [] };
+    const span = positions[positions.length - 1] - positions[0] + 1;
+    const tightness = q.length / span; // 1.0 = perfectly contiguous
+    return {
+      score: Math.min((raw / q.length) * tightness, 0.6),
+      positions,
+    };
+  }
+
+  const initOne = (root: HTMLElement) => {
+    if (root.dataset.scriptInitialized) return;
+    root.dataset.scriptInitialized = "true";
+
+    const input = root.querySelector<HTMLInputElement>(".search__input");
+    const clear = root.querySelector<HTMLButtonElement>("[data-search-clear]");
+    const status = root.querySelector<HTMLElement>("[data-search-status]");
+    if (!input) return;
+
+    const targetSelector = root.getAttribute("data-target-selector") || "";
+    const groupSelector = root.getAttribute("data-group-selector") || "";
+    const emptySelector = root.getAttribute("data-empty-selector") || "";
+    const debounceMs = Number(root.getAttribute("data-debounce")) || 80;
+    const minScore = Number(root.getAttribute("data-min-score")) || 0;
+
+    const itemsForQuery = () =>
+      Array.from(document.querySelectorAll<HTMLElement>(targetSelector));
+    const groups = () =>
+      groupSelector
+        ? Array.from(document.querySelectorAll<HTMLElement>(groupSelector))
+        : [];
+    const emptyEl = () =>
+      emptySelector ? document.querySelector<HTMLElement>(emptySelector) : null;
+
+    const apply = (query: string) => {
+      const items = itemsForQuery();
+      let visible = 0;
+
+      for (const item of items) {
+        const text = item.getAttribute("data-search-text") ?? item.textContent ?? "";
+        const { score } = fuzzyScore(query, text);
+        const show = query === "" ? true : score > minScore;
+        item.toggleAttribute("hidden", !show);
+        if (show) visible++;
+      }
+
+      // Hide whole groups that have no visible items.
+      for (const group of groups()) {
+        const groupItems = Array.from(
+          group.querySelectorAll<HTMLElement>(targetSelector),
+        );
+        const anyVisible = groupItems.some((el) => !el.hasAttribute("hidden"));
+        group.toggleAttribute("hidden", !anyVisible && query !== "");
+      }
+
+      // Toggle empty state.
+      const empty = emptyEl();
+      if (empty) {
+        empty.toggleAttribute("hidden", visible !== 0 || query === "");
+      }
+
+      // Toggle clear button.
+      if (clear) clear.toggleAttribute("hidden", query === "");
+
+      // Update SR status.
+      if (status) {
+        status.textContent =
+          query === ""
+            ? ""
+            : `${visible} ${visible === 1 ? "result" : "results"} for "${query}"`;
+      }
+
+      // Bubble a custom event for consumers (counters, analytics).
+      root.dispatchEvent(
+        new CustomEvent("search:filter", {
+          bubbles: true,
+          detail: { query, visible, total: items.length },
+        }),
+      );
+    };
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onInput = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => apply(input.value.trim()), debounceMs);
+    };
+
+    input.addEventListener("input", onInput);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && input.value !== "") {
+        e.preventDefault();
+        input.value = "";
+        apply("");
+      }
+    });
+    clear?.addEventListener("click", () => {
+      input.value = "";
+      apply("");
+      input.focus();
+    });
+
+    // Apply initial value if any.
+    if (input.value) apply(input.value.trim());
+  };
+
+  const initAll = () =>
+    document
+      .querySelectorAll<HTMLElement>('[data-search="component"]')
+      .forEach(initOne);
+
+  initAll();
+  document.addEventListener("astro:page-load", initAll);
+</script>

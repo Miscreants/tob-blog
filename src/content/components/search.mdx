@@ -1,0 +1,194 @@
+---
+title: Search
+description: Type-to-filter input with a fuzzy subsequence scorer. Filters DOM items in place — no re-rendering, no virtual list, no client framework.
+category: pattern
+order: 55
+sourceFile: src/components/Search.astro
+status: stable
+related: [FilterBar, ComboboxGrouped, Pagination]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Search from "@components/Search.astro";
+
+{/* cspell:ignore ropdown — bold markers split "Dropdown" mid-word below; the copy is correct. */}
+
+Lightweight client-side search. Drop the input above any list of items, point it at them with a CSS selector, and the script hides anything that doesn't match the query. Matching is fuzzy (subsequence) with bonuses for prefix matches and word-boundary hits, so `"btn"` finds **B**u**t**to**n**, `"drp"` finds **D**ropdown, etc.
+
+It's wired into the live [Components index](/components/) at the top of the page — try it there to see fuzzy scoring against this exact list.
+
+## Preview
+
+The sample below filters the four cards underneath. Try `"act"` (active), `"err"` (errored), or `"sub"` (subscribed).
+
+<Preview label="Filters real DOM nodes via selector" align="stretch">
+  <div class="w-full">
+    <Search
+      class="mb-4"
+      targetSelector="[data-demo-search-item]"
+      groupSelector="[data-demo-search-group]"
+      emptySelector="[data-demo-search-empty]"
+      placeholder="Search statuses…"
+    />
+    <ul data-demo-search-group class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <li data-demo-search-item data-search-text="Active subscribed paying customer" class="border border-stroke bg-panel p-4">
+        <h4 class="text-sm font-semibold">Active</h4>
+        <p class="text-xs text-fg-muted mt-1">Subscribed customer</p>
+      </li>
+      <li data-demo-search-item data-search-text="Trialing free trial signup" class="border border-stroke bg-panel p-4">
+        <h4 class="text-sm font-semibold">Trialing</h4>
+        <p class="text-xs text-fg-muted mt-1">Free trial signup</p>
+      </li>
+      <li data-demo-search-item data-search-text="Errored failed payment dunning" class="border border-stroke bg-panel p-4">
+        <h4 class="text-sm font-semibold">Errored</h4>
+        <p class="text-xs text-fg-muted mt-1">Failed payment</p>
+      </li>
+      <li data-demo-search-item data-search-text="Cancelled churned customer" class="border border-stroke bg-panel p-4">
+        <h4 class="text-sm font-semibold">Cancelled</h4>
+        <p class="text-xs text-fg-muted mt-1">Churned customer</p>
+      </li>
+    </ul>
+    <p data-demo-search-empty hidden class="mt-4 text-center text-sm text-fg-muted">No statuses match.</p>
+  </div>
+</Preview>
+
+(The preview uses `data-demo-search-*` attributes so its filter doesn't interfere with the page's own search wiring.)
+
+## Props
+
+<PropsTable props={[
+  { name: "targetSelector", type: "string", required: true, description: "CSS selector for items to filter. Each match is hidden via the `hidden` attribute when it doesn't match." },
+  { name: "groupSelector", type: "string", description: "CSS selector for group containers — they get `hidden` when all of their items are hidden." },
+  { name: "emptySelector", type: "string", description: "CSS selector for a 'no results' element to show when the query produces zero matches." },
+  { name: "placeholder", type: "string", default: '"Search…"', description: "Input placeholder." },
+  { name: "label", type: "string", default: '"Search"', description: "Accessible label (visually hidden by default)." },
+  { name: "labelHidden", type: "boolean", default: "true", description: "Visually hide the label. It stays for screen readers." },
+  { name: "id", type: "string", description: "Stable input id. Auto-generated otherwise." },
+  { name: "value", type: "string", default: '""', description: "Initial query." },
+  { name: "debounce", type: "number", default: "80", description: "Debounce in ms between input and filter." },
+  { name: "minScore", type: "number", default: "0.08", description: "Minimum score to keep an item visible. Lower = looser matching. Default filters sparse cross-word coincidences while keeping tight fuzzy matches; raise toward 0.7 to require substring matches only." },
+  { name: "autofocus", type: "boolean", default: "false", description: "Focus the input on mount." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Wiring it to a list
+
+The component is decoupled from the list it filters — you mark items with attributes and pass selectors. Three pieces:
+
+1. **Items** carry `data-search-item` and (optionally) `data-search-text`. If `data-search-text` is omitted, the item's `textContent` is used. Custom text lets you index hidden facets (category, tags, alternate names).
+2. **Groups** (optional) wrap items and carry the group selector (e.g. `data-search-group`). When every item inside a group is hidden, the group is hidden too — so empty section headers don't linger.
+3. **Empty state** (optional) is any element marked with the empty selector — hidden by default, revealed when zero items match.
+
+```astro
+---
+import Search from "@components/Search.astro";
+---
+
+<Search
+  targetSelector="[data-search-item]"
+  groupSelector="[data-search-group]"
+  emptySelector="[data-search-empty]"
+  placeholder="Search…"
+/>
+
+<section data-search-group>
+  <h2>Primitives</h2>
+  <ul>
+    <li data-search-item data-search-text="Button primary action CTA">…</li>
+    <li data-search-item data-search-text="Tag chip pill label">…</li>
+  </ul>
+</section>
+
+<p data-search-empty hidden>No results.</p>
+```
+
+## Wiring to a content collection
+
+Items rendered from a content collection just need their text concatenated into `data-search-text`. The full setup used by the live [Components index](/components/):
+
+```astro
+---
+import { getCollection } from "astro:content";
+import Search from "@components/Search.astro";
+
+const all = await getCollection("components");
+const groups = ["primitive", "block", "pattern"].map((cat) => ({
+  category: cat,
+  items: all.filter((c) => c.data.category === cat),
+}));
+---
+
+<Search
+  targetSelector="[data-search-item]"
+  groupSelector="[data-search-group]"
+  emptySelector="[data-search-empty]"
+  placeholder="Search components…"
+/>
+
+{groups.map((group) => (
+  <section data-search-group>
+    <h2>{group.category}</h2>
+    <ul>
+      {group.items.map((item) => (
+        <li
+          data-search-item
+          data-search-text={`${item.data.title} ${item.data.description} ${item.data.category}`}
+        >
+          <a href={`/components/${item.id}/`}>
+            <h3>{item.data.title}</h3>
+            <p>{item.data.description}</p>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+))}
+
+<div data-search-empty hidden>No components match.</div>
+```
+
+Same shape works for any collection — blog tags, FAQ entries, changelog items.
+
+## Scoring
+
+The fuzzy scorer returns a value in `[0..1]`:
+
+| Score   | Meaning                                                            |
+|---------|--------------------------------------------------------------------|
+| `1.0`   | Query matches at the start of the target string.                   |
+| `0.9`   | Query matches a word boundary (after space, `-`, `_`, `/`).        |
+| `0.7`   | Query matches mid-word as a contiguous substring.                  |
+| `0–0.6` | Subsequence match — query characters in order, with gaps allowed.  |
+| `0`     | At least one query character couldn't be matched.                  |
+
+Items pass when their score is greater than `minScore`. With the default `minScore=0.01` everything that's at least a subsequence match shows up; raise it to `0.7` if you only want substring matches.
+
+## Events
+
+Each filter pass dispatches a `search:filter` event on the wrapper:
+
+```js
+document.addEventListener("search:filter", (e) => {
+  console.log(e.detail);
+  // { query: "btn", visible: 1, total: 47 }
+});
+```
+
+Use it to update a result counter, log analytics, or persist the query to the URL.
+
+## Accessibility
+
+- Real `<input type="search">` — gets `Cmd/Ctrl+F`-style browser affordances and supports the native Escape-clear behavior.
+- `<label>` is visually hidden by default but always present — screen readers announce the input's purpose.
+- Polite `aria-live` status region announces `"N results for 'query'"` after each filter pass, so screen-reader users know the list shrank.
+- Clear button is a real `<button>` with `aria-label="Clear search"`. Hidden when the input is empty, so the tab order isn't cluttered.
+- The browser's built-in WebKit clear UI is suppressed in CSS so we don't double up.
+- Items are hidden via the `hidden` attribute, which removes them from both the visual flow and the accessibility tree.
+
+## Notes
+
+- Filtering happens entirely client-side, so the full list must be rendered server-side first. For very large lists (thousands of items) consider a server-rendered search route instead — fuzzy matching across thousands of nodes per keystroke will lag.
+- `data-search-text` is plain text — no HTML. Concatenate whatever facets you want indexed.
+- Hidden items remain in the DOM, so deep-linking and "view source" still work as expected.
+- The scorer is deliberately small (≈40 lines) and dependency-free. If you outgrow it (typo tolerance, weighted fields, multi-word AND), swap to [Fuse.js](https://fusejs.io/) or [MiniSearch](https://lucaong.github.io/minisearch/) and feed results back via `hidden` toggles using the same selector contract.

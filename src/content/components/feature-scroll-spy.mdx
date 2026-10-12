@@ -1,0 +1,139 @@
+---
+title: FeatureScrollSpy
+description: Sticky table-of-contents beside scrolling content panels — the TOC highlights whichever panel is in view and scrolls to it on click.
+category: pattern
+order: 62
+sourceFile: src/components/FeatureScrollSpy.astro
+status: stable
+related: [FlowSteps, TableOfContents, SectionMain]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import FeatureScrollSpy from "@components/FeatureScrollSpy.astro";
+
+A long-form feature or capability section: a **sticky, data-driven table of contents** on the left, and a column of scrolling content panels on the right. As the reader scrolls, the TOC entry for the panel currently in view is highlighted; clicking an entry smooth-scrolls to that panel.
+
+The TOC is driven by the `items` prop (so it stays predictable and accessible), while the panels themselves are a plain `<slot />` — put whatever markup you like in there. The only contract is that **each top-level panel carries an `id` matching one of the `items`**.
+
+## Preview
+
+<Preview label="Sticky TOC + panels" align="stretch">
+  <div class="w-full">
+    <FeatureScrollSpy
+      tocLabel="Capabilities"
+      ariaLabel="Capability navigation"
+      items={[
+        { id: "demo-build", label: "Build", eyebrow: "01" },
+        { id: "demo-network", label: "Network", eyebrow: "02" },
+        { id: "demo-scale", label: "Scale", eyebrow: "03" },
+      ]}
+    >
+      <article id="demo-build" class="border border-stroke p-6">
+        <h4 class="h6">Build, automatically</h4>
+        <p class="mt-2 text-body-md text-fg-muted">Source in, production image out — no pipeline to maintain.</p>
+      </article>
+      <article id="demo-network" class="border border-stroke p-6">
+        <h4 class="h6">The network attaches at startup</h4>
+        <p class="mt-2 text-body-md text-fg-muted">A private network is constructed before the first request lands.</p>
+      </article>
+      <article id="demo-scale" class="border border-stroke p-6">
+        <h4 class="h6">Scale on real load</h4>
+        <p class="mt-2 text-body-md text-fg-muted">No thresholds to configure, no capacity to pre-provision.</p>
+      </article>
+    </FeatureScrollSpy>
+  </div>
+</Preview>
+
+The active-state highlight tracks **page** scroll, so it reads as static inside this framed preview — scroll the page itself to watch it move.
+
+## Props
+
+<PropsTable props={[
+  { name: "items", type: "Item[]", required: true, description: "Drives the TOC. Each id must match an id on a slotted panel." },
+  { name: "tocLabel", type: "string", default: '"On this page"', description: "Small heading above the TOC list." },
+  { name: "ariaLabel", type: "string", default: '"Section navigation"', description: "Accessible name for both the <section> and the TOC <nav>." },
+  { name: "class", type: "string", default: '""', description: "Additional classes on the wrapping <section>." },
+]} />
+
+The `Item` shape:
+
+```ts
+type Item = {
+  id: string;       // anchor target — must match an id on the slotted content
+  label: string;    // text shown in the TOC
+  eyebrow?: string; // optional small prefix, e.g. "01" or "Step 1"
+};
+```
+
+## Mechanism
+
+### Layout
+
+A 12-column grid at `md` and up: the TOC `<aside>` takes 4 columns and is `sticky top-24`; the content column takes 8 and stacks its panels with `gap-24`. Below `md` the grid collapses to one column, so the TOC sits above the content as a plain jump-list and nothing is sticky.
+
+### Scroll spy
+
+An `IntersectionObserver` watches every resolved panel with an **active band** in the upper third of the viewport:
+
+```js
+{ rootMargin: "-25% 0px -65% 0px", threshold: 0 }
+```
+
+A panel becomes active as its top crosses into that band. Tall panels and fast scrolls can leave several panels intersecting at once, so the callback sorts the intersecting entries by `Math.abs(boundingClientRect.top)` and picks the one nearest the band's top edge. The winner's TOC link gets `data-active="true"`; every other link is set to `"false"`, and the styling hangs off `data-[active=true]:` variants.
+
+### Click-to-scroll
+
+TOC clicks are intercepted rather than left to native anchor behavior, so the component can smooth-scroll **without** setting a global `html { scroll-behavior: smooth }` that would affect every other scroll on the page. After scrolling it calls `history.replaceState` so the anchor shows in the URL and stays shareable — `replaceState`, not `pushState`, so browser-back doesn't have to walk through every section the reader clicked.
+
+### Anchor offset
+
+A small `is:global` block gives any direct child of the content area that has an `id` a `scroll-margin-top: 6rem`, so anchor jumps don't slide under the fixed nav. It's global (namespaced under `[data-scrollspy-content]`) because the panels are rendered by the caller, not by this component, and scoped styles wouldn't reach them.
+
+### Drift tolerance
+
+TOC targets are resolved to DOM elements once at init. An `item` whose `id` has no matching panel is **skipped silently** rather than throwing, so the component keeps working while `items` and slot content are out of sync mid-edit. The flip side: a typo'd `id` fails quietly — if an entry never highlights, check that its `id` matches.
+
+### Accessibility
+
+- The wrapper is a `<section>` with `aria-label`, and the TOC is a `<nav>` with the same label, so both landmarks are distinguishable.
+- TOC entries are real `<a href="#…">` links — they work as jump links with JS disabled, and the first item renders with `data-active="true"` so the list is never blank before hydration.
+- Full focus ring on every entry (`focus-visible:ring-2 ring-focus ring-offset-2 ring-offset-canvas`).
+- `prefers-reduced-motion: reduce` switches click-scrolling from `smooth` to `auto`.
+
+## Usage
+
+```astro
+---
+import SectionMain from "@components/SectionMain.astro";
+import FeatureScrollSpy from "@components/FeatureScrollSpy.astro";
+
+const features = [
+  { id: "workflows", label: "Real-time workflows", eyebrow: "01" },
+  { id: "lifecycle",  label: "Data lifecycle",     eyebrow: "02" },
+  { id: "schema",     label: "Schema-driven",      eyebrow: "03" },
+];
+---
+
+<SectionMain padding="sm" contentPadding="none" contentClass="gap-12 px-4 lg:px-10">
+  <FeatureScrollSpy tocLabel="Features" ariaLabel="Feature navigation" items={features}>
+    <article id="workflows">…</article>
+    <article id="lifecycle">…</article>
+    <article id="schema">…</article>
+  </FeatureScrollSpy>
+</SectionMain>
+```
+
+Build the `items` array from the same source as the panels so the two can't drift:
+
+```astro
+const tocItems = features.map((f) => ({ id: f.key, label: f.tab }));
+```
+
+## Notes
+
+- **Panels are yours.** The component owns the TOC, the grid and the spy; it makes no assumptions about panel markup. Cards, tables, media, nested grids — all fine, as long as the top-level element carries the `id`.
+- **Wrap it in `SectionMain`** for the page's standard centering and rhythm (STANDARDS §5.0). Use `contentPadding="none"` if your panels manage their own edge padding.
+- **Sticky offset assumes a ~6rem nav.** `md:top-24` on the TOC and the `6rem` `scroll-margin-top` are tuned to the starter's nav height — retune both together if a project's nav is taller, or the TOC will sit under it and anchors will land short.
+- **Three to six items is the sweet spot.** The TOC is sticky but not scrollable, so a long list can overflow the viewport on short screens.
+- **Known limitation — no view-transition re-init.** The script runs once at module evaluation; it has no `data-script-initialized` guard and no `astro:page-load` listener, so it won't re-wire after a client-side view transition. This is inconsistent with the §5.6 standard every other interactive component in the starter follows, and is worth fixing when the component is next touched.

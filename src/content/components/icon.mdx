@@ -1,0 +1,113 @@
+---
+title: Icon
+description: Slot-based icon wrapper that owns the box (size, alignment, ARIA) so any child SVG, lucide icon, or img scales consistently.
+category: primitive
+order: 5
+sourceFile: src/components/Icon.astro
+status: stable
+related: [Button, Breadcrumbs]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Icon from "@components/Icon.astro";
+import { Icon as LucideIcon } from "astro-icon/components";
+
+A thin wrapper that fixes one job: every icon on the site shares the same size scale, the same alignment behavior, and the same accessibility defaults. The actual graphic is whatever you drop into the slot — an `astro-icon` `<Icon>`, a raw `<svg>`, or an `<img>`. The child stretches to fill the box (`width: 100%; height: 100%`), so call sites stop carrying `h-4 w-4` / `size-5` Tailwind utilities.
+
+## Preview
+
+<Preview label="Sizes (xs · sm · md · lg · xl)">
+  <div class="flex items-end gap-6 text-fg">
+    <Icon size="xs"><LucideIcon name="lucide:star" /></Icon>
+    <Icon size="sm"><LucideIcon name="lucide:star" /></Icon>
+    <Icon size="md"><LucideIcon name="lucide:star" /></Icon>
+    <Icon size="lg"><LucideIcon name="lucide:star" /></Icon>
+    <Icon size="xl"><LucideIcon name="lucide:star" /></Icon>
+  </div>
+</Preview>
+
+<Preview label="Mixed icon sources (lucide · inline svg · img)">
+  <div class="flex items-center gap-6 text-fg">
+    <Icon size="lg"><LucideIcon name="lucide:search" /></Icon>
+    <Icon size="lg">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    </Icon>
+    <Icon size="lg" label="Astro logo">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2 4 22h16L12 2zm0 6 5 12H7l5-12z" />
+      </svg>
+    </Icon>
+  </div>
+</Preview>
+
+<Preview label="Inline with text">
+  <p class="flex items-center gap-2 text-fg">
+    <Icon size="sm"><LucideIcon name="lucide:check" /></Icon>
+    Saved to your library
+  </p>
+</Preview>
+
+<Preview label="Fluid — scales with container width">
+  <div class="flex w-full items-center justify-center gap-4 text-fg" style="container-type: inline-size;">
+    <Icon size="lg" fluid><LucideIcon name="lucide:zap" /></Icon>
+    <span class="text-sm text-fg-muted">Resize the viewport to see the icon scale.</span>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "size", type: '"xs" | "sm" | "md" | "lg" | "xl"', default: '"md"', description: "Sets the box dimensions via the --icon-size CSS variable. xs=12px, sm=14px, md=16px, lg=20px, xl=24px." },
+  { name: "fluid", type: "boolean", default: "false", description: "Switches the size to a clamp() that grows with the nearest container's inline size (cqi). Aligns icons with the project's fluid type scale." },
+  { name: "label", type: "string", description: "Accessible name. Sets role='img' + aria-label. Omit for decorative icons (gets aria-hidden='true' automatically)." },
+  { name: "class", type: "string", description: "Extra classes appended to the wrapper (color, margin, etc.)." },
+]} />
+
+## Mechanism
+
+- Renders a single `<span class="icon icon--{size}">` that sets `width` and `height` from `--icon-size`.
+- The slotted child is targeted with `:global(svg)` / `:global(img)` and stretched to `100%/100%`, so it always fills the box.
+- `display: inline-flex` + `align-items: center` keeps icons baseline-aligned next to text without per-call-site flex utilities.
+- `flex-shrink: 0` so an icon next to a long label can't get squashed inside a flex row.
+- Accessibility: passing `label` flips on `role="img" aria-label="…"`. With no label the wrapper is `aria-hidden="true"` — the default for decorative icons.
+
+### Fluid scaling
+
+When `fluid` is set, `--icon-size` becomes a `clamp(MIN, intercept + slope*cqi, MAX)` expression mirroring the typography ramp in `global.css`. The icon grows when its container is wide (`cqi` = 1% of the nearest container's inline size) and pins at the min/max at the extremes. Use it only inside an element that has `container-type: inline-size` set — otherwise `cqi` resolves against the viewport and you'll just get viewport-fluid sizing.
+
+## Usage
+
+```astro
+---
+import Icon from "@components/Icon.astro";
+import { Icon as LucideIcon } from "astro-icon/components";
+---
+
+{/* Decorative — aria-hidden by default */}
+<Icon size="md"><LucideIcon name="lucide:search" /></Icon>
+
+{/* Meaningful — gets role="img" + aria-label */}
+<Icon size="lg" label="Open menu">
+  <LucideIcon name="lucide:menu" />
+</Icon>
+
+{/* Inline SVG, no library needed */}
+<Icon size="sm">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="…" /></svg>
+</Icon>
+
+{/* Fluid — scales with the surrounding container's inline size */}
+<Icon size="lg" fluid><LucideIcon name="lucide:zap" /></Icon>
+```
+
+> The `astro-icon` import is aliased to `LucideIcon` because both components are named `Icon`. Only one needs an alias — pick whichever is less common in the file.
+
+## Tokens
+
+- Static sizes: `xs 0.75rem · sm 0.875rem · md 1rem · lg 1.25rem · xl 1.5rem`
+- Fluid sizes (when `fluid` is set): `clamp()` ramps mirroring the typography scale
+- Color: inherited (`currentColor`) — set via the parent's text color, e.g. `text-fg-muted` or `text-intent`

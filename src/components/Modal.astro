@@ -1,0 +1,252 @@
+---
+// Modal — accessible dialog using the native <dialog> element.
+//
+// Wiring (Pattern 1: trigger-by-ID):
+//   <button data-modal-open="signup">Sign up</button>
+//   <Modal id="signup">…</Modal>
+//
+// Multiple buttons can open the same modal (just point them at the same id).
+// Inside the modal, any element with `data-modal-close` closes its containing
+// dialog. `data-modal-close="other-id"` on an element outside the modal
+// closes that specific dialog.
+//
+// Why native <dialog>:
+//   * `.showModal()` gives top-layer rendering, an inert background, and a
+//     focus trap from the platform — no JS reimplementation.
+//   * Esc-to-close is built in.
+//   * `::backdrop` + `@starting-style` + `allow-discrete` transitions give
+//     the entry/exit animation without any JS choreography.
+
+import { Icon } from "astro-icon/components";
+
+type Size = "sm" | "md" | "lg" | "xl";
+
+interface Props {
+  id: string;
+  ariaLabel?: string;          // used when there's no `title` slot
+  size?: Size;
+  dismissOnOverlay?: boolean;  // backdrop click closes — default true
+  closable?: boolean;          // render the X button — default true
+  class?: string;
+}
+
+const {
+  id,
+  ariaLabel,
+  size = "md",
+  dismissOnOverlay = true,
+  closable = true,
+  class: className = "",
+} = Astro.props;
+
+const sizeClass = {
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-2xl",
+}[size];
+
+const titleId = `${id}-title`;
+const descId = `${id}-desc`;
+const hasTitle = Astro.slots.has("title");
+const hasDescription = Astro.slots.has("description");
+const hasFooter = Astro.slots.has("footer");
+---
+
+<dialog
+  id={id}
+  data-modal
+  data-dismiss-overlay={dismissOnOverlay ? "true" : "false"}
+  aria-labelledby={hasTitle ? titleId : undefined}
+  aria-label={!hasTitle ? ariaLabel : undefined}
+  aria-describedby={hasDescription ? descId : undefined}
+  class:list={[
+    "modal m-auto w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] border border-stroke bg-canvas shadow-popover p-0",
+    sizeClass,
+    className,
+  ]}
+>
+  {/* Inner wrapper handles padding + scroll so clicking the dialog's own
+      box (1px border edge) doesn't fall through to overlay-click logic. */}
+  <div class="flex flex-col max-h-[inherit]">
+    {(hasTitle || hasDescription || closable) && (
+      <header class="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
+        <div class="flex-1 min-w-0">
+          {hasTitle && (
+            <h2 id={titleId} class="h4 text-fg">
+              <slot name="title" />
+            </h2>
+          )}
+          {hasDescription && (
+            <p id={descId} class="mt-2 text-sm text-fg-muted">
+              <slot name="description" />
+            </p>
+          )}
+        </div>
+        {closable && (
+          <button
+            type="button"
+            data-modal-close
+            aria-label="Close dialog"
+            class="grid h-8 w-8 shrink-0 place-items-center text-fg-muted transition hover:bg-panel-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus cursor-pointer"
+          >
+            <Icon name="lucide:x" class="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+      </header>
+    )}
+
+    <div class="px-6 pb-6 overflow-y-auto">
+      <slot />
+    </div>
+
+    {hasFooter && (
+      <footer class="flex items-center justify-end gap-2 border-t border-stroke px-6 py-4">
+        <slot name="footer" />
+      </footer>
+    )}
+  </div>
+</dialog>
+
+<style is:global>
+  /* Native <dialog> animation via @starting-style + allow-discrete transitions.
+     No JS animation, no JS choreography for open/close. is:global because the
+     same animation should apply to any consumer's <Modal>. */
+  dialog.modal {
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease,
+      overlay 180ms ease allow-discrete,
+      display 180ms ease allow-discrete;
+  }
+  dialog.modal[open] {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  /* Starting state on open — animates from this to [open]. */
+  @starting-style {
+    dialog.modal[open] {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  /* End state on close — fades out before display: none kicks in. */
+  dialog.modal:not([open]) {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  dialog.modal::backdrop {
+    background: color-mix(in oklab, var(--color-fg) 50%, transparent);
+    transition:
+      background-color 180ms ease,
+      overlay 180ms ease allow-discrete,
+      display 180ms ease allow-discrete;
+  }
+  @starting-style {
+    dialog.modal[open]::backdrop {
+      background: transparent;
+    }
+  }
+
+  /* Lock body scroll while a modal is open. `<dialog>.showModal()` makes the
+     background inert, but it doesn't prevent scrolling — this fills the gap.
+     `scrollbar-gutter: stable` reserves space so the page doesn't shift. */
+  html { scrollbar-gutter: stable; }
+  html.modal-open { overflow: hidden; }
+
+  @media (prefers-reduced-motion: reduce) {
+    dialog.modal,
+    dialog.modal::backdrop {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  // Global handler — initialized once per page. All modals on the page
+  // share this handler; per-modal config is read from data attributes.
+  if (!(window as any).__modalInit) {
+    (window as any).__modalInit = true;
+
+    let returnFocusEl: HTMLElement | null = null;
+
+    const openModal = (id: string) => {
+      const dialog = document.getElementById(id);
+      if (!(dialog instanceof HTMLDialogElement)) return;
+      returnFocusEl = document.activeElement as HTMLElement | null;
+      dialog.showModal();
+      document.documentElement.classList.add("modal-open");
+
+      // Optional override: if a child has `data-modal-autofocus`, focus it
+      // instead of the default first-focusable. Useful when you want the
+      // first input field focused, not the close button.
+      const auto = dialog.querySelector<HTMLElement>("[data-modal-autofocus]");
+      if (auto) auto.focus();
+
+      dialog.dispatchEvent(new CustomEvent("modal:open", { bubbles: true }));
+    };
+
+    const closeModal = (dialog: HTMLDialogElement) => {
+      dialog.close();
+      // The native `close` event handler below restores focus + class.
+    };
+
+    // Single click handler covers both opens and closes.
+    document.addEventListener("click", (e) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+
+      const opener = target.closest<HTMLElement>("[data-modal-open]");
+      if (opener) {
+        e.preventDefault();
+        const id = opener.dataset.modalOpen;
+        if (id) openModal(id);
+        return;
+      }
+
+      const closer = target.closest<HTMLElement>("[data-modal-close]");
+      if (closer) {
+        const id = closer.dataset.modalClose;
+        // `data-modal-close="other-id"` closes that specific modal;
+        // bare `data-modal-close` closes the closest enclosing one.
+        const dialog =
+          id && id.length > 0
+            ? document.getElementById(id)
+            : closer.closest("dialog");
+        if (dialog instanceof HTMLDialogElement) closeModal(dialog);
+        return;
+      }
+
+      // Backdrop click — `e.target === dialog` only when clicking the
+      // ::backdrop or the dialog's own border edge. Inner clicks have
+      // a child element as target.
+      if (target instanceof HTMLDialogElement && target.matches("[data-modal]")) {
+        if (target.dataset.dismissOverlay === "true") {
+          closeModal(target);
+        }
+      }
+    });
+
+    // Native `close` event fires for `.close()`, Esc, and form-method=dialog
+    // submits — single restoration path.
+    document.addEventListener(
+      "close",
+      (e) => {
+        const dialog = e.target;
+        if (!(dialog instanceof HTMLDialogElement)) return;
+        if (!dialog.matches("[data-modal]")) return;
+
+        document.documentElement.classList.remove("modal-open");
+        dialog.dispatchEvent(new CustomEvent("modal:close", { bubbles: true }));
+
+        // Return focus to whatever opened the modal.
+        if (returnFocusEl && document.contains(returnFocusEl)) {
+          returnFocusEl.focus();
+        }
+        returnFocusEl = null;
+      },
+      true // capture so we run before any user listeners that might re-focus
+    );
+  }
+</script>

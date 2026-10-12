@@ -1,0 +1,40 @@
+---
+title: TestComponent
+description: Minimal greeting demo used for learning Astro component patterns. Not for production.
+category: primitive
+order: 90
+sourceFile: src/components/TestComponent.astro
+status: stable
+related: []
+---
+
+import PropsTable from "@components/_docs/PropsTable.astro";
+
+A throwaway "hello world" component. Keep it around as a reference for the `class`-prop aliasing pattern (since `class` is a reserved word in JS).
+
+## Props
+
+<PropsTable props={[
+  { name: "message", type: "string", required: true, description: "Name or text shown in the greeting." },
+  { name: "class", type: "string", default: '""', description: "Additional classes on the outer div." },
+]} />
+
+## Mechanism
+
+- Demonstrates the `class` prop pattern: declare `class` in the props interface, alias it to `className` during destructuring (since `class` is a JS reserved word), then apply it via `class:list`.
+- Renders `Hello, {message}!` using the `h4` fluid typography utility.
+
+## Usage
+
+```astro
+---
+import TestComponent from "@components/TestComponent.astro";
+---
+
+<TestComponent message="World" class="bg-white rounded-lg" />
+```
+
+## Notes
+
+- Debug/learning component — don't ship to production.
+- Useful as a clean reference for the `class` aliasing pattern used throughout the codebase.

@@ -1,0 +1,247 @@
+---
+title: Pagination
+description: Page-N-of-M control with prev/next, numeric pages, and ellipsis truncation. Anchor-based by default (no JS needed); button-mode for client-side state.
+category: pattern
+order: 60
+sourceFile: src/components/Pagination.astro
+status: stable
+related: [FilterBar]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Pagination from "@components/Pagination.astro";
+
+Numeric pagination component for paginated lists, blog archives, search results, and any "page N of M" surface. Two render modes:
+
+- **Anchor mode (default)** — pages render as real `<a href="...">` tags via the `hrefFor` prop. Works without JavaScript, plays nicely with crawlers, and supports browser middle-click / open-in-new-tab.
+- **Button mode** — pages render as `<button>` and clicks dispatch a `pagination:change` event. Use this for client-side filtering or in-page list navigation.
+
+## Preview
+
+<Preview label="Anchor mode (current = 3 of 10)" align="center">
+  <div class="py-2">
+    <Pagination current={3} total={10} hrefFor={(p) => `?page=${p}`} />
+  </div>
+</Preview>
+
+<Preview label="Long range with ellipsis (current = 7 of 50)" align="center">
+  <div class="py-2">
+    <Pagination current={7} total={50} hrefFor={(p) => `?page=${p}`} />
+  </div>
+</Preview>
+
+<Preview label="Button mode" align="center">
+  <div class="py-2">
+    <Pagination current={1} total={5} buttons />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "current", type: "number", required: true, description: "1-based current page." },
+  { name: "total", type: "number", required: true, description: "Total number of pages." },
+  { name: "hrefFor", type: "(page: number) => string", description: "URL builder for anchor mode. Required unless `buttons` is true." },
+  { name: "buttons", type: "boolean", default: "false", description: "Render <button> elements and dispatch `pagination:change` instead of using anchors." },
+  { name: "siblings", type: "number", default: "1", description: "Number of sibling pages to show on each side of `current` before truncating." },
+  { name: "boundaries", type: "boolean", default: "true", description: "Always include the first and last page (with ellipsis if needed)." },
+  { name: "ariaLabel", type: "string", default: '"Pagination"', description: "Accessible label for the wrapping <nav>." },
+  { name: "prevLabel", type: "string", default: '"Previous"', description: "Label for the previous button." },
+  { name: "nextLabel", type: "string", default: '"Next"', description: "Label for the next button." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Anchor mode
+
+```astro
+---
+import Pagination from "@components/Pagination.astro";
+
+const currentPage = Number(Astro.url.searchParams.get("page") ?? 1);
+const totalPages = Math.ceil(totalItems / pageSize);
+---
+
+<Pagination
+  current={currentPage}
+  total={totalPages}
+  hrefFor={(p) => `?${new URLSearchParams({ page: String(p) })}`}
+/>
+```
+
+Each page button is a real anchor — no JS required, works offline, plays nicely with crawlers, and supports middle-click open-in-new-tab. The current page is `aria-current="page"` and styled as the active state.
+
+## Button mode
+
+```astro
+<Pagination current={1} total={5} buttons />
+
+<script>
+  document.addEventListener("pagination:change", (e) => {
+    console.log(`Page change: ${e.detail.from} → ${e.detail.to}`);
+    // Render the next page of results
+  });
+</script>
+```
+
+Listen on the wrapper (or any ancestor — the event bubbles). The event is `cancelable` — call `preventDefault()` to manage state externally before letting the component update its own `data-pagination-current` attribute.
+
+## Wiring to a content collection (blog, docs, changelog…)
+
+Astro has a built-in `paginate()` helper that splits any array into page-sized chunks and generates one route per page. Combined with this component, that gives you a full paginated archive with stable URLs — `/blog/`, `/blog/2/`, `/blog/3/` — that work without JavaScript.
+
+### 1. Define the collection
+
+`src/content.config.ts`:
+
+```ts
+import { defineCollection, z } from "astro:content";
+import { glob } from "astro/loaders";
+
+const blog = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/blog" }),
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    date: z.coerce.date(),
+    draft: z.boolean().default(false),
+  }),
+});
+
+export const collections = { blog };
+```
+
+### 2. Create the paginated route
+
+`src/pages/blog/[...page].astro` — the `[...page]` rest segment is what makes Astro generate `/blog/`, `/blog/2/`, `/blog/3/`, …
+
+```astro
+---
+import Layout from "@layouts/Layout.astro";
+import Pagination from "@components/Pagination.astro";
+import { getCollection } from "astro:content";
+import type { GetStaticPaths } from "astro";
+
+export const getStaticPaths: GetStaticPaths = async ({ paginate }) => {
+  const posts = (await getCollection("blog", ({ data }) => !data.draft))
+    .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+  return paginate(posts, { pageSize: 9 });
+};
+
+const { page } = Astro.props;
+---
+
+<Layout title={`Blog — page ${page.currentPage}`}>
+  <h1>Blog</h1>
+
+  <ul class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {page.data.map((post) => (
+      <li>
+        <a href={`/blog/${post.id}/`}>
+          <h2>{post.data.title}</h2>
+          <p>{post.data.description}</p>
+        </a>
+      </li>
+    ))}
+  </ul>
+
+  <Pagination
+    class="mt-10"
+    current={page.currentPage}
+    total={page.lastPage}
+    hrefFor={(p) => (p === 1 ? "/blog/" : `/blog/${p}/`)}
+  />
+</Layout>
+```
+
+`page` is the [`Page` object](https://docs.astro.build/en/reference/api-reference/#page) Astro injects: `page.data` is the posts on this page, `page.currentPage` and `page.lastPage` map directly to this component's `current` / `total` props, and `page.url.prev` / `page.url.next` are also available if you'd rather use them than `hrefFor`.
+
+### 3. Filtering by tag, category, etc.
+
+Wrap the same pattern in a second rest param to paginate filtered subsets — `/blog/tag/astro/`, `/blog/tag/astro/2/`:
+
+```astro
+---
+// src/pages/blog/tag/[tag]/[...page].astro
+export const getStaticPaths: GetStaticPaths = async ({ paginate }) => {
+  const posts = await getCollection("blog", ({ data }) => !data.draft);
+  const tags = [...new Set(posts.flatMap((p) => p.data.tags ?? []))];
+
+  return tags.flatMap((tag) => {
+    const filtered = posts
+      .filter((p) => p.data.tags?.includes(tag))
+      .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+    return paginate(filtered, {
+      pageSize: 9,
+      params: { tag },
+      props: { tag },
+    });
+  });
+};
+---
+
+<Pagination
+  current={page.currentPage}
+  total={page.lastPage}
+  hrefFor={(p) => (p === 1 ? `/blog/tag/${tag}/` : `/blog/tag/${tag}/${p}/`)}
+/>
+```
+
+### 4. Query-string mode (filters, search)
+
+For `?page=N` style pagination — e.g. when the list is filtered by a search box and you don't want a separate static path per query — a single non-paginated route is enough:
+
+```astro
+---
+// src/pages/blog/index.astro
+const PAGE_SIZE = 9;
+const posts = (await getCollection("blog", ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+const currentPage = Math.max(1, Number(Astro.url.searchParams.get("page") ?? 1));
+const totalPages = Math.max(1, Math.ceil(posts.length / PAGE_SIZE));
+const start = (currentPage - 1) * PAGE_SIZE;
+const pageItems = posts.slice(start, start + PAGE_SIZE);
+---
+
+<Pagination
+  current={currentPage}
+  total={totalPages}
+  hrefFor={(p) => `?${new URLSearchParams({ page: String(p) })}`}
+/>
+```
+
+This needs SSR (`output: "server"` or hybrid mode in `astro.config.mjs`) since the URL search params change per-request. For static builds, prefer pattern (2) — one path per page, fully prerendered, crawlable, and cache-friendly.
+
+## Truncation algorithm
+
+The list always includes:
+- The current page.
+- `siblings` pages on each side of current.
+- The first and last page (when `boundaries` is true).
+
+Gaps between non-adjacent runs are rendered as a `…` ellipsis (`<li data-pagination-ellipsis>` with `aria-hidden`). Examples for `siblings=1`, `total=10`:
+
+| Current | Visible pages          |
+|--------:|------------------------|
+| 1       | `1 2 … 10`             |
+| 4       | `1 … 3 4 5 … 10`       |
+| 7       | `1 … 6 7 8 … 10`       |
+| 10      | `1 … 9 10`             |
+
+## Accessibility
+
+- `<nav aria-label="Pagination">` wrapper — screen readers announce the region.
+- Current page marked with `aria-current="page"`.
+- Disabled prev/next: in anchor mode, `aria-disabled="true"` (link still renders without href); in button mode, the button has the native `disabled` attribute.
+- Each numeric link/button has `aria-label="Page N"` so screen readers announce purpose, not just the number.
+- The `<nav>` is ordered (`<ol>`) so screen readers announce position correctly.
+- Focus-visible outline uses `--color-focus`.
+
+## Notes
+
+- On screens narrower than 480px, the visible "Previous" / "Next" labels collapse to just the arrow icons. The `aria-label` still announces the full text.
+- Use anchor mode whenever the URL is the source of truth (deep linking, sharing, SEO). Use button mode only when pagination state is in-page transient.
+- For "Load more" patterns, prefer a real `<button>` with progressive disclosure — this component is for discrete page navigation, not infinite scroll.

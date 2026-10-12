@@ -1,0 +1,15 @@
+---
+interface Props {
+ eyebrow?: string;
+ class?: string;
+ header?: string;
+}
+const { eyebrow, class: className = "", header } = Astro.props;
+---
+<div class:list={["flex flex-col  relative border-stroke border-r px-6 py-8", className]}>
+    <slot name="icon" />
+    <span class="text-fg-muted">{eyebrow}</span>
+    <div class="flex flex-col gap-2 mb-1"><h3 class="h5">{header}</h3></div>
+    <slot name="content" />
+   
+</div>

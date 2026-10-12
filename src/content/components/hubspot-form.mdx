@@ -1,0 +1,54 @@
+---
+title: HubspotForm
+description: Embed a HubSpot form by portal + form ID. Loads the SDK and mounts into a target div.
+category: form
+order: 10
+sourceFile: src/components/HubspotForm.astro
+status: stable
+related: []
+---
+
+import PropsTable from "@components/_docs/PropsTable.astro";
+
+Embeds a HubSpot form by loading the HubSpot Forms SDK and initializing it with the given portal and form IDs.
+
+## Props
+
+<PropsTable props={[
+  { name: "region", type: "string", default: '"na1"', description: "HubSpot data center region." },
+  { name: "portalId", type: "string", default: '"40120329"', description: "HubSpot portal (account) ID." },
+  { name: "formId", type: "string", default: '"34f97be6-a435-4a54-a676-371efe148e70"', description: "Specific form ID to embed." },
+]} />
+
+## Mechanism
+
+1. Renders an empty `<div id="hubspot-form-container">` as the mount target.
+2. Loads the HubSpot Forms embed script (`//js.hsforms.net/forms/embed/v2.js`) via `is:inline`.
+3. Calls `hbspt.forms.create()` with the provided props, targeting the container div.
+4. Uses `define:vars` to pass Astro props into the inline script.
+
+## Usage
+
+```astro
+---
+import HubspotForm from "@components/HubspotForm.astro";
+---
+
+<!-- Default form -->
+<HubspotForm />
+
+<!-- Custom form -->
+<HubspotForm
+  region="eu1"
+  portalId="12345678"
+  formId="abcdef12-3456-7890-abcd-ef1234567890"
+/>
+```
+
+## Notes
+
+- Scripts use `is:inline` so they execute immediately (not deferred / bundled by Astro).
+- The HubSpot SDK loads from an external CDN — adds a third-party dependency and network request.
+- Default prop values are specific to a particular HubSpot account. Update them for your own forms.
+- No loading state or error handling — if the SDK fails to load, the container stays empty.
+- No live preview — the embed depends on a live HubSpot SDK request and a real form ID.

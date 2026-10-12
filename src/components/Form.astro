@@ -1,0 +1,253 @@
+---
+// Form — progressive-enhancement wrapper around <form>. Works without JS
+// (browser submits to `action` and reloads the page); with JS, intercepts
+// submission, posts via fetch, and exposes a state machine via
+// `data-form-status` for CSS to drive feedback regions.
+//
+// States surfaced via the `[data-form-status]` attribute on the form:
+//   idle | submitting | success | error
+//
+// Slots:
+//   (default)        Form body — Field components, submit button, etc.
+//   success          Region shown after a successful submit. role=status.
+//   error            Region shown after a failed submit. role=alert.
+//
+// Markup:
+//   <Form action="/api/contact" method="POST">
+//     <Field label="Name" name="name" required />
+//     <Field label="Email" name="email" type="email" required />
+//     <button type="submit">Send</button>
+//     <p slot="success">Thanks — we'll be in touch.</p>
+//     <p slot="error">Something went wrong. Please try again.</p>
+//   </Form>
+
+interface Props {
+  /** Form action URL. */
+  action: string;
+  /** HTTP method. Default "POST". */
+  method?: "GET" | "POST";
+  /** Encoding type. Default depends on whether the form contains files. */
+  enctype?: "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
+  /** Where to send the form data via fetch. Defaults to `action`. */
+  endpoint?: string;
+  /** Disable the JS-enhanced submit and let the browser do a full page POST. */
+  noEnhance?: boolean;
+  /** Adds a hidden honeypot input — bots fill it, real users don't. */
+  honeypot?: boolean;
+  /** Honeypot field name. Default "website". */
+  honeypotName?: string;
+  /** ID for the form. Auto-generated otherwise. */
+  id?: string;
+  class?: string;
+}
+
+const {
+  action,
+  method = "POST",
+  enctype,
+  endpoint,
+  noEnhance = false,
+  honeypot = true,
+  honeypotName = "website",
+  id,
+  class: className,
+} = Astro.props;
+
+const formId = id ?? `form-${Math.random().toString(36).slice(2, 10)}`;
+---
+
+<form
+  id={formId}
+  action={action}
+  method={method}
+  enctype={enctype}
+  data-form="component"
+  data-form-status="idle"
+  data-form-endpoint={endpoint ?? action}
+  data-form-no-enhance={noEnhance ? "true" : undefined}
+  novalidate
+  class:list={["form", className]}
+>
+  <slot />
+
+  {honeypot && (
+    <div data-form-honeypot aria-hidden="true">
+      <label for={`${formId}-${honeypotName}`}>Website (leave blank)</label>
+      <input
+        id={`${formId}-${honeypotName}`}
+        name={honeypotName}
+        type="text"
+        tabindex="-1"
+        autocomplete="off"
+      />
+    </div>
+  )}
+
+  <div data-form-feedback="success" role="status" aria-live="polite" hidden>
+    <slot name="success">
+      <p>Thanks — we received your submission.</p>
+    </slot>
+  </div>
+
+  <div data-form-feedback="error" role="alert" aria-live="assertive" hidden>
+    <slot name="error">
+      <p>Something went wrong. Please try again.</p>
+    </slot>
+  </div>
+</form>
+
+<style is:global>
+  /* Honeypot is invisible but still in the layout flow when JS is off — push
+     it offscreen so sighted users never see it, but bots still fill it. */
+  [data-form-honeypot] {
+    position: absolute;
+    left: -9999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  [data-form-feedback] {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-stroke);
+  }
+  [data-form-feedback="success"] {
+    border-color: color-mix(in srgb, var(--color-success) 50%, var(--color-stroke));
+    background: color-mix(in srgb, var(--color-success) 10%, var(--color-panel));
+    color: var(--color-success);
+  }
+  [data-form-feedback="error"] {
+    border-color: color-mix(in srgb, var(--color-error) 50%, var(--color-stroke));
+    background: color-mix(in srgb, var(--color-error) 10%, var(--color-panel));
+    color: var(--color-error);
+  }
+
+  /* Visibility driven by form status. */
+  [data-form-status="success"] [data-form-feedback="success"][hidden] { display: block; }
+  [data-form-status="error"] [data-form-feedback="error"][hidden] { display: block; }
+  [data-form-status="success"] [data-form-feedback="success"][hidden],
+  [data-form-status="error"] [data-form-feedback="error"][hidden] {
+    /* Override the [hidden] attribute — display:block above wins. */
+  }
+  /* Disable submit buttons during submitting state. */
+  [data-form-status="submitting"] button[type="submit"],
+  [data-form-status="submitting"] input[type="submit"] {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+</style>
+
+<script>
+  type Status = "idle" | "submitting" | "success" | "error";
+
+  const setStatus = (form: HTMLFormElement, status: Status) => {
+    form.setAttribute("data-form-status", status);
+    const success = form.querySelector<HTMLElement>('[data-form-feedback="success"]');
+    const error = form.querySelector<HTMLElement>('[data-form-feedback="error"]');
+    if (success) success.hidden = status !== "success";
+    if (error) error.hidden = status !== "error";
+  };
+
+  // Surface native validity messages into the corresponding Field's
+  // [data-field-error] region. Falls back to the input's own validationMessage.
+  const showFieldErrors = (form: HTMLFormElement) => {
+    const inputs = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      "input, textarea, select"
+    );
+    let firstInvalid: HTMLElement | null = null;
+    inputs.forEach((input) => {
+      const field = input.closest<HTMLElement>('[data-field="component"]');
+      const errorEl = field?.querySelector<HTMLElement>('[data-field-error]');
+      if (!field || !errorEl) return;
+
+      if (!input.validity.valid) {
+        errorEl.textContent = input.validationMessage;
+        input.setAttribute("aria-invalid", "true");
+        field.setAttribute("data-field-invalid", "true");
+        if (!firstInvalid) firstInvalid = input;
+      } else {
+        errorEl.textContent = "";
+        input.removeAttribute("aria-invalid");
+        field.removeAttribute("data-field-invalid");
+      }
+    });
+    if (firstInvalid) (firstInvalid as HTMLElement).focus();
+  };
+
+  const initOne = (form: HTMLFormElement) => {
+    if (form.dataset.scriptInitialized) return;
+    form.dataset.scriptInitialized = "true";
+
+    if (form.getAttribute("data-form-no-enhance") === "true") return;
+
+    form.addEventListener("submit", async (e) => {
+      // Native validation first — if invalid, surface inline messages
+      // and don't attempt fetch.
+      if (!form.checkValidity()) {
+        e.preventDefault();
+        showFieldErrors(form);
+        return;
+      }
+
+      e.preventDefault();
+      setStatus(form, "submitting");
+
+      const endpoint = form.getAttribute("data-form-endpoint") || form.action;
+      const method = (form.method || "POST").toUpperCase();
+      const data = new FormData(form);
+
+      // Honeypot filled? Pretend success without actually sending — bots
+      // get no signal.
+      const honeypotInput = form.querySelector<HTMLInputElement>(
+        "[data-form-honeypot] input"
+      );
+      if (honeypotInput?.value) {
+        setStatus(form, "success");
+        return;
+      }
+
+      try {
+        const opts: RequestInit = { method, headers: { Accept: "application/json" } };
+        if (method === "GET") {
+          const params = new URLSearchParams();
+          data.forEach((v, k) => params.append(k, String(v)));
+          const url = `${endpoint}${endpoint.includes("?") ? "&" : "?"}${params}`;
+          const res = await fetch(url, opts);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        } else {
+          opts.body = data;
+          const res = await fetch(endpoint, opts);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }
+        setStatus(form, "success");
+        form.dispatchEvent(new CustomEvent("form:success", { bubbles: true }));
+        form.reset();
+      } catch (err) {
+        setStatus(form, "error");
+        form.dispatchEvent(new CustomEvent("form:error", { bubbles: true, detail: err }));
+      }
+    });
+
+    // Clear field error state as the user fixes the input.
+    form.addEventListener("input", (e) => {
+      const target = e.target as HTMLInputElement;
+      if (!target.matches("input, textarea, select")) return;
+      const field = target.closest<HTMLElement>('[data-field="component"]');
+      if (!field) return;
+      if (target.validity.valid) {
+        target.removeAttribute("aria-invalid");
+        field.removeAttribute("data-field-invalid");
+        const errorEl = field.querySelector<HTMLElement>('[data-field-error]');
+        if (errorEl) errorEl.textContent = "";
+      }
+    });
+  };
+
+  const initAll = () =>
+    document.querySelectorAll<HTMLFormElement>('[data-form="component"]').forEach(initOne);
+
+  initAll();
+  document.addEventListener("astro:page-load", initAll);
+</script>

@@ -1,0 +1,99 @@
+---
+title: Form
+description: Progressive-enhancement form wrapper. Works without JS via native submission; with JS, intercepts and posts via fetch with idle/submitting/success/error states.
+category: form
+order: 10
+sourceFile: src/components/Form.astro
+status: stable
+related: [Field, HubspotForm]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Form from "@components/Form.astro";
+import Field from "@components/Field.astro";
+
+Thin wrapper around `<form>` that turns it into a state-driven, progressively-enhanced submission flow without forcing a framework on the consumer.
+
+- **Without JS:** the browser does a normal `POST` (or `GET`) to `action` and reloads the page.
+- **With JS:** the script intercepts submit, runs HTML5 validation, posts via `fetch`, and exposes the lifecycle through `data-form-status` so feedback regions show/hide automatically.
+- **Honeypot** is on by default — adds a hidden field bots fill in but humans don't. If the field has a value at submit time, the form silently "succeeds" without sending.
+
+## Preview
+
+<Preview label="Contact form" align="stretch">
+  <div class="w-full max-w-md">
+    <Form action="/api/contact" method="POST">
+      <Field label="Name" name="name" required autocomplete="name" />
+      <Field label="Email" name="email" type="email" required autocomplete="email" />
+      <Field label="Message" name="message" type="textarea" required rows={4} />
+      <button type="submit" class="bg-intent px-4 py-2 text-sm font-medium text-fg-on-intent">
+        Send message
+      </button>
+    </Form>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "action", type: "string", required: true, description: "Form action URL." },
+  { name: "method", type: '"GET" | "POST"', default: '"POST"', description: "HTTP method." },
+  { name: "enctype", type: '"application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain"', description: "Encoding type. Browser default unless specified." },
+  { name: "endpoint", type: "string", description: "Where to POST via fetch when JS-enhanced. Defaults to `action`." },
+  { name: "noEnhance", type: "boolean", default: "false", description: "Skip the JS-enhanced submit path entirely — let the browser do a full page POST." },
+  { name: "honeypot", type: "boolean", default: "true", description: "Add a hidden honeypot input." },
+  { name: "honeypotName", type: "string", default: '"website"', description: "Name attribute of the honeypot field." },
+  { name: "id", type: "string", description: "Form ID. Auto-generated if omitted." },
+  { name: "class", type: "string", description: "Additional classes on the form." },
+]} />
+
+## Slots
+
+| Slot      | Purpose                                                              |
+|-----------|----------------------------------------------------------------------|
+| (default) | Form body — Field components, submit button, fieldsets, etc.         |
+| `success` | Region shown after a successful submit. Has `role="status"`.         |
+| `error`   | Region shown after a failed submit. Has `role="alert"`.              |
+
+Both slots have sensible defaults (generic "Thanks" / "Something went wrong" messages), so you can omit them.
+
+## Status states
+
+The form carries a `data-form-status` attribute for CSS to drive UI:
+
+| Status        | When                                                                  |
+|---------------|-----------------------------------------------------------------------|
+| `idle`        | Initial / after reset.                                                |
+| `submitting`  | Fetch in flight. Submit buttons inside the form are auto-disabled.    |
+| `success`     | Server returned 2xx. The success region is shown; the form is reset.  |
+| `error`       | Network or non-2xx response. The error region is shown.               |
+
+Custom events are dispatched on the form for JS callers:
+- `form:success` — fires after a successful submit.
+- `form:error` — fires on failure, with `event.detail` set to the underlying error.
+
+## Validation
+
+- HTML5 validation runs first. If any field is invalid, the form does not submit — instead, each invalid field's `[data-field-error]` region gets the native `validationMessage`, and the first invalid input receives focus.
+- As the user types, valid input clears the error state on that field.
+- The form is rendered with `novalidate` so the browser doesn't show its native bubbles — `Field` surfaces messages inline instead.
+
+## Honeypot
+
+When `honeypot` is `true` (default), a hidden text input named `website` is injected. Real users never see or fill it; bots typically auto-fill anything `<input type="text">` they can find. If the field has a value at submit time, the form silently transitions to `success` without making a network request — bots get no signal that they were caught.
+
+To disable, pass `honeypot={false}`.
+
+## Accessibility
+
+- Form remains a real `<form>` — keyboard / screen-reader semantics intact.
+- Success region: `role="status"`, `aria-live="polite"`.
+- Error region: `role="alert"`, `aria-live="assertive"`.
+- Submit buttons get visually disabled (opacity + pointer-events: none) but remain in the DOM so screen-reader focus isn't lost.
+
+## Notes
+
+- Default endpoint mirrors `action` — set `endpoint` separately only if your fetch target differs from your no-JS fallback URL.
+- `multipart/form-data` is supported (file uploads work via FormData).
+- For HubSpot-specific forms, see `HubspotForm` — it has additional logic for HubSpot's portal/form-ID submission API.

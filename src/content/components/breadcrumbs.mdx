@@ -1,0 +1,90 @@
+---
+title: Breadcrumbs
+description: Compact bordered breadcrumb trail with home icon and chevron separators. Drop into any page header.
+category: pattern
+order: 30
+sourceFile: src/components/Breadcrumbs.astro
+status: stable
+related: [Nav, NavMorph]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Breadcrumbs from "@components/Breadcrumbs.astro";
+
+A small framed trail showing the user's location in the site hierarchy. The first slot is always a home-icon link; subsequent items are chevron-separated, with the last item rendered as a non-link `aria-current="page"` label.
+
+## Preview
+
+<Preview label="Default" align="start">
+  <Breadcrumbs items={[
+    { label: "Components", href: "/components/" },
+    { label: "Breadcrumbs" },
+  ]} />
+</Preview>
+
+<Preview label="Deeper hierarchy" align="start">
+  <Breadcrumbs items={[
+    { label: "Docs", href: "/docs/" },
+    { label: "Guides", href: "/docs/guides/" },
+    { label: "Routing", href: "/docs/guides/routing/" },
+    { label: "Dynamic params" },
+  ]} />
+</Preview>
+
+<Preview label="Custom home" align="start">
+  <Breadcrumbs
+    homeHref="/dashboard/"
+    homeLabel="Dashboard"
+    items={[
+      { label: "Settings", href: "/dashboard/settings/" },
+      { label: "Billing" },
+    ]}
+  />
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "items", type: "{ label: string; href?: string }[]", required: true, description: "Trail entries after the home icon. Last item renders as plain text with aria-current='page'. Items without href also render as plain text." },
+  { name: "homeHref", type: "string", default: '"/"', description: "Destination of the home-icon link." },
+  { name: "homeLabel", type: "string", default: '"Home"', description: "Accessible label for the home link (used as aria-label and as the prefix in the menu's aria-label)." },
+  { name: "ariaLabel", type: "string", default: '"Breadcrumb"', description: "aria-label on the wrapping <nav>." },
+  { name: "class", type: "string", description: "Extra classes appended to the container." },
+]} />
+
+## Mechanism
+
+- Renders `<nav aria-label="…"><ol><li>…` — the standard breadcrumbs pattern.
+- The home item is always an icon link (`lucide:house`), even when items is empty.
+- Each subsequent item is preceded by a `lucide:chevron-right` separator marked `aria-hidden="true"` so it isn't announced.
+- The last item gets `aria-current="page"` and is rendered as a `<span>`. Any earlier item without an `href` is also rendered as a `<span>` (e.g. for a non-clickable section label).
+
+### Accessibility
+
+- `<nav aria-label>` so assistive tech can identify the landmark.
+- Chevrons are decorative (`aria-hidden`); the visual separator does not interfere with announcement.
+- Focus-visible rings (`ring-focus`, `ring-offset-canvas`) on every link.
+- Home link carries an explicit `aria-label` (icon-only, no text).
+
+## Usage
+
+```astro
+---
+import Breadcrumbs from "@components/Breadcrumbs.astro";
+---
+
+<Breadcrumbs items={[
+  { label: "Components", href: "/components/" },
+  { label: "Button" },
+]} />
+```
+
+Wired by default into `src/pages/components/[...slug].astro` so every component doc page gets a trail above its title.
+
+## Tokens
+
+- Container: `border-stroke` + `bg-canvas`, `text-xs text-fg-muted`
+- Hover/current: `text-fg`
+- Separators: `text-fg-subtle`
+- Focus ring: `ring-focus` with `ring-offset-canvas`

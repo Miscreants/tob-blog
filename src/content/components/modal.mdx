@@ -1,0 +1,96 @@
+---
+title: Modal
+description: Accessible dialog using the native <dialog> element with id-based trigger wiring.
+category: pattern
+order: 40
+sourceFile: src/components/Modal.astro
+status: stable
+related: []
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Modal from "@components/Modal.astro";
+import Button from "@components/Button.astro";
+
+Top-layer dialog built on native `<dialog>` + `.showModal()`. Triggers wired by id (`data-modal-open="..."`), so multiple buttons can open the same modal — common case for hero CTA + footer CTA + pricing-tier button all opening the same signup flow.
+
+## Preview
+
+<Preview label="Trigger + dialog" align="start">
+  <div class="flex flex-col gap-3">
+    <div class="flex flex-wrap gap-2">
+      <Button label="Open signup" data-modal-open="docs-signup" />
+      <Button label="Open confirm" variant="secondary" data-modal-open="docs-confirm" />
+      <Button label="Same modal again" variant="secondary" data-modal-open="docs-signup" />
+    </div>
+    <p class="text-xs text-fg-subtle">All three buttons share the same modal pair. Open one, then try Esc, the X, or clicking the backdrop.</p>
+  </div>
+</Preview>
+
+<Modal id="docs-signup" size="md" ariaLabel="Sign up">
+  <h2 slot="title">Create your account</h2>
+  <p slot="description">Spin up a project in under five minutes.</p>
+
+  <form onsubmit="event.preventDefault(); this.closest('dialog').close();">
+    <label class="flex flex-col gap-1 text-sm">
+      <span class="text-fg-muted">Email</span>
+      <input
+        type="email"
+        required
+        data-modal-autofocus
+        class="border border-stroke bg-canvas px-3 py-2 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      />
+    </label>
+  </form>
+
+  <Fragment slot="footer">
+    <Button label="Cancel" variant="secondary" data-modal-close />
+    <Button label="Create account" />
+  </Fragment>
+</Modal>
+
+<Modal id="docs-confirm" size="sm" ariaLabel="Confirm action">
+  <h2 slot="title">Delete project?</h2>
+  <p slot="description">This action can't be undone. All associated data will be permanently removed.</p>
+  <Fragment slot="footer">
+    <Button label="Cancel" variant="secondary" data-modal-close />
+    <Button label="Delete" data-modal-close />
+  </Fragment>
+</Modal>
+
+## Props
+
+<PropsTable props={[
+  { name: "id", type: "string", required: true, description: "DOM id triggers point at via data-modal-open." },
+  { name: "ariaLabel", type: "string", description: "Accessible name when no title slot is provided." },
+  { name: "size", type: '"sm" | "md" | "lg" | "xl"', default: '"md"', description: "Caps the dialog max-width (sm 24rem → xl 42rem)." },
+  { name: "dismissOnOverlay", type: "boolean", default: "true", description: "Click outside the dialog box closes it." },
+  { name: "closable", type: "boolean", default: "true", description: "Render the X close button in the header." },
+  { name: "class", type: "string", description: "Extra classes on the <dialog> element." },
+]} />
+
+## Slots
+
+- **`title`** — heading. Auto-wired to `aria-labelledby`.
+- **`description`** — optional sub-heading paragraph. Auto-wired to `aria-describedby`.
+- **default** — body content.
+- **`footer`** — optional action row. Use `<Fragment slot="footer">` to drop in multiple buttons.
+
+## Trigger / close attributes
+
+| Attribute | Where | Behavior |
+|---|---|---|
+| `data-modal-open="<id>"` | Any button or link, anywhere | Opens the modal with that id |
+| `data-modal-close` | Element inside the modal | Closes the enclosing dialog |
+| `data-modal-close="<id>"` | Element outside, on a different modal | Closes that specific dialog |
+| `data-modal-autofocus` | Child of the modal | Focused on open (overrides default first-focusable) |
+
+## A11y
+
+- Native `<dialog>` — keyboard, focus trap, Esc-to-close, inert background all from the platform.
+- `aria-labelledby` / `aria-describedby` auto-wired to the title / description slots.
+- Focus moves into the modal on open; the element with `data-modal-autofocus` wins, otherwise first focusable.
+- Focus restored to the original trigger button on close — works for any close path (X, Esc, backdrop, programmatic `.close()`).
+- Body scroll locked while open via `html.modal-open { overflow: hidden }`. `scrollbar-gutter: stable` on `<html>` prevents layout shift.
+- `prefers-reduced-motion: reduce` disables the entry/exit animation.

@@ -1,0 +1,161 @@
+---
+// Footer — brand column with logo + tagline + socials, link columns, bottom bar with
+// copyright + legal links. Mirrors the grid + token classes used elsewhere
+// in the starter (section-grid-outside, bg-canvas, text-fg-muted, border-stroke).
+import { Icon } from "astro-icon/components";
+import Logo from "./Logo.astro";
+
+type LinkItem = { label: string; href: string };
+type LinkColumn = { heading: string; items: LinkItem[] };
+type SocialItem = { label: string; href: string; icon: string };
+
+interface Props {
+  tagline?: string;
+  copyright?: string;
+  columns?: LinkColumn[];
+  legal?: LinkItem[];
+  socials?: SocialItem[];
+  borderTop?: boolean;
+  borderBottom?: boolean;
+}
+
+
+// Defaults match the demo content — pages can override per-instance.
+const {
+  tagline = "Components and blocks for building modern websites with Astro and Tailwind.",
+  copyright = `© ${new Date().getFullYear()} Miscreants. All rights reserved.`,
+  columns = [
+    {
+      heading: "Product",
+      items: [
+        { label: "Overview", href: "#" },
+        { label: "Pricing", href: "#" },
+        { label: "Integrations", href: "#" },
+        { label: "Changelog", href: "#" },
+      ],
+    },
+    {
+      heading: "Company",
+      items: [
+        { label: "About", href: "#" },
+        { label: "Careers", href: "#" },
+        { label: "Customers", href: "#" },
+        { label: "Contact", href: "#" },
+      ],
+    },
+    {
+      heading: "Resources",
+      items: [
+        { label: "Documentation", href: "#" },
+        { label: "Guides", href: "#" },
+        { label: "Blog", href: "#" },
+        { label: "Status", href: "#" },
+      ],
+    },
+  ],
+  legal = [
+    { label: "Terms", href: "#" },
+    { label: "Privacy", href: "#" },
+    { label: "Cookies", href: "#" },
+  ],
+  socials = [
+    { label: "GitHub", href: "#", icon: "lucide:github" },
+    { label: "X (Twitter)", href: "#", icon: "lucide:twitter" },
+    { label: "LinkedIn", href: "#", icon: "lucide:linkedin" },
+    { label: "YouTube", href: "#", icon: "lucide:youtube" },
+  ],
+  borderTop = false,
+  borderBottom = false,
+} = Astro.props;
+---
+
+{/* Footer root — `container-page` keeps it aligned with every other boxed
+    component (Nav, SectionMain). */}
+<footer
+  id="site-footer"
+  class="container-page"
+  aria-labelledby="footer-heading"
+>
+  <h2 id="footer-heading" class="sr-only">Footer</h2>
+
+  <div
+    class:list={[
+      "flex flex-col px-6 section-pt-md section-pb-md border-l border-r border-stroke",
+      borderTop && "border-t border-stroke",
+      borderBottom && "border-b border-stroke",
+    ]}
+  >
+    {/* Top region: brand column + link columns. */}
+    <div class="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-8">
+      {/* Brand column — logo, tagline, social icons. */}
+      <div class="md:col-span-5 flex flex-col gap-6">
+        <a
+          href="/"
+          class="inline-flex items-center text-fg transition hover:text-intent focus-visible:text-intent outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          aria-label="Home"
+        >
+          <Logo class="h-5 w-auto" />
+        </a>
+        <p class="max-w-sm text-sm text-fg-muted">{tagline}</p>
+
+        {socials.length > 0 && (
+          <ul class="flex items-center gap-2" aria-label="Social media">
+            {socials.map((social) => (
+              <li>
+                <a
+                  href={social.href}
+                  aria-label={social.label}
+                  class="grid h-9 w-9 place-items-center border border-stroke text-fg-muted transition hover:border-stroke-strong hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                >
+                  <Icon name={social.icon} class="h-4 w-4" aria-hidden="true" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Link columns — stacks on mobile, sits in the right 7 cols on md+. */}
+      <div class="md:col-span-7 grid grid-cols-2 gap-8 sm:grid-cols-3">
+        {columns.map((column) => (
+          <nav aria-label={column.heading} class="flex flex-col gap-3">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+              {column.heading}
+            </h3>
+            <ul class="flex flex-col gap-2 text-sm">
+              {column.items.map((item) => (
+                <li>
+                  <a
+                    href={item.href}
+                    class="text-fg-muted transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
+    </div>
+
+    {/* Bottom bar — copyright + legal links. Stacks on mobile, splits on md+. */}
+    <div class="mt-12 flex flex-col items-start justify-between gap-4 border-t border-stroke pt-6 text-sm text-fg-muted md:flex-row md:items-center">
+      <p>{copyright}</p>
+      {legal.length > 0 && (
+        <ul class="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Legal">
+          {legal.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                class="transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                {item.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </div>
+</footer>

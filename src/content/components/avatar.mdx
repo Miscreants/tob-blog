@@ -1,0 +1,238 @@
+---
+title: Avatar
+description: Author avatar with image + initials fallback, optional name and position label, optional status indicator, and five size variants.
+category: primitive
+order: 13
+sourceFile: src/components/Avatar.astro
+status: stable
+related: [Tag, Logo]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Avatar from "@components/Avatar.astro";
+
+Compact author block — avatar circle (image or initials) plus an optional name and position label. Image is optional; if omitted or it fails to load, initials derived from the name are shown instead. An optional status dot can be pinned to the corner of the avatar.
+
+## Preview
+
+<Preview label="Image + name + position" align="center">
+  <div class="flex flex-col gap-4 py-2">
+    <Avatar
+      name="Jane Cooper"
+      src="https://i.pravatar.cc/120?img=47"
+      position="Principal Designer"
+    />
+    <Avatar
+      name="Marcus Reed"
+      src="https://i.pravatar.cc/120?img=12"
+      position="Engineering Manager"
+    />
+    <Avatar name="Anna Schmidt" position="Product, Growth" />
+  </div>
+</Preview>
+
+<Preview label="Initials fallback (no image)" align="center">
+  <div class="flex flex-wrap items-center gap-4 py-2">
+    <Avatar name="Jane Cooper" hideLabel />
+    <Avatar name="Marcus Reed" hideLabel />
+    <Avatar name="Olu Adebayo" hideLabel />
+    <Avatar name="Sam" hideLabel />
+  </div>
+</Preview>
+
+<Preview label="Sizes" align="center">
+  <div class="flex flex-wrap items-end gap-4 py-2">
+    <Avatar name="Jane Cooper" src="https://i.pravatar.cc/120?img=47" size="xs" hideLabel />
+    <Avatar name="Jane Cooper" src="https://i.pravatar.cc/120?img=47" size="sm" hideLabel />
+    <Avatar name="Jane Cooper" src="https://i.pravatar.cc/120?img=47" size="md" hideLabel />
+    <Avatar name="Jane Cooper" src="https://i.pravatar.cc/120?img=47" size="lg" hideLabel />
+    <Avatar name="Jane Cooper" src="https://i.pravatar.cc/120?img=47" size="xl" hideLabel />
+  </div>
+</Preview>
+
+<Preview label="Status indicators" align="center">
+  <div class="flex flex-wrap items-center gap-6 py-2">
+    <Avatar name="Jane Cooper" src="https://i.pravatar.cc/120?img=47" status="online" position="Online" size="lg" />
+    <Avatar name="Marcus Reed" src="https://i.pravatar.cc/120?img=12" status="busy" position="Busy" size="lg" />
+    <Avatar name="Olu Adebayo" status="away" position="Away" size="lg" />
+    <Avatar name="Sam Lee" status="offline" position="Offline" size="lg" />
+  </div>
+</Preview>
+
+<Preview label="Square shape" align="center">
+  <div class="flex flex-wrap items-center gap-4 py-2">
+    <Avatar name="Acme Co." src="https://i.pravatar.cc/120?img=68" shape="square" position="Brand" />
+    <Avatar name="Globex" shape="square" position="Brand" />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "name", type: "string", description: "Person's full name. Required — drives initials, alt text, and the accessible label when `hideLabel` is set." },
+  { name: "src", type: "string | ImageMetadata", description: "Avatar image — an imported astro:assets asset (optimized) or a URL string (CMS/remote). If omitted, or if it fails to load, initials are shown instead." },
+  { name: "alt", type: "string", description: "Image alt text. Defaults to `name`. Set to an empty string when a sibling label already announces the person." },
+  { name: "position", type: "string", description: "Sub-label rendered under the name (job title, team, role)." },
+  { name: "size", type: '"xs" | "sm" | "md" | "lg" | "xl"', default: '"md"', description: "Avatar diameter. Label font size scales with the avatar size." },
+  { name: "shape", type: '"circle" | "square"', default: '"circle"', description: "Avatar shape." },
+  { name: "status", type: '"online" | "offline" | "away" | "busy"', description: "Show a status dot at the corner of the avatar with an aria-label announcing the state." },
+  { name: "hideLabel", type: "boolean", default: "false", description: "Hide the visible name + position. The avatar still gets an accessible name from `name`." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Accessibility
+
+- The avatar figure is `role="img"` and gets an `aria-label` of `name` when `hideLabel` is set, so screen readers always announce who it represents.
+- When the visible name is shown, the figure's accessible name is left empty (the name appears as text right next to it) — this avoids duplicate announcement.
+- Status dots get `role="status"` and an `aria-label` like `"Online"` so screen readers describe presence.
+- Initials are marked `aria-hidden` — they're a visual fallback, not part of the accessible name.
+- The image uses `loading="lazy"` and `decoding="async"` to keep avatars off the critical path.
+
+## Wiring to MD / MDX content
+
+There are three common patterns for driving Avatars from authored content.
+
+### 1. Inline inside MDX
+
+MDX files can import the component and use it directly — same as inside this doc:
+
+```mdx
+---
+title: "Why we ship every Friday"
+date: 2026-04-12
+---
+
+import Avatar from "@components/Avatar.astro";
+
+<Avatar
+  name="Jane Cooper"
+  src="/img/team/jane.jpg"
+  position="Principal Designer"
+/>
+
+The team has been shipping every Friday for the past two years…
+```
+
+This works for the body of any MDX page (blog posts, case studies, changelog entries) because MDX evaluates `import` and JSX. Plain `.md` files cannot do this — Astro's Markdown renderer doesn't run JSX.
+
+### 2. Frontmatter-driven (recommended for blog posts / case studies)
+
+Type the author shape on the collection so every entry can pass it to `<Avatar />` from a layout. In `src/content.config.ts`:
+
+```ts
+const blog = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/blog" }),
+  schema: z.object({
+    title: z.string(),
+    date: z.coerce.date(),
+    author: z.object({
+      name: z.string(),
+      position: z.string().optional(),
+      avatar: z.string().optional(),
+    }),
+  }),
+});
+```
+
+A blog post's frontmatter:
+
+```md
+---
+title: "Why we ship every Friday"
+date: 2026-04-12
+author:
+  name: Jane Cooper
+  position: Principal Designer
+  avatar: /img/team/jane.jpg
+---
+
+Body copy here…
+```
+
+Render it from the page route (e.g. `src/pages/blog/[...slug].astro`):
+
+```astro
+---
+import Avatar from "@components/Avatar.astro";
+import { getEntry, render } from "astro:content";
+
+const entry = await getEntry("blog", Astro.params.slug);
+const { Content } = await render(entry);
+const { author } = entry.data;
+---
+
+<header>
+  <h1>{entry.data.title}</h1>
+  <Avatar
+    name={author.name}
+    src={author.avatar}
+    position={author.position}
+    size="sm"
+  />
+</header>
+<Content />
+```
+
+This works for both `.md` and `.mdx` posts because the layout — not the body — renders the avatar.
+
+### 3. Shared author records (referenced from posts)
+
+If the same person writes many posts, define an `authors` collection and reference it by id from each post:
+
+```ts
+const authors = defineCollection({
+  loader: glob({ pattern: "**/*.md", base: "./src/content/authors" }),
+  schema: z.object({
+    name: z.string(),
+    position: z.string().optional(),
+    avatar: z.string().optional(),
+  }),
+});
+
+const blog = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/blog" }),
+  schema: z.object({
+    title: z.string(),
+    date: z.coerce.date(),
+    author: reference("authors"),
+  }),
+});
+```
+
+`src/content/authors/jane-cooper.md`:
+
+```md
+---
+name: Jane Cooper
+position: Principal Designer
+avatar: /img/team/jane.jpg
+---
+```
+
+A post references `author: jane-cooper`, and the page resolves it:
+
+```astro
+---
+import Avatar from "@components/Avatar.astro";
+import { getEntry } from "astro:content";
+
+const post = await getEntry("blog", Astro.params.slug);
+const author = await getEntry(post.data.author);
+---
+
+<Avatar
+  name={author.data.name}
+  src={author.data.avatar}
+  position={author.data.position}
+/>
+```
+
+Editing one author file updates the avatar everywhere.
+
+## Notes
+
+- Initials are derived as: first letter of the first word + first letter of the last word, uppercased. Single-word names use the first two letters. Empty / whitespace-only names render `?`.
+- The image is layered over the initials; if it fails to load, a small client script hides the image so the initials show through. Cached errors before the listener attaches are also handled.
+- The status dot uses `box-shadow` to draw a ring matching `--color-canvas`, so it stands out against any avatar.
+- For groups of overlapping avatars (a stack), wrap several `Avatar`s in a flex container with negative left margins on all but the first.

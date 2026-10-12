@@ -1,0 +1,167 @@
+---
+title: FlowSteps
+description: Stepped how-it-works section — clickable step list drives a vertical-carousel panel of poster content.
+category: pattern
+order: 60
+sourceFile: src/components/FlowSteps.astro
+status: stable
+related: [Tabs, SectionMain]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import FlowSteps from "@components/FlowSteps.astro";
+
+A "how it works" section. The clickable step list on the left drives a **vertical-carousel panel** on the right — clicking a step slides the panel column so the selected panel is in view. On mobile it collapses to a flat stack of step-header → panel pairs, so the same content reads as a linear walkthrough without any JS.
+
+## Preview
+
+<Preview label="Three-step flow" align="stretch">
+  <div class="w-full">
+    <FlowSteps
+      title="How it works."
+      description="Issue mobile wallet credentials with a simple API integration."
+      panelHeight={360}
+      duration={600}
+      steps={[
+        { title: "Issue credentials from your portal", description: "Control the look and feel of credential issuance directly in your portal." },
+        { title: "Craft a template to issue passes via API", description: "Display your brand in wallet. Issue credentials via API, delivered over SMS." },
+        { title: "Users install your custom crafted credential", description: "Users receive a text with a link to install the pass on their phone." },
+      ]}
+    >
+      <Fragment slot="panel-0">
+        <div class="w-full max-w-sm rounded-2xl bg-canvas p-6 shadow-popover">
+          <div class="text-sm font-semibold text-fg">Add credential</div>
+          <div class="mt-3 text-xs text-fg-muted">Branded pass — preview before issue.</div>
+          <div class="mt-6 h-24 rounded-lg bg-panel-muted"></div>
+        </div>
+      </Fragment>
+      <Fragment slot="panel-1">
+        <pre class="w-full max-w-sm rounded-2xl bg-fg p-5 font-mono text-xs leading-5 text-canvas">{`curl https://api.example.com/v1/credentials \\
+  --request POST \\
+  --header "Authorization: Bearer ..." \\
+  --data '{"template_id": "abc-123"}'`}</pre>
+      </Fragment>
+      <Fragment slot="panel-2">
+        <div class="w-full max-w-xs rounded-3xl border border-stroke bg-canvas p-4 shadow-popover">
+          <div class="text-xs text-fg-muted">SMS · just now</div>
+          <div class="mt-2 text-sm text-fg">Your pass is ready. Tap to install:</div>
+          <div class="mt-1 text-xs text-intent underline">https://wal.let/p/abc-123</div>
+        </div>
+      </Fragment>
+    </FlowSteps>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "title", type: "string", description: "Heading shown above the step list." },
+  { name: "description", type: "string", description: "Lead paragraph under the heading." },
+  { name: "steps", type: "Step[]", required: true, description: "Array of { title, description } — one per step." },
+  { name: "panelHeight", type: "number", default: "560", description: "Minimum height of the panel area in px (desktop)." },
+  { name: "duration", type: "number", default: "800", description: "Transition duration in ms for slide + description reveal." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+The `Step` shape:
+
+```ts
+interface Step {
+  title: string;
+  description: string;
+}
+```
+
+Panels are passed via named slots: `panel-0`, `panel-1`, etc. — one per step.
+
+## Mechanism
+
+### The vertical carousel
+
+All panels occupy the **same CSS grid cell** (`[grid-template-areas:'stack']` with every child placed into `stack`), so they sit on top of each other. Each panel sets its own index as a CSS custom property (`--flow-i`) and the root sets `--flow-active` to the selected index. The transform is:
+
+```css
+transform: translateY(calc((var(--flow-i) - var(--flow-active)) * 100%));
+```
+
+With `overflow: hidden` on the container, only the panel whose `--flow-i` equals `--flow-active` is visible — the others sit just above or below the viewport. Changing `--flow-active` animates the whole column in one motion. The transition is CSS-only; JS just flips the custom property.
+
+### Step description reveal
+
+The expanded description under the active step uses the **CSS grid `0fr` / `1fr`** technique (same as `Accordion`) so height animates without JS measurement. It works inside a `<button>` because the animated element is a `<span>` with `display: grid`.
+
+### Mobile layout
+
+Below `md` the component renders a **separate DOM tree**: the stepped carousel is hidden, and a flat stack of `step-header` + `panel` pairs is shown. No JS runs against the mobile tree — panels are always visible, in order. Zero interactivity required.
+
+### Named slots via `Astro.slots.render`
+
+Astro requires static slot names, so the component renders each `panel-N` slot to HTML in the frontmatter and injects it via `<Fragment set:html={…} />`. The caller's API stays `<Fragment slot="panel-0">…</Fragment>`. Panel content is duplicated between desktop and mobile renders — keep panels visual and side-effect-free (no form inputs that would collide on IDs, no iframes that would double-load).
+
+### ARIA & accessibility
+
+- The step list is `role="tablist"` with `aria-orientation="vertical"`; each step is a native `<button role="tab">`.
+- Each panel is `role="tabpanel"` with `tabindex="0"` so screen-reader users can enter the panel content.
+- `aria-selected` + `aria-controls` (tab) and `aria-labelledby` + `aria-hidden` (panel) wired on every state change.
+- Roving `tabindex` — only the active tab has `tabindex="0"`.
+- Keyboard: ArrowUp/Down and ArrowLeft/Right cycle (wrapping); Home/End jump to first/last.
+- **Reduced motion** — slide, padding, pill fill, and description reveal transitions are all disabled under `prefers-reduced-motion: reduce`.
+
+### Script initialization
+
+- `data-script-initialized` guards against double-init across Astro view transitions.
+- Each instance uses a random UID in its ARIA IDs, so multiple FlowSteps coexist safely on the same page.
+
+## Usage
+
+```astro
+---
+import FlowSteps from "@components/FlowSteps.astro";
+import SectionMain from "@components/SectionMain.astro";
+---
+
+<SectionMain id="how-it-works" padding="none" contentPadding="none" borderTop>
+  <FlowSteps
+    title="How it works."
+    description="Issue mobile wallet credentials with a simple API integration."
+    steps={[
+      { title: "Issue credentials from your portal", description: "Control the look and feel of credential issuance." },
+      { title: "Craft a template to issue passes via API", description: "Display your brand in wallet." },
+      { title: "Users install your custom crafted credential", description: "Users receive a text with an install link." },
+    ]}
+  >
+    <Fragment slot="panel-0">
+      <div class="w-full max-w-sm rounded-2xl bg-canvas p-6 shadow-popover">…</div>
+    </Fragment>
+    <Fragment slot="panel-1">
+      <pre class="w-full max-w-sm rounded-2xl bg-fg text-canvas p-5 font-mono text-xs">…</pre>
+    </Fragment>
+    <Fragment slot="panel-2">
+      <img src="/assets/phone-preview.png" alt="Install preview on phone" />
+    </Fragment>
+  </FlowSteps>
+</SectionMain>
+```
+
+### Tuning panel height
+
+`panelHeight` sets the desktop minimum (px) — the grid container's `min-height`. If a panel's content is taller, the whole column grows. Mobile panels use `85%` of this value.
+
+### Tuning duration
+
+Default `800ms` drives panel slide, step padding expansion, number-pill fill, and description reveal — all four stay in sync.
+
+```astro
+<FlowSteps duration={500} steps={…}>
+  …
+</FlowSteps>
+```
+
+## Notes
+
+- **Best placed inside `SectionMain padding="none" contentPadding="none"`.** FlowSteps already handles its own 2-column grid, internal padding, and top/bottom borders — wrapping it in `SectionMain`'s gutter grid will either clip it or over-indent it.
+- Panels should feel like **posters, not live UI** — they're duplicated (desktop + mobile trees) and inactive desktop versions sit translated off-screen. Avoid heavy iframes, autoplay video, or forms with shared IDs.
+- The number pill uses `bg-intent` / `text-fg-on-intent` when active, so it inherits theme correctly in light and dark mode.
+- Multiple instances on a page are safe — each picks up its own UID for ARIA IDs.
+- Long step descriptions are fine — the grid-rows technique measures real height, so nothing clips. The button itself grows with the description.

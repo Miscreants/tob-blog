@@ -1,0 +1,437 @@
+---
+// Media — video tile with three activation modes (autoplay / hover / click).
+// Lazy-loads the video src on first in-view activation, pauses out of view
+// and on tab-hidden, respects prefers-reduced-motion for non-interactive
+// modes, and falls through to a chosen `touchMode` on no-hover devices.
+//
+// State is exposed via `data-media-status` ("not-active" | "loading" |
+// "playing" | "paused") so CSS can drive poster/play-overlay visibility
+// without extra JS.
+//
+// Click-mode interaction:
+//   - If a `[data-media-toggle]` element is slotted, it is the click target.
+//   - Otherwise the wrapper itself becomes the button (role, keyboard, focus).
+
+import type { ImageMetadata } from "astro";
+import { Image } from "astro:assets";
+
+interface Props {
+  /** Video URL. Loaded lazily on first activation. */
+  src: string;
+  /** Poster image shown until the video plays — an imported asset (optimized
+   *  via astro:assets) or a URL string. */
+  poster?: string | ImageMetadata;
+  /** Alt text for the poster image. Empty = decorative. */
+  alt?: string;
+  /** Activation mode. */
+  mode?: "autoplay" | "hover" | "click";
+  /** Fallback mode on no-hover (touch) devices. Defaults: hover→autoplay, others unchanged. */
+  touchMode?: "autoplay" | "click";
+  /** Aspect ratio CSS value, e.g. "16/9", "3/4", "1/1". Default 16/9. Pass `auto` to disable. */
+  aspect?: string;
+  /** Loop the video. Default true. */
+  loop?: boolean;
+  /** Reset to t=0 on pause. Default: true for hover, false otherwise. */
+  resetOnPause?: boolean;
+  /** Pause when scrolled out of viewport. Default true. */
+  pauseOffscreen?: boolean;
+  /** IntersectionObserver root margin (pre-load buffer). Default "10%". */
+  rootMargin?: string;
+  /** Pause delay in ms (debounces hover-out flicker). Default 200. */
+  pauseDelay?: number;
+  /** Native preload hint for the <video>. Default "none" (we control loading). */
+  preload?: "none" | "metadata" | "auto";
+  /** Accessible label when the wrapper itself is the click target (no slotted toggle). */
+  ariaLabel?: string;
+  class?: string;
+}
+
+const {
+  src,
+  poster,
+  alt = "",
+  mode = "autoplay",
+  touchMode,
+  aspect = "16/9",
+  loop = true,
+  resetOnPause,
+  pauseOffscreen = true,
+  rootMargin = "10%",
+  pauseDelay = 200,
+  preload = "none",
+  ariaLabel,
+  class: className,
+} = Astro.props;
+
+const hasToggleSlot = Astro.slots.has("toggle");
+// Click mode without a slotted toggle → the wrapper is the button.
+const wrapperIsButton = mode === "click" && !hasToggleSlot;
+const aspectStyle = aspect === "auto" ? undefined : `--media-aspect: ${aspect};`;
+---
+
+<div
+  data-media="component"
+  data-media-mode={mode}
+  data-media-touch-mode={touchMode}
+  data-media-reset-on-pause={resetOnPause === undefined ? undefined : String(resetOnPause)}
+  data-media-pause-offscreen={pauseOffscreen ? undefined : "false"}
+  data-media-root-margin={rootMargin}
+  data-media-pause-delay={pauseDelay}
+  data-media-status="not-active"
+  style={aspectStyle}
+  class:list={["media", className]}
+  role={wrapperIsButton ? "button" : undefined}
+  tabindex={wrapperIsButton ? "0" : undefined}
+  aria-pressed={wrapperIsButton ? "false" : undefined}
+  aria-label={wrapperIsButton ? (ariaLabel ?? "Play video") : undefined}
+>
+  {poster && (typeof poster === "string"
+    ? (
+      <img
+        data-media="poster"
+        class="media__poster"
+        src={poster}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+      />
+    ) : (
+      <Image
+        data-media="poster"
+        class="media__poster"
+        src={poster}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+      />
+    ))}
+  <video
+    data-media="video"
+    data-media-src={src}
+    class="media__video"
+    preload={preload}
+    muted
+    playsinline
+    aria-hidden={alt ? undefined : "true"}
+    {...(loop ? { loop: true } : {})}
+  ></video>
+  {mode === "click" && (
+    <div data-media="play-overlay" class="media__play" aria-hidden="true">
+      <slot name="play-icon">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor" aria-hidden="true">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </slot>
+    </div>
+  )}
+  {hasToggleSlot && (
+    <div data-media="toggle-wrap">
+      <slot name="toggle" />
+    </div>
+  )}
+</div>
+
+<style is:global>
+  [data-media="component"] {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    background: var(--color-panel-muted);
+    aspect-ratio: var(--media-aspect, 16 / 9);
+  }
+
+  [data-media="poster"],
+  [data-media="video"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 250ms ease;
+  }
+
+  /* Poster on top until the video is ready/playing. */
+  [data-media="poster"] { opacity: 1; z-index: 1; }
+  [data-media="video"]  { opacity: 0; z-index: 0; }
+
+  [data-media="component"][data-media-status="playing"] [data-media="video"]  { opacity: 1; z-index: 1; }
+  [data-media="component"][data-media-status="playing"] [data-media="poster"] { opacity: 0; z-index: 0; }
+
+  /* Play overlay (click mode). Hidden once playing. */
+  [data-media="play-overlay"] {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Scrim-relative, not theme-relative: the overlay always sits on a dark
+       scrim over the media, so it stays light in every theme. Namespaced
+       component props (§5.5) rather than raw values, so a project can retune
+       the scrim without forking the component. */
+    color: var(--media-overlay-fg, #fff);
+    background: var(--media-overlay-scrim, rgb(0 0 0 / 0.25));
+    pointer-events: none;
+    transition: opacity 250ms ease;
+  }
+  [data-media="component"][data-media-status="playing"] [data-media="play-overlay"] { opacity: 0; }
+
+  /* Wrapper-as-button affordances. */
+  [data-media="component"][role="button"] { cursor: pointer; }
+  [data-media="component"][role="button"]:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Slotted toggle sits above the layers. */
+  [data-media="toggle-wrap"] {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+  }
+  [data-media="toggle-wrap"] > * { pointer-events: auto; }
+</style>
+
+<script>
+  type Mode = "autoplay" | "hover" | "click";
+
+  const initOne = (root: HTMLElement) => {
+    if (root.dataset.scriptInitialized) return;
+    root.dataset.scriptInitialized = "true";
+
+    const video = root.querySelector<HTMLVideoElement>('[data-media="video"]');
+    if (!video) {
+      console.warn("Media: missing <video> element", root);
+      return;
+    }
+
+    // ---- Config ----
+    const declaredMode = (root.getAttribute("data-media-mode") || "autoplay") as Mode;
+    const touchMode = (root.getAttribute("data-media-touch-mode") as Mode | null) || undefined;
+    const resetAttr = root.getAttribute("data-media-reset-on-pause");
+    const pauseOffscreen = root.getAttribute("data-media-pause-offscreen") !== "false";
+    const rootMargin = root.getAttribute("data-media-root-margin") || "10%";
+    const pauseDelay = Number(root.getAttribute("data-media-pause-delay")) || 200;
+
+    const isHoverDevice = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Touch fallback: hover → autoplay (or whatever touchMode says).
+    const mode: Mode = !isHoverDevice
+      ? (touchMode || (declaredMode === "hover" ? "autoplay" : declaredMode))
+      : declaredMode;
+
+    // Reduced motion: auto/hover modes don't auto-play. Click stays interactive.
+    const motionGated = reducedMotion && mode !== "click";
+
+    const shouldResetOnPause =
+      resetAttr === "true" ? true : resetAttr === "false" ? false : mode === "hover";
+
+    const slottedToggles = Array.from(
+      root.querySelectorAll<HTMLElement>("[data-media-toggle]")
+    );
+
+    // ---- State ----
+    let isInView = false;
+    let isHovering = false;
+    let userActivated = false;
+    let userPaused = false;
+    let hasLoaded = false;
+    let shouldBePlaying = false;
+    let pauseTimer: ReturnType<typeof setTimeout> | null = null;
+    const cleanups: Array<() => void> = [];
+
+    const setStatus = (s: "not-active" | "loading" | "playing" | "paused") => {
+      root.setAttribute("data-media-status", s);
+      if (root.getAttribute("role") === "button") {
+        root.setAttribute("aria-pressed", s === "playing" ? "true" : "false");
+      }
+    };
+
+    const clearPauseTimer = () => {
+      if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+    };
+
+    const on = <K extends keyof HTMLElementEventMap | keyof DocumentEventMap>(
+      target: EventTarget,
+      event: string,
+      handler: EventListenerOrEventListenerObject
+    ) => {
+      target.addEventListener(event, handler);
+      cleanups.push(() => target.removeEventListener(event, handler));
+    };
+
+    const loadVideo = () => {
+      if (hasLoaded) return;
+      const realSrc = video.getAttribute("data-media-src");
+      if (!realSrc) return;
+      video.src = realSrc;
+      video.load();
+      hasLoaded = true;
+    };
+
+    const playAttempt = () => {
+      const p = video.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => { if (shouldBePlaying) setStatus("playing"); }).catch(() => {});
+      }
+    };
+
+    const playVideo = () => {
+      if (!isInView || document.hidden) return;
+      shouldBePlaying = true;
+      clearPauseTimer();
+      loadVideo();
+      setStatus(video.readyState < 3 ? "loading" : "playing");
+      playAttempt();
+    };
+
+    const pauseVideo = (delay = 0, reset = false) => {
+      shouldBePlaying = false;
+      clearPauseTimer();
+      pauseTimer = setTimeout(() => {
+        video.pause();
+        if (reset) video.currentTime = 0;
+      }, delay);
+    };
+
+    const shouldResume = () => {
+      if (!isInView || document.hidden || motionGated) return false;
+      if (mode === "autoplay") return !userPaused;
+      if (mode === "click") return userActivated && !userPaused;
+      return isHovering; // hover
+    };
+
+    // ---- Mode-specific handlers ----
+    const onHoverIn = () => {
+      if (!isInView || document.hidden) return;
+      isHovering = true;
+      clearPauseTimer();
+      playVideo();
+    };
+
+    const onHoverOut = () => {
+      if (!isInView) return;
+      isHovering = false;
+      setStatus("paused");
+      pauseVideo(pauseDelay, shouldResetOnPause);
+    };
+
+    const onClickToggle = () => {
+      if (!isInView || document.hidden) return;
+      clearPauseTimer();
+      if (video.paused) {
+        userActivated = true;
+        userPaused = false;
+        playVideo();
+      } else {
+        userActivated = true;
+        userPaused = true;
+        setStatus("paused");
+        pauseVideo(pauseDelay, shouldResetOnPause);
+      }
+    };
+
+    // ---- Intersection (activation + auto-pause) ----
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.target !== root) continue;
+          isInView = entry.isIntersecting;
+
+          if (isInView) {
+            if (mode === "autoplay" && !motionGated && !userPaused) playVideo();
+            else if (shouldResume()) playVideo();
+          } else if (pauseOffscreen) {
+            isHovering = false;
+            if (!video.paused || shouldBePlaying) {
+              setStatus("paused");
+              pauseVideo(0, false);
+            }
+          }
+        }
+      },
+      { rootMargin: `${rootMargin} 0px ${rootMargin} 0px`, threshold: 0 }
+    );
+    observer.observe(root);
+    cleanups.push(() => observer.disconnect());
+
+    // ---- Wire up interactions ----
+    if (mode === "hover") {
+      on(root, "mouseenter", onHoverIn);
+      on(root, "mouseleave", onHoverOut);
+      on(root, "focusin", onHoverIn);
+      on(root, "focusout", (e: Event) => {
+        const fe = e as FocusEvent;
+        if (!fe.relatedTarget || !root.contains(fe.relatedTarget as Node)) onHoverOut();
+      });
+    }
+
+    if (mode === "click") {
+      const targets: HTMLElement[] = slottedToggles.length ? slottedToggles : [root];
+      targets.forEach((t) => on(t, "click", onClickToggle));
+      // Wrapper-as-button keyboard support.
+      if (!slottedToggles.length) {
+        on(root, "keydown", (e: Event) => {
+          const ke = e as KeyboardEvent;
+          if (ke.key === " " || ke.key === "Enter") {
+            ke.preventDefault();
+            onClickToggle();
+          }
+        });
+      }
+    }
+
+    // ---- Page visibility ----
+    on(document, "visibilitychange", () => {
+      if (document.hidden) {
+        if (!video.paused || shouldBePlaying) {
+          setStatus("paused");
+          pauseVideo(0, false);
+        }
+      } else if (shouldResume()) {
+        playVideo();
+      }
+    });
+
+    // ---- Video lifecycle ----
+    on(video, "playing", () => { if (shouldBePlaying) setStatus("playing"); });
+    on(video, "waiting", () => { if (shouldBePlaying) setStatus("loading"); });
+    on(video, "canplay", () => { if (shouldBePlaying && isInView && !document.hidden) playAttempt(); });
+    on(video, "loadeddata", () => { if (shouldBePlaying && isInView && !document.hidden) playAttempt(); });
+    on(video, "ended", () => {
+      if (!shouldBePlaying || !isInView || document.hidden) return;
+      video.currentTime = 0;
+      playAttempt();
+    });
+    on(video, "error", () => {
+      console.warn("Media: video error", video.error, root);
+      setStatus("not-active");
+    });
+
+    // ---- Reduced-motion change reaction (no full re-init, just stop) ----
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onMotionChange = (e: MediaQueryListEvent) => {
+      if (e.matches && mode !== "click") {
+        setStatus("paused");
+        pauseVideo(0, true);
+      }
+    };
+    motionQuery.addEventListener("change", onMotionChange);
+    cleanups.push(() => motionQuery.removeEventListener("change", onMotionChange));
+
+    cleanups.push(() => { clearPauseTimer(); video.pause(); });
+
+    // Stash for potential teardown.
+    (root as any).__mediaCleanup = cleanups;
+  };
+
+  const initAll = () =>
+    document.querySelectorAll<HTMLElement>('[data-media="component"]').forEach(initOne);
+
+  initAll();
+  // Re-scan after Astro view transitions land.
+  document.addEventListener("astro:page-load", initAll);
+</script>

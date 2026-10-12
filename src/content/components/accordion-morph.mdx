@@ -1,0 +1,87 @@
+---
+title: AccordionMorph
+description: Native <details> accordion with bouncy spring animation and morphing radius/margin between rows.
+category: pattern
+order: 30
+sourceFile: src/components/AccordionMorph.astro
+status: stable
+related: [Accordion, AccordionFAQ]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import AccordionMorph from "@components/AccordionMorph.astro";
+
+An accordion built on native `<details>` / `<summary>` elements with a "morph" animation: the open row gets full border-radius, neighbors peel away with a bouncy spring, and panel content fades + translates + un-blurs in. Mutually-exclusive open behavior comes from the platform itself — modern browsers treat `<details>` elements that share the same `name` attribute as a single exclusive group.
+
+## Preview
+
+<Preview label="Default — exclusive open">
+  <div class="w-full max-w-md">
+    <AccordionMorph
+      ariaLabel="FAQ"
+      openIndex={0}
+      items={[
+        { icon: "lucide:wrench", title: "What is design engineering?", description: "Where design intuition meets code execution — enabling you to see UI problems and build solutions from the ground up." },
+        { icon: "lucide:puzzle", title: "What is the craft of UI?", description: "A course about building things well — mastering the web platform so you're not limited by tools or libraries." },
+        { icon: "lucide:globe", title: "Why focus on the web platform?", description: "Because when you work with the web — not fight it — you unlock performance, accessibility, and durability that last." },
+      ]}
+    />
+  </div>
+</Preview>
+
+<Preview label="Allow multiple open">
+  <div class="w-full max-w-md">
+    <AccordionMorph
+      allowMultiple
+      items={[
+        { title: "Item one", description: "Each row toggles independently when allowMultiple is set." },
+        { title: "Item two", description: "Try opening more than one — both stay open." },
+        { title: "Item three", description: "The native exclusive-open behavior is dropped by removing the shared name attribute." },
+      ]}
+    />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "items", type: "Item[]", required: true, description: "Array of { title, description, icon? } — one per row." },
+  { name: "name", type: "string", default: "random morph-xxxxx", description: "Exclusive group name. All items in the same instance share it." },
+  { name: "allowMultiple", type: "boolean", default: "false", description: "When true, drops the name so multiple rows can be open at once." },
+  { name: "openIndex", type: "number", description: "Index of the row that should be open initially (0-based)." },
+  { name: "ariaLabel", type: "string", description: 'When set, wraps in role="region" with this label.' },
+  { name: "class", type: "string", description: "Extra classes on the root." },
+]} />
+
+The `Item` shape:
+
+```ts
+type Item = {
+  title: string;
+  description: string;
+  icon?: string;        // optional lucide name (e.g. "lucide:wrench")
+};
+```
+
+## Why native `<details>`
+
+| Concern                | Custom button accordion  | Native `<details>`               |
+|------------------------|--------------------------|----------------------------------|
+| Keyboard / focus / SR  | Re-implemented in JS     | Free from the platform           |
+| Exclusive open         | JS state machine         | `name="..."` shared across items |
+| Initial-open SSR       | Manual `aria-expanded`   | `<details open>` works pre-JS    |
+| Height animation       | grid-rows trick or JS    | `::details-content` + interpolate-size |
+| Bundle cost            | ~150 lines               | ~30 lines                        |
+
+## Mechanism — the bouncy spring
+
+The height transition uses a long `linear()` easing function that overshoots 1.0, giving a spring-like settle. Don't replace with `cubic-bezier()` — the overshoot above 1.0 isn't expressible there.
+
+The other transitions (border-radius, margins, content fade) use a separate non-overshooting curve so they don't bounce together with the height.
+
+## Gotchas
+
+- **`interpolate-size` is recent.** Chrome 129+ supports it natively. Older browsers use the JS height-measurement fallback that runs once on page load.
+- **`allowMultiple` drops exclusive behavior entirely.** No middle ground (e.g. "max 2 open at once") — that's a custom JS state machine. The native primitive is one-of-many or all-of-many.
+- **Long content + the bounce.** The bouncy spring overshoots ~13% past target before settling. With very long content, tune `--bounce-duration` down (e.g. 0.6s) if the snap feels heavy.

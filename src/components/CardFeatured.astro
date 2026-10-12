@@ -1,0 +1,58 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+  border?: "all" | "y" | "x" | "none";
+  class?: string;
+  titleClass?: string;
+  titleTag?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+}
+
+const {
+  title,
+  description,
+  border = "all",
+  class: className = "",
+  titleClass = "h3",
+  titleTag: TitleTag = "h3",
+} = Astro.props;
+
+const borderClass = {
+  all: "border border-stroke",
+  y: "border-y border-stroke",
+  x: "border-x border-stroke",
+  none: "",
+}[border];
+
+// `Astro.slots.has(name)` returns true whenever a slotted element appears in
+// the parent's children expression — even when wrapped in a falsy conditional
+// like `{cond && <img slot="media" />}`. Render the slot and inspect the
+// output instead, so empty/conditional slots correctly fall through to the
+// no-media padding.
+const eyebrowContent = Astro.slots.has("eyebrow") ? await Astro.slots.render("eyebrow") : "";
+const mediaContent = Astro.slots.has("media") ? await Astro.slots.render("media") : "";
+const buttonContent = Astro.slots.has("button") ? await Astro.slots.render("button") : "";
+
+const hasEyebrow = eyebrowContent.trim().length > 0;
+const hasMedia = mediaContent.trim().length > 0;
+const hasButton = buttonContent.trim().length > 0;
+---
+
+<div
+  class:list={[
+    "relative px-4 pt-4 md:px-8 md:pt-8",
+    hasMedia ? "pb-0" : "pb-8",
+    borderClass,
+    className,
+  ]}
+>
+  <div class="flex flex-col gap-4">
+    {hasEyebrow && (
+      <div class="text-body-sm text-fg-muted" set:html={eyebrowContent} />
+    )}
+    {title && <TitleTag class={titleClass}>{title}</TitleTag>}
+    {description && <p class="text-fg-muted">{description}</p>}
+    {hasMedia && <Fragment set:html={mediaContent} />}
+    {hasButton && <Fragment set:html={buttonContent} />}
+  </div>
+</div>

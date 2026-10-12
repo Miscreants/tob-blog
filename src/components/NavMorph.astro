@@ -1,0 +1,732 @@
+---
+import { Icon } from "astro-icon/components";
+import LogoMenu from "./LogoMenu.astro";
+import Button from "./Button.astro";
+
+// Nav link shapes: plain anchor, simple dropdown menu, or 3-column mega menu.
+// `id` ties a trigger button to its content panel via [data-panel-id].
+type PlainLink = { label: string; href: string };
+type MenuLink = {
+  label: string;
+  type: "menu";
+  id: string;
+  items: { label: string; href: string }[];
+};
+type MegaLink = {
+  label: string;
+  type: "mega";
+  id: string;
+  columns: {
+    heading: string;
+    items: { label: string; href: string; description?: string }[];
+  }[];
+};
+type NavLink = PlainLink | MenuLink | MegaLink;
+
+// Logo target, primary CTA button, and extra links pinned at the bottom of the mobile drawer.
+const homeHref = "/";
+const cta = { label: "Get a Demo", href: "#" };
+const mobileFooterLinks: PlainLink[] = [{ label: "Log in", href: "#" }];
+
+// Primary nav source of truth — drives both desktop morph panel and mobile accordion.
+// Order here is the visual order in the bar.
+const links: NavLink[] = [
+  {
+    label: "Products",
+    type: "mega",
+    id: "products",
+    columns: [
+      {
+        heading: "Platform",
+        items: [
+          { label: "Overview", href: "#", description: "Everything in one place" },
+          { label: "Analytics", href: "#", description: "Track what matters" },
+          { label: "Integrations", href: "#", description: "Connect your stack" },
+        ],
+      },
+      {
+        heading: "Developers",
+        items: [
+          { label: "API reference", href: "#", description: "REST + GraphQL" },
+          { label: "SDKs", href: "#", description: "JS, Python, Go" },
+          { label: "CLI", href: "#", description: "Ship from the terminal" },
+        ],
+      },
+      {
+        heading: "Resources",
+        items: [
+          { label: "Documentation", href: "#", description: "Read the guides" },
+          { label: "Changelog", href: "#", description: "What's new" },
+          { label: "Status", href: "#", description: "Live uptime" },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Company",
+    type: "menu",
+    id: "company",
+    items: [
+      { label: "About", href: "#" },
+      { label: "Careers", href: "#" },
+      { label: "Blog", href: "#" },
+      { label: "Contact", href: "#" },
+    ],
+  },
+  { label: "Pricing", href: "#" },
+  { label: "Docs", href: "#" },
+  { label: "Changelog", href: "#" },
+  { label: "Components", href: "/components" },
+];
+
+// Subset of links that need a panel rendered (menu + mega). Plain links are skipped.
+const dropdowns = links.filter(
+  (l): l is MenuLink | MegaLink =>
+    "type" in l && (l.type === "menu" || l.type === "mega")
+);
+---
+
+{/* Root element — `data-nav-morph` is the JS init hook. Fixed to the top across all breakpoints. */}
+<header
+  data-nav-morph
+  class="container-page fixed inset-x-0 top-0 z-50 transition-all duration-300"
+>
+  {/* Optional announcement bar slot (rendered above the nav bar by the parent layout). */}
+  <slot name="announcement" />
+
+  {/* The nav bar itself. `data-nav-bar` toggles the .is-scrolled style once the page scrolls > 12px. */}
+  <div
+    data-nav-bar
+    class="px-4 relative flex h-14 items-center justify-between border border-stroke bg-canvas/0 transition-all duration-300"
+  >
+    {/* Home / logo link (left side of the bar). Right-click opens brand menu. */}
+    <LogoMenu href={homeHref} class="px-2" logoClass="h-5 w-auto" />
+
+
+    {/* Desktop primary nav. Hidden on mobile (the hamburger drawer takes over). */}
+    <nav
+      class="hidden self-stretch text-sm text-fg-muted md:flex"
+      aria-label="Primary"
+    >
+      {
+        // Render each top-level link. Menu/mega links become trigger buttons that
+        // morph the shared panel below; plain links are simple anchors.
+        links.map((link) => {
+          if ("type" in link && (link.type === "menu" || link.type === "mega")) {
+            // Dropdown trigger button — `data-panel-id` matches a content block in the panel below.
+            return (
+              <button
+                type="button"
+                data-nav-morph-trigger
+                data-panel-id={link.id}
+                aria-haspopup="true"
+                aria-controls="nav-morph-panel"
+                aria-expanded="false"
+                class="flex h-full items-center gap-1 px-4 transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2  cursor-pointer focus-visible:ring-offset-canvas"
+              >
+                {link.label}
+                <Icon
+                  name="lucide:chevron-down"
+                  data-icon="chevron-down"
+                  class="h-3 w-3 mt-0.5"
+                  aria-hidden="true"
+                />
+              </button>
+            );
+          }
+
+          // Plain link (Pricing, Docs, Changelog).
+          const plain = link as PlainLink;
+          return (
+            <a
+              href={plain.href}
+              class="flex h-full items-center px-4 transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            >
+              {plain.label}
+            </a>
+          );
+        })
+      }
+    </nav>
+
+    {/* Right cluster: primary CTA + mobile hamburger toggle. */}
+    <div class="flex items-center gap-2 pr-2">
+      {/* CTA hidden on mobile — moved into the hamburger drawer to free up bar space. */}
+      <div class="hidden md:flex">
+        <Button label={cta.label} href={cta.href} />
+      </div>
+
+      {/* Mobile hamburger — toggles the drawer below. Hidden on md+. */}
+      <button
+        type="button"
+        data-nav-toggle
+        aria-label="Open menu"
+        aria-expanded="false"
+        aria-controls="nav-morph-mobile-panel"
+        class="ml-1 grid h-9 w-9 place-items-center border border-stroke text-fg-muted transition hover:border-stroke-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
+      >
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path data-nav-icon-open d="M3 6h18M3 12h18M3 18h18" />
+          <path data-nav-icon-close class="hidden" d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Desktop morphing dropdown panel.
+       Single shared container — every dropdown's content is rendered inside, stacked
+       absolutely. Only one is active at a time. The panel itself animates width/height
+       and translateX between triggers, producing the "morph" effect. -->
+  <div
+    id="nav-morph-panel"
+    data-nav-morph-panel
+    data-open="false"
+    role="region"
+    aria-label="Primary menu panel"
+    class="pointer-events-none absolute top-full left-0 hidden border border-stroke bg-panel shadow-popover md:block"
+  >
+    {/* Viewport clips overflow so the inactive (offset) content blocks aren't visible. */}
+    <div data-nav-morph-viewport class="relative h-full overflow-hidden">
+      {
+        // One content block per dropdown trigger. JS toggles data-active to switch.
+        dropdowns.map((link) => (
+          <div
+            data-nav-morph-content
+            data-panel-id={link.id}
+            data-active="false"
+            class="absolute top-0 left-0"
+          >
+            {link.type === "menu" ? (
+              // Simple list dropdown (e.g. Company → About / Careers / Blog / Contact).
+              <div class="flex w-56 flex-col gap-1 p-2">
+                {link.items.map((item) => (
+                  <a
+                    href={item.href}
+                    class="block px-3 py-2 text-body-md text-fg transition hover:bg-panel-muted focus-visible:bg-panel-muted outline-none"
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+            ) : (
+              // Mega menu — 3 columns of grouped links with optional descriptions (Products).
+              <div class="grid w-[680px] grid-cols-3 gap-8 p-8">
+                {link.columns.map((col) => (
+                  <div>
+                    {/* Column heading (Platform / Developers / Resources). */}
+                    <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+                      {col.heading}
+                    </h3>
+                    <ul class="flex flex-col gap-1">
+                      {col.items.map((item) => (
+                        <li>
+                          <a
+                            href={item.href}
+                            class="block px-3 py-2 transition hover:bg-panel-muted focus-visible:bg-panel-muted outline-none"
+                          >
+                            <div class="text-body-md text-fg">{item.label}</div>
+                            {item.description && (
+                              <div class="text-body-sm text-fg-muted">{item.description}</div>
+                            )}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))
+      }
+    </div>
+  </div>
+
+  <!-- Mobile drawer. Uses native <details>/<summary> for each dropdown — no JS needed
+       for accordion expand/collapse. Same link list as the desktop nav. -->
+  <div
+    id="nav-morph-mobile-panel"
+    data-nav-morph-mobile
+    class="md:hidden mt-2 hidden overflow-hidden"
+  >
+    <div class="border border-stroke bg-panel p-4 shadow-popover">
+      <nav class="flex flex-col gap-1 text-sm" aria-label="Mobile primary">
+        {
+          links.map((link) => {
+            // Plain link — direct anchor.
+            if (!("type" in link)) {
+              return (
+                <a
+                  href={link.href}
+                  class="block px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg"
+                >
+                  {link.label}
+                </a>
+              );
+            }
+
+            // Simple dropdown — collapsible list under a summary.
+            if (link.type === "menu") {
+              return (
+                <details class="group">
+                  <summary class="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg">
+                    <span>{link.label}</span>
+                    <Icon
+                      name="lucide:chevron-down"
+                      class="h-4 w-4 transition group-open:rotate-180"
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <div class="mt-1 ml-3 flex flex-col gap-0.5 border-l border-stroke pl-3">
+                    {link.items.map((item) => (
+                      <a
+                        href={item.href}
+                        class="block px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg"
+                      >
+                        {item.label}
+                      </a>
+                    ))}
+                  </div>
+                </details>
+              );
+            }
+
+            // Mega menu — same accordion, but body shows each column's heading + links.
+            return (
+              <details class="group">
+                <summary class="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg">
+                  <span>{link.label}</span>
+                  <Icon
+                    name="lucide:chevron-down"
+                    class="h-4 w-4 transition group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <div class="mt-1 ml-3 flex flex-col gap-3 border-l border-stroke pl-3 py-2">
+                  {link.columns.map((column) => (
+                    <div>
+                      <h3 class="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+                        {column.heading}
+                      </h3>
+                      <div class="flex flex-col gap-0.5">
+                        {column.items.map((item) => (
+                          <a
+                            href={item.href}
+                            class="block px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg"
+                          >
+                            {item.label}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            );
+          })
+        }
+        {/* Footer area inside the mobile drawer (e.g. Log in). */}
+        {mobileFooterLinks.length > 0 && <hr class="my-2 border-stroke" />}
+        {
+          mobileFooterLinks.map((link) => (
+            <a
+              href={link.href}
+              class="block px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg"
+            >
+              {link.label}
+            </a>
+          ))
+        }
+        {/* Primary CTA at the bottom of the drawer — full-width so it reads as
+            an action, not a list item. */}
+        <div class="mt-3">
+          <Button label={cta.label} href={cta.href} class="w-full" />
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<style>
+  /* The morphing panel itself. Size + position are driven by CSS vars the
+     JS writes. Everything transitions smoothly as the caller hovers between
+     triggers. */
+  [data-nav-morph-panel] {
+    width: var(--panel-width, 0);
+    height: var(--panel-height, 0);
+    transform: translateX(var(--panel-x, 0));
+    opacity: 0;
+    visibility: hidden;
+    margin-top: 8px;
+    transition:
+      width 300ms cubic-bezier(0.32, 0.72, 0, 1),
+      height 300ms cubic-bezier(0.32, 0.72, 0, 1),
+      transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
+      opacity 200ms ease,
+      visibility 0s linear 200ms;
+    z-index: 10;
+    will-change: width, height, transform;
+  }
+  [data-nav-morph-panel][data-open="true"] {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      width 300ms cubic-bezier(0.32, 0.72, 0, 1),
+      height 300ms cubic-bezier(0.32, 0.72, 0, 1),
+      transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
+      opacity 200ms ease,
+      visibility 0s linear 0s;
+  }
+  /* Applied briefly on first open so the panel snaps to size without the
+     width/height/transform animating from 0. Opacity still fades in. */
+  [data-nav-morph-panel].no-size-transition {
+    transition:
+      opacity 200ms ease,
+      visibility 0s linear 0s !important;
+  }
+
+  /* Content items stack inside the viewport. Only one is visible at a time,
+     crossfades + slight Y slide as the active one changes. */
+  [data-nav-morph-content] {
+    opacity: 0;
+    transform: translateY(4px);
+    visibility: hidden;
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease,
+      visibility 0s linear 180ms;
+    pointer-events: none;
+  }
+  [data-nav-morph-content][data-active="true"] {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease,
+      visibility 0s linear 0s;
+  }
+
+  /* Nav bar scroll state (same as Nav.astro) */
+  [data-nav-bar].is-scrolled {
+    border-color: var(--color-stroke);
+    background-color: color-mix(in oklab, var(--color-canvas) 92%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: var(--shadow-header);
+  }
+  [data-nav-morph-trigger] [data-icon="chevron-down"] {
+    transition: transform 0.2s ease-in-out;
+  }
+  [data-nav-morph-trigger][aria-expanded="true"] [data-icon="chevron-down"] {
+    transform: rotate(180deg);
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-nav-morph-panel],
+    [data-nav-morph-content],
+    [data-nav-morph-arrow],
+    [data-nav-bar] {
+      transition: none !important;
+    }
+  }
+</style>
+
+<script>
+  const HOVER_ENTER = 80;
+  const HOVER_LEAVE = 150;
+
+  type MorphEls = {
+    root: HTMLElement;
+    navBar: HTMLElement;
+    panel: HTMLElement;
+    viewport: HTMLElement;
+    triggers: HTMLButtonElement[];
+    contents: HTMLElement[];
+    toggle: HTMLButtonElement | null;
+    mobilePanel: HTMLElement | null;
+    iconOpen: SVGElement | null;
+    iconClose: SVGElement | null;
+  };
+
+  const init = (root: HTMLElement) => {
+    const navBar = root.querySelector<HTMLElement>("[data-nav-bar]");
+    const panel = root.querySelector<HTMLElement>("[data-nav-morph-panel]");
+    const viewport = root.querySelector<HTMLElement>("[data-nav-morph-viewport]");
+    if (!navBar || !panel || !viewport) return;
+
+    const els: MorphEls = {
+      root,
+      navBar,
+      panel,
+      viewport,
+      triggers: Array.from(
+        root.querySelectorAll<HTMLButtonElement>("[data-nav-morph-trigger]")
+      ),
+      contents: Array.from(
+        root.querySelectorAll<HTMLElement>("[data-nav-morph-content]")
+      ),
+      toggle: root.querySelector<HTMLButtonElement>("[data-nav-toggle]"),
+      mobilePanel: root.querySelector<HTMLElement>("[data-nav-morph-mobile]"),
+      iconOpen: root.querySelector<SVGElement>("[data-nav-icon-open]"),
+      iconClose: root.querySelector<SVGElement>("[data-nav-icon-close]"),
+    };
+
+    // --- scroll-aware bar ------------------------------------------------
+    let isScrolled = false;
+    const updateScroll = () => {
+      const scrolled = window.scrollY > 12;
+      if (scrolled === isScrolled) return;
+      isScrolled = scrolled;
+      els.navBar.classList.toggle("is-scrolled", scrolled);
+    };
+    updateScroll();
+    window.addEventListener("scroll", updateScroll, { passive: true });
+
+    // --- panel morph -----------------------------------------------------
+    let activeId: string | null = null;
+    let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+    let leaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearTimers = () => {
+      if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+    };
+
+    const findContent = (id: string) =>
+      els.contents.find((c) => c.dataset.panelId === id) ?? null;
+    const findTrigger = (id: string) =>
+      els.triggers.find((t) => t.dataset.panelId === id) ?? null;
+
+    const measure = (content: HTMLElement) => {
+      // Content is absolutely positioned; natural size read from scroll box.
+      // Temporarily flip visibility so scrollWidth/Height are accurate even
+      // when the item isn't currently active. +2 accounts for the panel's 1px
+      // border on each side — the viewport clips at the panel's content box,
+      // so target dims must include that border to avoid edge clipping.
+      const prevVis = content.style.visibility;
+      const prevOpacity = content.style.opacity;
+      content.style.visibility = "hidden";
+      content.style.opacity = "0";
+      const w = content.scrollWidth + 2;
+      const h = content.scrollHeight + 2;
+      content.style.visibility = prevVis;
+      content.style.opacity = prevOpacity;
+      return { w, h };
+    };
+
+    const position = (trigger: HTMLButtonElement, contentWidth: number) => {
+      // Panel's left:0 origin is the <header>, not the bar. Compute trigger
+      // center in header coordinates, then center the panel on it. Clamp so
+      // the panel stays inside the header's visual width.
+      const hdrRect = els.root.getBoundingClientRect();
+      const trRect = trigger.getBoundingClientRect();
+      const trCenter = trRect.left - hdrRect.left + trRect.width / 2;
+      let panelX = trCenter - contentWidth / 2;
+      panelX = Math.max(0, Math.min(panelX, hdrRect.width - contentWidth));
+      return { panelX };
+    };
+
+    const activate = (id: string) => {
+      els.contents.forEach((c) => {
+        c.dataset.active = c.dataset.panelId === id ? "true" : "false";
+      });
+      els.triggers.forEach((t) => {
+        t.setAttribute(
+          "aria-expanded",
+          t.dataset.panelId === id ? "true" : "false"
+        );
+      });
+    };
+
+    const openOrMorph = (id: string) => {
+      const content = findContent(id);
+      const trigger = findTrigger(id);
+      if (!content || !trigger) return;
+
+      const { w, h } = measure(content);
+      const { panelX } = position(trigger, w);
+
+      const wasClosed = els.panel.dataset.open !== "true";
+
+      const writeVars = () => {
+        els.panel.style.setProperty("--panel-width", `${w}px`);
+        els.panel.style.setProperty("--panel-height", `${h}px`);
+        els.panel.style.setProperty("--panel-x", `${panelX}px`);
+      };
+
+      if (wasClosed) {
+        // First open this session — snap to target size without animating
+        // width/height/transform, so it doesn't "unfurl" from 0.
+        els.panel.classList.add("no-size-transition");
+        writeVars();
+        void els.panel.offsetHeight; // force reflow
+        els.panel.classList.remove("no-size-transition");
+        requestAnimationFrame(() => {
+          els.panel.dataset.open = "true";
+          activate(id);
+          activeId = id;
+        });
+      } else {
+        // Morph between triggers — let the CSS transitions animate.
+        writeVars();
+        activate(id);
+        activeId = id;
+      }
+    };
+
+    const closePanel = () => {
+      els.panel.dataset.open = "false";
+      els.contents.forEach((c) => (c.dataset.active = "false"));
+      els.triggers.forEach((t) => t.setAttribute("aria-expanded", "false"));
+      activeId = null;
+    };
+
+    const scheduleClose = () => {
+      if (leaveTimer) clearTimeout(leaveTimer);
+      leaveTimer = setTimeout(closePanel, HOVER_LEAVE);
+    };
+    const cancelClose = () => clearTimers();
+
+    // --- trigger wiring --------------------------------------------------
+    els.triggers.forEach((trigger) => {
+      trigger.addEventListener("mouseenter", () => {
+        clearTimers();
+        const id = trigger.dataset.panelId!;
+        const delay = els.panel.dataset.open === "true" ? 0 : HOVER_ENTER;
+        hoverTimer = setTimeout(() => openOrMorph(id), delay);
+      });
+
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = trigger.dataset.panelId!;
+        if (activeId === id) {
+          closePanel();
+        } else {
+          openOrMorph(id);
+        }
+      });
+
+      trigger.addEventListener("keydown", (e) => {
+        const id = trigger.dataset.panelId!;
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          openOrMorph(id);
+          requestAnimationFrame(() => {
+            const content = findContent(id);
+            content?.querySelector<HTMLAnchorElement>("a[href]")?.focus();
+          });
+        } else if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (activeId === id) closePanel();
+          else openOrMorph(id);
+        } else if (e.key === "Escape" && activeId === id) {
+          e.preventDefault();
+          closePanel();
+          trigger.focus();
+        }
+      });
+
+      trigger.addEventListener("mouseleave", scheduleClose);
+    });
+
+    // --- panel hover persistence & keyboard nav --------------------------
+    els.panel.addEventListener("mouseenter", cancelClose);
+    els.panel.addEventListener("mouseleave", scheduleClose);
+
+    els.panel.addEventListener("keydown", (e) => {
+      if (!activeId) return;
+      const content = findContent(activeId);
+      if (!content) return;
+      const items = Array.from(
+        content.querySelectorAll<HTMLAnchorElement>("a[href]")
+      );
+      if (items.length === 0) return;
+      const current = document.activeElement as HTMLAnchorElement | null;
+      const idx = current ? items.indexOf(current) : -1;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        items[(idx + 1) % items.length]?.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        items[(idx - 1 + items.length) % items.length]?.focus();
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        items[0]?.focus();
+      } else if (e.key === "End") {
+        e.preventDefault();
+        items[items.length - 1]?.focus();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        const trigger = findTrigger(activeId);
+        closePanel();
+        trigger?.focus();
+      }
+    });
+
+    // --- click outside closes --------------------------------------------
+    document.addEventListener("click", (e) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (root.contains(target)) return;
+      closePanel();
+    });
+
+    // --- re-measure on resize (if open, keep aligned) --------------------
+    window.addEventListener(
+      "resize",
+      () => {
+        if (!activeId || els.panel.dataset.open !== "true") return;
+        openOrMorph(activeId);
+      },
+      { passive: true }
+    );
+
+    // --- mobile menu -----------------------------------------------------
+    const setMobileOpen = (open: boolean) => {
+      if (!els.mobilePanel || !els.toggle) return;
+      els.mobilePanel.classList.toggle("hidden", !open);
+      els.iconOpen?.classList.toggle("hidden", open);
+      els.iconClose?.classList.toggle("hidden", !open);
+      els.toggle.setAttribute("aria-expanded", String(open));
+      els.toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    };
+
+    els.toggle?.addEventListener("click", () => {
+      const isOpen = !els.mobilePanel?.classList.contains("hidden");
+      setMobileOpen(!isOpen);
+    });
+
+    els.mobilePanel?.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => setMobileOpen(false));
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (activeId) {
+        closePanel();
+        findTrigger(activeId)?.focus();
+      }
+      if (els.mobilePanel && !els.mobilePanel.classList.contains("hidden")) {
+        setMobileOpen(false);
+        els.toggle?.focus();
+      }
+    });
+  };
+
+  document.querySelectorAll<HTMLElement>("[data-nav-morph]").forEach(init);
+</script>

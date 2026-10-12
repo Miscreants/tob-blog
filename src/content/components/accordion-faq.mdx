@@ -1,0 +1,118 @@
+---
+title: AccordionFAQ
+description: Typed, mapped preset over the Accordion primitive — pass an array of question/answer pairs.
+category: pattern
+order: 20
+sourceFile: src/components/AccordionFAQ.astro
+status: stable
+related: [Accordion, AccordionMorph]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import AccordionFAQ from "@components/AccordionFAQ.astro";
+
+A styled, opinionated preset over the `Accordion` primitive. Takes a list of `{ question, answer }` objects and renders an FAQ-style disclosure list with native `<button>` triggers, a chevron that rotates on open, muted answer text, and bottom borders between items. All behavior and accessibility come from the primitive — this preset only adds markup and default styling.
+
+Use this when you have straightforward Q/A content (e.g., the `faq` content collection). For rich content inside items — embedded buttons, videos, images, custom per-item styling — reach for the primitive directly.
+
+## Preview
+
+<Preview label="Inline data" align="start">
+  <div class="w-full max-w-md">
+    <AccordionFAQ
+      openByDefault={1}
+      items={[
+        { question: "What is Astro?", answer: "A web framework for content-driven websites — ships zero JS by default." },
+        { question: "How does it compare to Next.js?", answer: "Astro ships less JavaScript by default. Next.js is better for app-like UIs." },
+        { question: "Can I use React inside Astro?", answer: "Yes — and Vue, Svelte, Solid, Preact, and Lit. Mix frameworks per island." },
+        { question: "What's a content collection?", answer: "A typed, file-backed data source. Astro generates types from a Zod schema you declare in src/content.config.ts." },
+      ]}
+    />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "items", type: "{ question: string; answer: string }[]", required: true, description: "List of question/answer pairs to render." },
+  { name: "closePrevious", type: "boolean", default: "true", description: "Close other items when one opens (single-open mode)." },
+  { name: "openByDefault", type: "number", description: "1-based index of the item to open on page load." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+Does **not** forward `closeOnSecondClick` — defaults to `true` from the primitive, which is almost always what you want for FAQs.
+
+## What it renders
+
+For each item:
+
+```html
+<div data-accordion="item" class="border-b border-stroke">
+  <button type="button" data-accordion="button" class="...">
+    <span>{question}</span>
+    <Icon data-accordion="icon" name="lucide:chevron-down" />
+  </button>
+  <div data-accordion="content">
+    <div class="pb-5 text-body-lg text-fg-muted">{answer}</div>
+  </div>
+</div>
+```
+
+- Triggers are **native `<button>`** elements — correct focus, activation, and screen-reader semantics out of the box.
+- Chevron is `lucide:chevron-down` via `astro-icon`, rotates 180° on open (inherited from the primitive's CSS).
+- Answer text uses `text-fg-muted` so it flips in dark mode automatically.
+- `prefers-reduced-motion` is respected via the primitive — no extra wiring needed.
+
+## Usage
+
+### From inline data
+
+```astro
+---
+import AccordionFAQ from "@components/AccordionFAQ.astro";
+
+const faqItems = [
+  { question: "What is Astro?", answer: "A web framework for content-driven websites." },
+  { question: "How does it compare to Next.js?", answer: "Astro ships less JavaScript by default." },
+];
+---
+
+<AccordionFAQ items={faqItems} />
+```
+
+### From the `faq` content collection
+
+```astro
+---
+import { getCollection } from "astro:content";
+import AccordionFAQ from "@components/AccordionFAQ.astro";
+
+const faqs = (await getCollection("faq"))
+  .filter((faq) => faq.data.page === "homepage")
+  .sort((a, b) => a.data.order - b.data.order);
+
+const items = faqs.map((faq) => ({
+  question: faq.data.question,
+  answer: faq.body ?? "",
+}));
+---
+
+<AccordionFAQ items={items} openByDefault={1} />
+```
+
+## When to use the primitive instead
+
+Reach for `Accordion` when:
+
+- Each item's body contains rich content (buttons, videos, embedded code, custom-styled lists).
+- You need per-item styling differences (different background per item, custom icons).
+- The trigger is more than plain text + chevron (icon + text + badge, for example).
+- You want a different default typography scale for questions/answers.
+
+`AccordionFAQ` is intentionally opinionated — when you need to override its rendering, you're better off writing the primitive's markup yourself than fighting the preset.
+
+## Notes
+
+- Answer text renders as plain text. If you need markdown in answers (bold, links), compile the markdown body yourself before passing — e.g., `<Fragment set:html={compiledMarkdownHtml} />` inside the primitive instead of this preset.
+- `AccordionFAQ` adds `border-b border-stroke` to each item and `flex flex-col` to the wrapper. Override via `class` if you want different separators.

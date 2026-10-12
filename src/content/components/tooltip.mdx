@@ -1,0 +1,86 @@
+---
+title: Tooltip
+description: Accessible popover-API tooltip — hover and focus to open, Escape or blur to close, anchored to the trigger via a small JS positioner.
+category: pattern
+order: 57
+sourceFile: src/components/Tooltip.astro
+status: stable
+related: [Dropdown, Modal]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Tooltip from "@components/Tooltip.astro";
+
+Lightweight tooltip built on the native [Popover API](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API). Uses `popover="manual"` so its visibility is controlled by hover/focus, not by click — that's the right model for a hint, not an action menu. `aria-describedby` is wired automatically from the trigger to the tooltip.
+
+## Preview
+
+<Preview label="Hover or focus the buttons" align="center">
+  <div class="flex flex-wrap items-center gap-6 py-8">
+    <Tooltip text="Top-anchored tooltip" placement="top">
+      <button class="border border-stroke bg-panel px-4 py-2 text-sm">Top</button>
+    </Tooltip>
+    <Tooltip text="Bottom-anchored tooltip" placement="bottom">
+      <button class="border border-stroke bg-panel px-4 py-2 text-sm">Bottom</button>
+    </Tooltip>
+    <Tooltip text="Left-anchored tooltip" placement="left">
+      <button class="border border-stroke bg-panel px-4 py-2 text-sm">Left</button>
+    </Tooltip>
+    <Tooltip text="Right-anchored tooltip" placement="right">
+      <button class="border border-stroke bg-panel px-4 py-2 text-sm">Right</button>
+    </Tooltip>
+  </div>
+</Preview>
+
+<Preview label="Rich content via the `content` slot" align="center">
+  <div class="py-8">
+    <Tooltip placement="top">
+      <button slot="trigger" class="border border-stroke bg-panel px-4 py-2 text-sm">
+        Hover for details
+      </button>
+      <Fragment slot="content">
+        <strong>Pro tip:</strong> rich tooltips support <em>any</em> markup — but keep them short.
+      </Fragment>
+    </Tooltip>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "text", type: "string", description: "Plain-text body. Use the `content` slot instead for rich markup." },
+  { name: "placement", type: '"top" | "bottom" | "left" | "right"', default: '"top"', description: "Side of the trigger to anchor to." },
+  { name: "showDelay", type: "number", default: "200", description: "Show delay in ms — debounces accidental hovers." },
+  { name: "hideDelay", type: "number", default: "100", description: "Hide delay in ms — bridges brief gaps when re-entering the trigger." },
+  { name: "id", type: "string", description: "Stable ID for the tooltip element. Auto-generated if omitted." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Slots
+
+| Slot         | Purpose                                                              |
+|--------------|----------------------------------------------------------------------|
+| (default)    | The trigger element. The first focusable descendant gets `aria-describedby`. |
+| `trigger`    | Alternative explicit trigger slot — used when `content` slot is also provided. |
+| `content`    | Rich content for the tooltip body. Overrides `text`.                 |
+
+## Accessibility
+
+- Tooltip element gets `role="tooltip"`.
+- The trigger gets `aria-describedby` pointing at the tooltip — screen readers announce the description after the trigger label.
+- `popover="manual"` means clicks elsewhere do **not** dismiss the tooltip — that's the right behavior for a description, not a menu.
+- Opens on `focus` (keyboard users) as well as `pointerenter`. Closes on `blur` and `pointerleave`.
+- Escape closes the tooltip without moving focus.
+- `prefers-reduced-motion: reduce` removes the fade/slide transition.
+- Tooltips have `pointer-events: none` so they never intercept clicks on the underlying UI.
+
+## Dependencies
+
+None. Native Popover API (Baseline 2024).
+
+## Notes
+
+- The trigger should be a real focusable element (`<button>`, `<a>`, `<input>`, etc.). Tooltips on non-focusable text are a screen-reader trap; if you need one, add `tabindex="0"` to the trigger.
+- Tooltips close on scroll and resize — re-hovering re-opens them at the new position.
+- Multiple tooltips on a page are independent and can be triggered from different elements with no shared state.

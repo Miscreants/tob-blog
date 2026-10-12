@@ -1,0 +1,295 @@
+---
+// AccordionMorph — exclusive accordion built on native <details>/<summary>,
+// with a morph-style animation: open items get full border-radius, neighbors
+// peel away with a bouncy spring, content fades + translates + un-blurs.
+//
+// Why native <details>:
+//   * Keyboard, focus, and screen-reader semantics for free.
+//   * Setting the same `name="..."` on every <details> makes them mutually
+//     exclusive in modern browsers (Chrome 120+, Safari 17.4+, Firefox 124+).
+//   * `::details-content` lets us animate height directly when the browser
+//     supports `interpolate-size: allow-keywords` — no JS height measurement
+//     needed on the happy path.
+//
+// A small JS fallback measures heights on browsers that don't yet support
+// interpolate-size, so the height animation still works in older Safari/FF.
+
+import { Icon } from "astro-icon/components";
+
+type Item = {
+  title: string;
+  description: string;
+  icon?: string;          // optional lucide name (e.g. "lucide:wrench")
+};
+
+interface Props {
+  items: Item[];
+  name?: string;           // exclusive group name; omit if you want multi-open
+  allowMultiple?: boolean; // when true, drops the `name` so multiple can open
+  openIndex?: number;      // initial open item, 0-based
+  ariaLabel?: string;
+  class?: string;
+}
+
+const {
+  items,
+  name = `morph-${Math.random().toString(36).slice(2, 9)}`,
+  allowMultiple = false,
+  openIndex,
+  ariaLabel,
+  class: className = "",
+} = Astro.props;
+
+const groupName = allowMultiple ? undefined : name;
+---
+
+<div
+  data-accordion-morph
+  role={ariaLabel ? "region" : undefined}
+  aria-label={ariaLabel}
+  class:list={["morphing-disclosure", className]}
+>
+  {items.map((item, i) => (
+    <details name={groupName} open={openIndex === i}>
+      <summary>
+        {item.icon && (
+          <Icon
+            name={item.icon}
+            class="h-5 w-5 shrink-0 text-fg-muted"
+            aria-hidden="true"
+          />
+        )}
+        <span class="text-fg">{item.title}</span>
+        <Icon
+          name="lucide:plus"
+          data-indicator
+          class="h-5 w-5 shrink-0 text-fg-muted"
+          aria-hidden="true"
+        />
+      </summary>
+      <div class="content">
+        <p class="text-fg-muted">{item.description}</p>
+      </div>
+    </details>
+  ))}
+</div>
+
+<style>
+  /* Tunables — override per-instance via the wrapper's class if needed. */
+  .morphing-disclosure {
+    --duration: 0.26s;
+    --bounce-duration: 1s;
+    --content-blur: 4px;
+    --content-translate-y: 0.5rem;
+    --content-opacity: 0.4;
+    --translate-margin: 0.75rem;
+    --radius: 0.5rem;
+
+    /* Eased curves — the "ease" is for transforms/colors, the "bounce" is
+       reserved for the height animation so it feels springy on open/close.
+       Long literal linear() lists, but they're what makes the motion feel
+       polished. Don't try to replace with cubic-bezier — the bounce above 1
+       requires linear(). */
+    --ease: linear(
+      0 0%, 0.2688 9.91%, 0.3859 15%, 0.4917 20.19%, 0.5865 25.5%,
+      0.6705 30.93%, 0.7441 36.51%, 0.8075 42.26%, 0.8593 47.98%,
+      0.9022 53.93%, 0.9366 60.13%, 0.963 66.67%, 0.9812 73.4%,
+      0.9929 80.76%, 0.9986 88.89%, 1 100%
+    );
+    --bounce: linear(
+      0 0%, 0.5571 7.53%, 0.8252 11.98%, 0.9337 14.38%, 1.0166 16.8%,
+      1.0765 19.31%, 1.1146 21.97%, 1.1263 23.47%, 1.1325 25.06%,
+      1.133 26.76%, 1.128 28.62%, 1.1094 31.9%, 1.0484 39.77%,
+      1.0218 43.85%, 1.0011 48.42%, 0.9895 53.23%, 0.9861 59.8%,
+      1 81.27% 100%
+    );
+
+    width: 100%;
+    transform-style: preserve-3d;
+  }
+
+  /* --- the row itself --------------------------------------------------- */
+
+  .morphing-disclosure details {
+    background: var(--color-canvas);
+    border-inline: 1px solid var(--color-stroke);
+    border-block-end: 1px solid var(--color-stroke);
+    position: relative;
+    transition-property: border-radius, margin, translate, transform, color, background-color;
+    transition-duration: var(--duration);
+    transition-timing-function: var(--ease);
+  }
+  .morphing-disclosure details:first-of-type {
+    border-block-start: 1px solid var(--color-stroke);
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
+  }
+  .morphing-disclosure details:last-of-type {
+    border-bottom-left-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+  }
+
+  .morphing-disclosure details:has(summary:hover) {
+    background: var(--color-panel-muted);
+  }
+
+  /* When open: full radius + breathing margin so the row floats. The
+     top border is drawn explicitly (normally a row's top edge is "drawn" by
+     the previous sibling's bottom border, but the breathing margin opens a
+     gap above the open row, leaving its top edge invisible). */
+  .morphing-disclosure details[open] {
+    border-radius: var(--radius);
+    border-block-start: 1px solid var(--color-stroke);
+    margin-block: var(--translate-margin);
+    z-index: 2;
+  }
+  /* Same fix for the row immediately after an open one — the gap below the
+     open row leaves the next row's top edge missing too. */
+  .morphing-disclosure details[open] + details {
+    border-block-start: 1px solid var(--color-stroke);
+  }
+  .morphing-disclosure details[open]:first-of-type {
+    margin-block-start: 0;
+  }
+  .morphing-disclosure details[open]:last-of-type {
+    margin-block-end: 0;
+  }
+
+  /* The neighbors of the open row round their adjacent edges to "release"
+     the open card. */
+  .morphing-disclosure details:has(+ details[open]) {
+    border-bottom-left-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+  }
+  .morphing-disclosure details[open] + details {
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
+  }
+
+  /* Items above the open row pull up; items below push down — the
+     translate-margin cascade. Together with the open row's margin-block,
+     the gap visually "morphs" rather than abruptly appearing. */
+  .morphing-disclosure details:has(~ details[open]) {
+    translate: 0 calc(var(--translate-margin) * -1);
+  }
+  .morphing-disclosure details[open] ~ details {
+    translate: 0 var(--translate-margin);
+  }
+
+  /* --- summary --------------------------------------------------------- */
+
+  .morphing-disclosure summary {
+    cursor: pointer;
+    list-style: none;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.875rem 1rem;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+  }
+  .morphing-disclosure summary:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+    border-radius: inherit;
+  }
+  .morphing-disclosure summary::-webkit-details-marker { display: none; }
+  .morphing-disclosure summary::marker { content: ""; }
+
+  /* The trailing "+" rotates to "×" when open. */
+  .morphing-disclosure [data-indicator] {
+    transition: rotate var(--duration) var(--ease), opacity var(--duration) var(--ease);
+    opacity: 0.7;
+  }
+  .morphing-disclosure details[open] [data-indicator] {
+    rotate: 45deg;
+    opacity: 1;
+  }
+
+  /* --- content --------------------------------------------------------- */
+
+  .morphing-disclosure .content {
+    padding: 0 1rem 1rem 1rem;
+    translate: 0 var(--content-translate-y);
+    opacity: var(--content-opacity);
+    filter: blur(var(--content-blur));
+    transition-property: translate, opacity, filter;
+    transition-duration: var(--duration);
+    transition-timing-function: var(--ease);
+  }
+  .morphing-disclosure details[open] .content {
+    translate: 0 0;
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  /* --- height animation ------------------------------------------------- */
+
+  /* Modern path: animate `height` between 0 and `auto` directly via
+     interpolate-size + ::details-content. No JS measurement needed.
+     Older browsers fall through to the fallback set by the script. */
+  .morphing-disclosure details::details-content {
+    height: 0;
+    overflow: hidden;
+    transition-property: content-visibility, height;
+    transition-behavior: allow-discrete;
+    transition-duration: var(--bounce-duration);
+    transition-timing-function: var(--bounce);
+  }
+  .morphing-disclosure details,
+  .morphing-disclosure details::details-content {
+    interpolate-size: allow-keywords;
+  }
+  .morphing-disclosure details[open]::details-content {
+    height: var(--content-height, auto);
+  }
+  @supports (interpolate-size: allow-keywords) {
+    .morphing-disclosure details[open]::details-content {
+      height: auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .morphing-disclosure details,
+    .morphing-disclosure .content,
+    .morphing-disclosure [data-indicator],
+    .morphing-disclosure details::details-content {
+      transition: none !important;
+    }
+    .morphing-disclosure .content {
+      filter: none;
+      translate: 0 0;
+      opacity: 1;
+    }
+  }
+</style>
+
+<script>
+  // Fallback height measurement for browsers without
+  // `interpolate-size: allow-keywords` (Safari ≤17, Firefox ≤140 at time of
+  // writing). Each <details>'s content height is measured once and stored as
+  // `--content-height`, which the CSS rule above falls back to. Skipped
+  // entirely on browsers that support the modern path.
+  const supportsInterpolateSize = CSS.supports("interpolate-size", "allow-keywords");
+
+  if (!supportsInterpolateSize) {
+    document.querySelectorAll<HTMLElement>("[data-accordion-morph]").forEach((root) => {
+      const details = root.querySelectorAll<HTMLDetailsElement>("details");
+      details.forEach((d) => {
+        const wasOpen = d.open;
+        // Force-open temporarily so we can read the natural height of the
+        // content. The visibility flip prevents a flash.
+        d.style.contentVisibility = "auto";
+        d.open = true;
+        const content = d.querySelector<HTMLElement>(".content");
+        if (content) {
+          const h = Math.ceil(content.getBoundingClientRect().height);
+          d.style.setProperty("--content-height", `${h}px`);
+        }
+        d.open = wasOpen;
+        d.style.removeProperty("content-visibility");
+      });
+    });
+  }
+</script>

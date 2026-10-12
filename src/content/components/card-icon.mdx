@@ -1,0 +1,82 @@
+---
+title: CardIcon
+description: Compact card with icon, eyebrow, heading, and content slot — designed to sit in a grid with shared borders.
+category: block
+order: 20
+sourceFile: src/components/CardIcon.astro
+status: stable
+related: [CardFeatured]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import CardIcon from "@components/CardIcon.astro";
+import { Icon } from "astro-icon/components";
+
+A simple icon-driven card. Stat callouts, feature highlights, side-by-side benefit lists. Designed to sit in a grid where adjacent cards share their `border-x`.
+
+## Preview
+
+<Preview label="Stat callout" align="start">
+  <div class="w-full max-w-sm">
+    <CardIcon eyebrow="98.3% uptime" header="Proven reliability across sources with proactive monitoring">
+      <Icon slot="icon" name="lucide:activity" class="h-4 w-4 mb-2 text-intent" />
+      <p slot="content" class="text-sm text-fg-muted mt-2">Backed by SLA and 24/7 status reporting.</p>
+    </CardIcon>
+  </div>
+</Preview>
+
+<Preview label="Three in a row">
+  <div class="grid w-full grid-cols-1 sm:grid-cols-3">
+    <CardIcon eyebrow="Fast" header="Sub-second cold start">
+      <Icon slot="icon" name="lucide:zap" class="h-4 w-4 mb-2 text-intent" />
+    </CardIcon>
+    <CardIcon eyebrow="Safe" header="Zero-trust access by default">
+      <Icon slot="icon" name="lucide:shield" class="h-4 w-4 mb-2 text-intent" />
+    </CardIcon>
+    <CardIcon eyebrow="Open" header="Built on open standards">
+      <Icon slot="icon" name="lucide:globe" class="h-4 w-4 mb-2 text-intent" />
+    </CardIcon>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "eyebrow", type: "string", description: "Small label text above the heading — typically a category or stat." },
+  { name: "header", type: "string", description: "Card heading. Renders as <h3> with h5 visual size." },
+  { name: "class", type: "string", default: '""', description: "Additional classes on the outer div." },
+]} />
+
+## Slots
+
+| Slot      | Purpose                                |
+|-----------|----------------------------------------|
+| `icon`    | Icon at the top of the card.           |
+| `content` | Body content below the heading.        |
+
+## Mechanism
+
+- Vertical stack via `flex-col`, `px-6 py-8` padding.
+- `border-x border-stroke` by default — when placed in a grid, neighboring cards share their borders for a single hairline between them.
+
+## Usage
+
+```astro
+---
+import CardIcon from "@components/CardIcon.astro";
+import { Icon } from "astro-icon/components";
+---
+
+<div class="grid grid-cols-4">
+  <CardIcon eyebrow="98.3% uptime" header="Proven reliability across sources">
+    <Icon slot="icon" name="lucide:activity" class="h-8 w-8 text-intent" />
+    <p slot="content" class="text-sm text-fg-muted">Additional details here.</p>
+  </CardIcon>
+</div>
+```
+
+## Notes
+
+- Designed to sit in a horizontal grid — vertical borders between adjacent cards form a clean rule.
+- Unlike `CardFeatured`, there's no media slot or configurable border prop. Reach for `CardFeatured` when the design needs more flexibility.

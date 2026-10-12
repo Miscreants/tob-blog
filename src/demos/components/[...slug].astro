@@ -1,0 +1,180 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import SectionMain from "../../components/SectionMain.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import { getCollection, render } from "astro:content";
+
+export async function getStaticPaths() {
+  const all = await getCollection("components");
+  return all.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+
+// Sibling links for "more in this category" navigation.
+const all = await getCollection("components");
+const siblings = all
+  .filter((c) => c.data.category === entry.data.category && c.id !== entry.id)
+  .sort((a, b) => a.data.order - b.data.order)
+  .slice(0, 4);
+---
+
+<Layout title={`${entry.data.title} — Components`}>
+  <main id="main" class="border-y border-stroke">
+    <SectionMain id="component-header" paddingTop="lg" paddingBottom="sm" contentPadding="default">
+      <Breadcrumbs
+        class="mb-4"
+        items={[
+          { label: "Components", href: "/components/" },
+          { label: entry.data.title },
+        ]}
+      />
+      <h1 class="h2">{entry.data.title}</h1>
+      <p class="mt-3 max-w-prose text-fg-muted">{entry.data.description}</p>
+      <p class="mt-4 text-xs text-fg-subtle">
+        <span class="uppercase tracking-wider mr-2">Source:</span>
+        <code class="text-fg-muted">{entry.data.sourceFile}</code>
+      </p>
+    </SectionMain>
+
+    <SectionMain id="component-body" paddingTop="sm" paddingBottom="md" contentPadding="default" borderTop>
+      <article class="prose-doc">
+        <Content />
+      </article>
+    </SectionMain>
+
+    {siblings.length > 0 && (
+      <SectionMain id="component-related" padding="sm" borderTop>
+        <h2 class="h5 mb-4">More {entry.data.category}s</h2>
+        <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {siblings.map((s) => (
+            <li>
+              <a
+                href={`/components/${s.id}/`}
+                class="flex h-full flex-col gap-2 border border-stroke bg-canvas p-6 transition hover:bg-panel-muted hover:border-stroke-strong focus-visible:bg-panel-muted outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                <h3 class="text-sm font-semibold text-fg">{s.data.title}</h3>
+                <p class="text-sm text-fg-muted line-clamp-2">{s.data.description}</p>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </SectionMain>
+    )}
+  </main>
+</Layout>
+
+<style is:global>
+  /* Minimal "doc prose" styling for MDX content. Every selector wraps the
+     element in `:not(:where(.not-prose, .not-prose *))` so prose styles
+     don't bleed into <Preview> blocks (which carry `not-prose`). Without
+     it, e.g. a live <AnnouncementBanner> rendered inside a Preview gets
+     its inner <a> overridden by .prose-doc a, producing dark-on-dark text.
+     `:where()` keeps specificity at 0 so live-component styles always win. */
+  .prose-doc {
+    color: var(--color-fg);
+    align-self: center;
+    /* Flex items default to min-width: auto and grow to fit their largest
+       min-content child (long code strings, wide tables). Set min-width: 0
+       so the article shrinks to its parent column on narrow viewports. */
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .prose-doc :where(h2):not(:where(.not-prose, .not-prose *)) {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.25;
+  }
+  .prose-doc :where(h3):not(:where(.not-prose, .not-prose *)) {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.5rem;
+  }
+  .prose-doc :where(p):not(:where(.not-prose, .not-prose *)) {
+    margin: 0.875rem 0;
+    color: var(--color-fg-muted);
+    line-height: 1.65;
+  }
+  .prose-doc :where(ul, ol):not(:where(.not-prose, .not-prose *)) {
+    margin: 0.875rem 0;
+    padding-left: 1.5rem;
+    color: var(--color-fg-muted);
+  }
+  .prose-doc :where(li):not(:where(.not-prose, .not-prose *)) {
+    margin: 0.25rem 0;
+  }
+  .prose-doc :where(p, li) > :where(code):not(:where(.not-prose, .not-prose *)) {
+    background: var(--color-panel-muted);
+    border: 1px solid var(--color-stroke);
+    padding: 0.05rem 0.35rem;
+    font-size: 0.85em;
+    border-radius: 2px;
+    color: var(--color-fg);
+    /* Long type signatures or paths shouldn't push the article wider than
+       the viewport — let them break wherever needed. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Same for inline code that lands inside headings (e.g. an `h3` with
+     "Why <code>::details-content</code>"). */
+  .prose-doc :where(h2, h3, h4, h5, h6):not(:where(.not-prose, .not-prose *)) {
+    overflow-wrap: anywhere;
+  }
+  .prose-doc :where(pre):not(:where(.not-prose, .not-prose *)) {
+    background: var(--color-fg);
+    color: var(--color-canvas);
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85em;
+    line-height: 1.6;
+    border: 1px solid var(--color-fg);
+  }
+  .prose-doc :where(pre code):not(:where(.not-prose, .not-prose *)) {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  .prose-doc :where(table):not(:where(.not-prose, .not-prose *)) {
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+    border-collapse: collapse;
+    border: 1px solid var(--color-stroke);
+  }
+  .prose-doc :where(th, td):not(:where(.not-prose, .not-prose *)) {
+    text-align: left;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--color-stroke);
+    vertical-align: top;
+  }
+  .prose-doc :where(th):not(:where(.not-prose, .not-prose *)) {
+    background: var(--color-panel-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    color: var(--color-fg-subtle);
+  }
+  .prose-doc :where(tr:last-child td):not(:where(.not-prose, .not-prose *)) {
+    border-bottom: 0;
+  }
+  .prose-doc :where(a):not(:where(.not-prose, .not-prose *)) {
+    color: var(--color-fg);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .prose-doc :where(a):not(:where(.not-prose, .not-prose *)):hover {
+    color: var(--color-intent);
+  }
+</style>

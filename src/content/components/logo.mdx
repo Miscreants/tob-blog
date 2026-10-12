@@ -1,0 +1,60 @@
+---
+title: Logo
+description: Inline SVG wordmark that inherits color via currentColor and scales to its container.
+category: primitive
+order: 30
+sourceFile: src/components/Logo.astro
+status: stable
+related: [Nav, NavMega, NavMorph, Footer]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Logo from "@components/Logo.astro";
+
+The "Miscreants" SVG wordmark. All paths use `fill="currentColor"`, so color is driven by the parent's `text-*` utility.
+
+## Preview
+
+<Preview label="Default">
+  <Logo class="h-5 w-auto text-fg" />
+</Preview>
+
+<Preview label="Larger, muted">
+  <Logo class="h-8 w-auto text-fg-muted" />
+</Preview>
+
+<Preview label="Inverted on dark surface" class="bg-fg">
+  <Logo class="h-6 w-auto text-canvas" />
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "class", type: "string", default: '""', description: "Classes applied to the <svg> element. Use h-* + w-auto for sizing, text-* for color." },
+]} />
+
+## Mechanism
+
+- The SVG sets `width="100%"` with a fixed `viewBox="0 0 370 57"`, so it stretches to fill the parent's width while preserving aspect ratio.
+- Every path uses `fill="currentColor"` — the wordmark inherits its color from the nearest ancestor with a `color` value (i.e. any Tailwind `text-*` utility).
+- `aria-label="Miscreants"` and `role="img"` make it announce as a single image to assistive tech.
+
+## Usage
+
+```astro
+---
+import Logo from "@components/Logo.astro";
+---
+
+<Logo class="h-5 w-auto" />
+
+<div class="text-canvas">
+  <Logo class="h-8 w-auto" />
+</div>
+```
+
+## Notes
+
+- Use `h-*` together with `w-auto` to size the logo. Without `w-auto`, the SVG's `width="100%"` will fill the parent's width.
+- The registered-trademark mark is part of the path data — not a separate text run.

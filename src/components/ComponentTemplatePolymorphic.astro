@@ -1,0 +1,69 @@
+---
+/**
+ * ComponentTemplatePolymorphic — for a control that renders as one of two
+ * elements, typically <a> when given an href and <button> otherwise.
+ *
+ * Use this only when the rendered element genuinely varies. A component that
+ * always renders the same tag should start from ComponentTemplateStatic.
+ *
+ * Copy, rename, delete what you don't need.
+ */
+import type { HTMLAttributes } from "astro/types";
+
+// Extend the primary element so callers can pass any native attribute —
+// data-*, aria-*, handlers — without us enumerating them, then forward the few
+// props belonging to the alternate element.
+//
+// Deliberately not `HTMLAttributes<"button"> & HTMLAttributes<"a">`: an
+// intersection makes every attribute optional on both and weakens the hints a
+// caller gets. A discriminated union is stronger still, and worth reaching for
+// when invalid combinations are genuinely dangerous — at the cost of needing
+// narrowing before you can destructure.
+interface Props extends HTMLAttributes<"button"> {
+  variant?: "primary" | "secondary";
+  /** Render as an <a> pointing here instead of a <button>. */
+  href?: string;
+  /** Anchor-only; forwarded when `href` is set. */
+  target?: string;
+  /** Anchor-only; defaults to "noopener noreferrer" when target="_blank". */
+  rel?: string;
+}
+
+const {
+  variant = "primary",
+  href,
+  type = "button",
+  target,
+  rel,
+  disabled = false,
+  class: className,
+  ...rest
+} = Astro.props;
+
+// A disabled link is not a thing — an <a> has no disabled state and stays
+// focusable and clickable. Fall back to a real button so the state is honest.
+const Tag = href && !disabled ? "a" : "button";
+
+// Opening a new context without noopener leaks window.opener to the target.
+const anchorRel = rel ?? (target === "_blank" ? "noopener noreferrer" : undefined);
+
+const variantClasses = {
+  primary: "bg-intent text-fg-on-intent",
+  secondary: "bg-panel text-fg border border-stroke",
+};
+---
+
+<Tag
+  {...rest}
+  {...(Tag === "a" ? { href, target, rel: anchorRel } : { type, disabled })}
+  class:list={[
+    "inline-flex items-center justify-center gap-2 px-4 py-2 cursor-pointer",
+    "focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+    "disabled:pointer-events-none disabled:opacity-50",
+    "aria-disabled:pointer-events-none aria-disabled:opacity-50",
+    variantClasses[variant],
+    className,
+  ]}
+>
+  <slot />
+</Tag>

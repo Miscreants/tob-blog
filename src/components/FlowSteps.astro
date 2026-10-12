@@ -1,0 +1,306 @@
+---
+/**
+ * Stepped "how it works" section with an animated vertical-carousel panel.
+ *
+ * Layout on desktop:
+ *   [ heading + step list ]  [ stacked panels — only active one visible ]
+ *
+ * Clicking a step slides the panel column vertically, exposing the panel
+ * at that index. CSS-only: one custom property (`--flow-active`) drives a
+ * translateY on every panel.
+ *
+ * Mobile collapses to a flat stack of step-header + panel pairs.
+ *
+ * Usage:
+ *   <FlowSteps
+ *     title="How it works"
+ *     description="..."
+ *     steps={[
+ *       { title: "Step one", description: "..." },
+ *       { title: "Step two", description: "..." },
+ *     ]}
+ *   >
+ *     <Fragment slot="panel-0">...</Fragment>
+ *     <Fragment slot="panel-1">...</Fragment>
+ *   </FlowSteps>
+ */
+
+interface Step {
+  title: string;
+  description: string;
+}
+
+interface Props {
+  title?: string;
+  description?: string;
+  steps: Step[];
+  /** Panel minimum height (desktop). Default: 560 */
+  panelHeight?: number;
+  /** Transition duration in ms for the panel slide + description expansion. Default: 800 */
+  duration?: number;
+  class?: string;
+}
+
+const {
+  title,
+  description,
+  steps,
+  panelHeight = 560,
+  duration = 800,
+  class: className,
+} = Astro.props;
+
+// Unique id per instance so ARIA relationships don't collide if multiple exist on a page.
+const uid = Math.random().toString(36).slice(2, 8);
+
+// Astro requires static slot names, so we render each named slot to HTML up-front
+// and inject it into the template with `set:html`.
+const panelHTML = await Promise.all(
+  steps.map((_, i) =>
+    Astro.slots.has(`panel-${i}`)
+      ? Astro.slots.render(`panel-${i}`)
+      : Promise.resolve("")
+  )
+);
+---
+
+<div
+  data-flow-steps
+  style={`--flow-active: 0; --flow-duration: ${duration}ms; --flow-panel-h: ${panelHeight}px;`}
+  class:list={[
+    "relative md:grid md:grid-cols-2  border-stroke bg-canvas",
+    className,
+  ]}
+>
+  {/* ─── DESKTOP LEFT COLUMN: heading + step list ─── */}
+  {/* No right border here — the right column's `border-l` (part of its
+      full `border border-stroke`) draws the divider, avoiding a double line. */}
+  <div class="hidden md:flex md:flex-col md:justify-between">
+    {(title || description) && (
+      <div class="px-10 pt-20 pb-10">
+        {title && <h2 class="h3">{title}</h2>}
+        {description && (
+          <p class="mt-4 text-fg-muted text-body-md max-w-md">{description}</p>
+        )}
+      </div>
+    )}
+
+    <div
+      class="relative"
+      role="tablist"
+      aria-orientation="vertical"
+      aria-label={title ?? "Steps"}
+    >
+      {steps.map((step, i) => (
+        <button
+          type="button"
+          data-flow-step
+          data-index={i}
+          id={`flow-${uid}-tab-${i}`}
+          role="tab"
+          aria-selected={i === 0 ? "true" : "false"}
+          aria-controls={`flow-${uid}-panel-${i}`}
+          tabindex={i === 0 ? 0 : -1}
+          data-open={i === 0 ? "" : undefined}
+          class="flow-step w-full text-left relative cursor-pointer px-10 border-t border-stroke focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus"
+        >
+          <span class="flex items-center gap-x-3">
+            <span
+              aria-hidden="true"
+              class="flow-step-num inline-flex h-[18px] min-w-[18px] items-center justify-center  border border-stroke bg-panel-muted text-fg text-[10px] leading-none font-semibold"
+            >
+              {i + 1}
+            </span>
+            <span class="text-body-sm font-medium">{step.title}</span>
+          </span>
+
+          <span class="flow-step-desc block text-fg-muted text-body-md">
+            <span class="flow-step-desc-inner block">
+              <span class="block pt-2">{step.description}</span>
+            </span>
+          </span>
+        </button>
+      ))}
+      <div class="h-px absolute left-0 bottom-0 w-full bg-stroke" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  {/* ─── DESKTOP RIGHT COLUMN: stacked panels ─── */}
+  <div
+    class="hidden md:grid relative overflow-hidden border border-stroke bg-panel-muted [grid-template-areas:'stack'] [&>*]:[grid-area:stack]"
+    style={`min-height: var(--flow-panel-h);`}
+  >
+    {steps.map((step, i) => (
+      <div
+        data-flow-panel
+        data-index={i}
+        id={`flow-${uid}-panel-${i}`}
+        role="tabpanel"
+        aria-labelledby={`flow-${uid}-tab-${i}`}
+        tabindex={i === 0 ? 0 : -1}
+        aria-hidden={i === 0 ? "false" : "true"}
+        inert={i !== 0}
+        class="flow-panel flex items-center justify-center px-8 md:px-12 focus-visible:outline-2 focus-visible:outline-focus"
+      >
+        <Fragment set:html={panelHTML[i]} />
+      </div>
+    ))}
+  </div>
+
+  {/* ─── MOBILE: flat stack ─── */}
+  <div class="md:hidden">
+    {(title || description) && (
+      <div class="px-6 pt-16 pb-8">
+        {title && <h2 class="h3">{title}</h2>}
+        {description && (
+          <p class="mt-4 text-fg-muted text-body-md">{description}</p>
+        )}
+      </div>
+    )}
+    {steps.map((step, i) => (
+      <div class="border-t border-stroke">
+        <div class="py-8 px-6">
+          <div class="flex items-center gap-x-3">
+            <span
+              aria-hidden="true"
+              class="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-intent bg-intent text-fg-on-intent text-[10px] leading-none font-semibold"
+            >
+              {i + 1}
+            </span>
+            <h3 class="text-sm font-medium">{step.title}</h3>
+          </div>
+          <p class="pt-2 text-fg-muted text-sm">{step.description}</p>
+        </div>
+        <div
+          class="relative flex items-center justify-center px-8 bg-panel-muted"
+          style={`min-height: calc(var(--flow-panel-h) * 0.85);`}
+        >
+          <Fragment set:html={panelHTML[i]} />
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style is:global>
+  /* ---- Panel: vertical carousel driven by --flow-active ---- */
+  [data-flow-steps] [data-flow-panel] {
+    transform: translateY(calc((var(--flow-i, 0) - var(--flow-active, 0)) * 100%));
+    transition: transform var(--flow-duration, 800ms) cubic-bezier(0.65, 0, 0.35, 1);
+    will-change: transform;
+  }
+
+  /* ---- Step button: padding shrinks when closed ---- */
+  [data-flow-steps] .flow-step {
+    padding-block: 25px;
+    transition: padding var(--flow-duration, 800ms) cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  [data-flow-steps] .flow-step[data-open] {
+    padding-block: 32px;
+  }
+
+  /* ---- Step number pill: fills on open ---- */
+  [data-flow-steps] .flow-step .flow-step-num {
+    transition: background-color var(--flow-duration, 800ms) cubic-bezier(0.65, 0, 0.35, 1),
+      color var(--flow-duration, 800ms) cubic-bezier(0.65, 0, 0.35, 1),
+      border-color var(--flow-duration, 800ms) cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  [data-flow-steps] .flow-step[data-open] .flow-step-num {
+    background-color: var(--color-intent);
+    color: var(--color-fg-on-intent);
+    border-color: var(--color-intent);
+  }
+
+  /* ---- Description reveal via grid-rows trick (works inside <button>) ---- */
+  [data-flow-steps] .flow-step-desc {
+    display: grid;
+    grid-template-rows: 0fr;
+    overflow: hidden;
+    transition: grid-template-rows var(--flow-duration, 800ms) cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  [data-flow-steps] .flow-step-desc-inner {
+    min-height: 0;
+    overflow: hidden;
+  }
+  [data-flow-steps] .flow-step[data-open] .flow-step-desc {
+    grid-template-rows: 1fr;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-flow-steps] [data-flow-panel],
+    [data-flow-steps] .flow-step,
+    [data-flow-steps] .flow-step-num,
+    [data-flow-steps] .flow-step-desc {
+      transition: none !important;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-flow-steps]").forEach((root) => {
+    if (root.dataset.scriptInitialized) return;
+    root.dataset.scriptInitialized = "true";
+
+    const steps = Array.from(root.querySelectorAll<HTMLElement>("[data-flow-step]"));
+    const panels = Array.from(root.querySelectorAll<HTMLElement>("[data-flow-panel]"));
+
+    if (!steps.length || !panels.length) return;
+
+    // Seed each panel with its index for the translateY calc.
+    panels.forEach((p, i) => p.style.setProperty("--flow-i", String(i)));
+
+    let activeIndex = 0;
+
+    const setActive = (index: number, focus = false) => {
+      if (index < 0 || index >= steps.length) return;
+      activeIndex = index;
+      root.style.setProperty("--flow-active", String(index));
+
+      steps.forEach((s, i) => {
+        const open = i === index;
+        if (open) s.setAttribute("data-open", "");
+        else s.removeAttribute("data-open");
+        s.setAttribute("aria-selected", open ? "true" : "false");
+        s.setAttribute("tabindex", open ? "0" : "-1");
+        if (open && focus) s.focus();
+      });
+
+      panels.forEach((p, i) => {
+        const active = i === index;
+        p.setAttribute("aria-hidden", active ? "false" : "true");
+        p.setAttribute("tabindex", active ? "0" : "-1");
+        // inert: blocks focus/interaction on the element AND its descendants,
+        // so focusable content inside an offscreen panel can't be tabbed into.
+        p.inert = !active;
+      });
+    };
+
+    steps.forEach((s, i) => {
+      s.addEventListener("click", () => setActive(i));
+      s.addEventListener("keydown", (e: KeyboardEvent) => {
+        switch (e.key) {
+          case "ArrowDown":
+          case "ArrowRight":
+            e.preventDefault();
+            setActive((i + 1) % steps.length, true);
+            break;
+          case "ArrowUp":
+          case "ArrowLeft":
+            e.preventDefault();
+            setActive((i - 1 + steps.length) % steps.length, true);
+            break;
+          case "Home":
+            e.preventDefault();
+            setActive(0, true);
+            break;
+          case "End":
+            e.preventDefault();
+            setActive(steps.length - 1, true);
+            break;
+        }
+      });
+    });
+
+    setActive(0);
+  });
+</script>

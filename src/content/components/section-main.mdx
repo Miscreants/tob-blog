@@ -1,0 +1,100 @@
+---
+title: SectionMain
+description: The section primitive — semantic section landmark, centered content column, vertical rhythm presets and side rules.
+category: layout
+order: 10
+sourceFile: src/components/SectionMain.astro
+status: stable
+related: [Layout, Footer]
+---
+
+import PropsTable from "@components/_docs/PropsTable.astro";
+
+The section primitive. **Build every `Section*` component on this** rather than hand-rolling a wrapper — it owns the semantic landmark, the centering, the vertical rhythm and the side rules, so sections stay aligned with each other, the nav and the footer. Hand-rolling `<section class="section-gutter section-padding">` drifts from the shared rhythm and silently drops the side rules. Bespoke markup is an allowed-with-reason deviation for genuinely full-bleed or self-framed sections (see STANDARDS §5.0).
+
+It extends `HTMLAttributes<"section">`, so `id`, `aria-*` and any other native attribute pass straight through to the `<section>`.
+
+## Props
+
+<PropsTable props={[
+  { name: "id", type: "string", description: "HTML id for anchor linking (any native section attribute passes through)." },
+  { name: "padding", type: '"none" | "xs" | "sm" | "md" | "lg" | "xl"', default: '"md"', description: "Vertical padding preset — shorthand for both edges." },
+  { name: "paddingTop", type: '"none" | "xs" | "sm" | "md" | "lg" | "xl"', description: "Overrides the top edge only." },
+  { name: "paddingBottom", type: '"none" | "xs" | "sm" | "md" | "lg" | "xl"', description: "Overrides the bottom edge only." },
+  { name: "contentPadding", type: '"none" | "default"', default: '"default"', description: "Horizontal padding inside the content column: none = px-0, default = px-2 md:px-6." },
+  { name: "contentClass", type: "string", default: '""', description: "Additional classes on the inner flex column." },
+  { name: "borderTop", type: "boolean", default: "false", description: "Add a top border to the section." },
+]} />
+
+## Mechanism
+
+### Structure
+
+Two elements — an outer `<section>` that centers, and an inner column that carries rhythm and rules:
+
+```
+<section class="container-page">          <!-- max-w-[90rem] + px-site-margin -->
+  <div class="section-pt-* section-pb-*   <!-- vertical rhythm -->
+              flex flex-col relative
+              border-l border-r border-stroke  <!-- side rules -->
+              px-2 md:px-6">              <!-- contentPadding -->
+    <slot />
+  </div>
+</section>
+```
+
+Centering comes from the `container-page` utility. (An earlier 5-column
+`section-grid-outside` grid with decorative `section-pattern` gutters was
+replaced by this — it's still in `global.css` but commented out and applied
+nowhere.)
+
+### Padding map
+
+`padding` / `paddingTop` / `paddingBottom` map to the `section-pt-*` and
+`section-pb-*` utilities in `global.css`. They **do** step up at `md:`:
+
+| Value  | Utility          | Mobile | `md:` and up |
+|--------|------------------|--------|--------------|
+| `none` | (none)           | —      | —            |
+| `xs`   | `section-p{t,b}-xs` | `2rem`  | `2.5rem` |
+| `sm`   | `section-p{t,b}-sm` | `3rem`  | `4rem`   |
+| `md`   | `section-p{t,b}-md` | `4rem`  | `6rem`   |
+| `lg`   | `section-p{t,b}-lg` | `6rem`  | `8rem`   |
+| `xl`   | `section-p{t,b}-xl` | `8rem`  | `12rem`  |
+
+`paddingTop` / `paddingBottom` each override `padding` for that edge.
+
+**Don't pass `padding` unless you mean to break rhythm.** `md` is the default and
+suits an ordinary stacked section. Reach for `lg`/`xl` to isolate a hero or a
+page-closing CTA, `xs`/`sm` for a dense strip, `none` when the child owns its own
+spacing.
+
+## Usage
+
+```astro
+---
+import SectionMain from "@components/SectionMain.astro";
+---
+
+<!-- Standard section -->
+<SectionMain>
+  <h2 class="h2">Features</h2>
+  <p>Content goes here</p>
+</SectionMain>
+
+<!-- Tight section with top border, no content padding -->
+<SectionMain padding="xs" contentPadding="none" borderTop={true}>
+  <div class="grid grid-cols-3">...</div>
+</SectionMain>
+
+<!-- Section with anchor link target -->
+<SectionMain id="pricing">
+  <h2 class="h2">Pricing</h2>
+</SectionMain>
+```
+
+## Notes
+
+- The left/right `border-stroke` rules are what give the page its ruled-column look, and they're the main thing you lose by hand-rolling a section.
+- `contentClass` lets you add things like `items-center` to the flex column without overriding the base layout classes.
+- Components like `FlowSteps` and `FeatureScrollSpy` already manage their own grid and padding — wrap them in `SectionMain padding="none" contentPadding="none"` so you don't double-indent.

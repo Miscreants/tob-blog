@@ -1,0 +1,61 @@
+---
+title: ButtonGroup
+description: Layout wrapper that arranges child buttons in a wrapping horizontal row with consistent spacing.
+category: primitive
+order: 20
+sourceFile: src/components/ButtonGroup.astro
+status: stable
+related: [Button]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import Button from "@components/Button.astro";
+import ButtonGroup from "@components/ButtonGroup.astro";
+
+A pure layout primitive — no logic, no scripts. Children render in a `flex flex-wrap` row with consistent gap, falling onto a new line on narrow viewports.
+
+## Preview
+
+<Preview label="Two buttons">
+  <ButtonGroup>
+    <Button label="Learn more" href="#features" />
+    <Button label="Get a demo" variant="secondary" href="/demo" />
+  </ButtonGroup>
+</Preview>
+
+<Preview label="Wraps on narrow viewports">
+  <ButtonGroup>
+    <Button label="Primary" />
+    <Button label="Secondary" variant="secondary" />
+    <Button label="Tertiary" variant="tertiary" />
+    <Button label="Read docs" href="/docs" variant="secondary" />
+  </ButtonGroup>
+</Preview>
+
+## Props
+
+None — children are passed via the default `<slot />`.
+
+## Mechanism
+
+- `flex flex-wrap gap-3 mt-4` on the wrapper. Children inherit the gap; rows wrap on overflow.
+- The `mt-4` is baked in — the component assumes the group sits below a heading or paragraph.
+
+## Usage
+
+```astro
+---
+import ButtonGroup from "@components/ButtonGroup.astro";
+import Button from "@components/Button.astro";
+---
+
+<ButtonGroup>
+  <Button label="Learn more" href="#features" />
+  <Button label="Get a demo" variant="secondary" href="/demo" />
+</ButtonGroup>
+```
+
+## Notes
+
+- The baked-in `mt-4` margin assumes the group sits below text. If you need it flush against a sibling (e.g. inside a card), wrap with `class="!mt-0"` or similar.
+- Anything goes inside — not just `Button`. Mix in `<a>`, `<Clickable>`, badges, etc. as long as flex-row layout makes sense.

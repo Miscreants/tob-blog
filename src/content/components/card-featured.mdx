@@ -1,0 +1,114 @@
+---
+title: CardFeatured
+description: Content card with optional eyebrow, media, and button area, driven by semantic theme tokens.
+category: block
+order: 10
+sourceFile: src/components/CardFeatured.astro
+status: stable
+related: [CardIcon, Clickable, SliderBasicMap]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import CardFeatured from "@components/CardFeatured.astro";
+import Button from "@components/Button.astro";
+
+A flexible content card with title, description, optional eyebrow label, optional media that bleeds to the bottom edge, and an optional action area. Colors and borders use semantic tokens, so the card flips automatically in dark mode.
+
+## Preview
+
+<Preview label="With eyebrow + button" align="start">
+  <div class="w-full max-w-md">
+    <CardFeatured
+      title="Design content structures your way."
+      description="Full control with a streamlined, API-first experience."
+      border="all"
+    >
+      <span slot="eyebrow">Schema Builder</span>
+      <Button slot="button" label="Read docs" href="/docs" variant="secondary" />
+    </CardFeatured>
+  </div>
+</Preview>
+
+<Preview label="Plain — no eyebrow, no button" align="start">
+  <div class="w-full max-w-md">
+    <CardFeatured
+      title="Learn more about our approach."
+      description="Straightforward, no surprises."
+      border="all"
+    />
+  </div>
+</Preview>
+
+<Preview label="Borders: y only" align="start">
+  <div class="w-full max-w-md">
+    <CardFeatured
+      title="Build faster with our REST API."
+      description="Simple, well-documented endpoints."
+      border="y"
+      titleTag="h2"
+    >
+      <span slot="eyebrow">API</span>
+    </CardFeatured>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "title", type: "string", description: "Card heading text. Heading element is omitted entirely when not set." },
+  { name: "description", type: "string", description: "Body text below the title. Omitted when not set." },
+  { name: "border", type: '"all" | "y" | "x" | "none"', default: '"all"', description: "Which borders to render, all using border-stroke." },
+  { name: "titleTag", type: '"h1" | "h2" | "h3" | "h4" | "h5" | "h6"', default: '"h3"', description: "Semantic heading level for the title." },
+  { name: "titleClass", type: "string", default: '"h3"', description: "Class applied to the title element — controls visual size." },
+  { name: "class", type: "string", default: '""', description: "Additional classes on the outer wrapper." },
+]} />
+
+## Slots
+
+| Slot      | Purpose                                                                  |
+|-----------|--------------------------------------------------------------------------|
+| `eyebrow` | Small label above the title. Only rendered when content is provided.    |
+| `media`   | Image or video that bleeds flush to the bottom edge of the card.        |
+| `button`  | Action area below description. Only rendered when content is provided.  |
+
+All three slots use `Astro.slots.has(...)` at build time, so nothing renders (and no empty wrapper is emitted) when a slot is unused.
+
+## Mechanism
+
+- The eyebrow slot is wrapped in a `text-body-sm text-fg-muted` container by default. Pass richer content (a badge, icon + text) and it takes over.
+- When the `media` slot has content, bottom padding drops to `pb-0` so the media sits flush. Otherwise `pb-8` keeps spacing consistent.
+- The `border` prop maps to `border`, `border-y`, `border-x`, or no border — always using the theme's `--color-stroke` token.
+- Title is fully optional — pass nothing and no heading element renders.
+
+## Usage
+
+```astro
+---
+import CardFeatured from "@components/CardFeatured.astro";
+import Button from "@components/Button.astro";
+import { Image } from "astro:assets";
+import screenshot from "@images/feature-1.webp";
+---
+
+<CardFeatured
+  title="Design content structures your way."
+  description="Full control with a streamlined, API-first experience."
+  border="all"
+>
+  <span slot="eyebrow">Schema Builder</span>
+  {/* media slot takes any markup; prefer <Image> from astro:assets for
+      raster screenshots so the build emits an optimized, sized /_astro/* file */}
+  <Image slot="media" src={screenshot} alt="Schema builder interface" loading="lazy" decoding="async" />
+</CardFeatured>
+
+<CardFeatured title="Build faster with our REST API." description="..." border="y" titleTag="h2">
+  <span slot="eyebrow">API</span>
+  <Button slot="button" href="/docs">Read docs</Button>
+</CardFeatured>
+```
+
+## Notes
+
+- The card itself is not a link — wrap it with `<Clickable>` if the whole card should navigate.
+- Colors use semantic tokens, so dropping the card inside `[data-theme="dark"]` automatically flips its surface, border, and text.

@@ -1,0 +1,155 @@
+---
+title: Grid
+description: Responsive CSS-grid wrapper with named breakpoints — mobile, mobileLandscape, tablet, desktop.
+category: layout
+order: 15
+sourceFile: src/components/Grid.astro
+status: stable
+related: [SectionMain]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Grid from "@components/Grid.astro";
+import CardFeatured from "@components/CardFeatured.astro";
+
+A thin wrapper around CSS grid that exposes breakpoint counts as semantic prop names instead of Tailwind's raw `sm:` / `md:` / `lg:` prefixes. Mirrors the breakpoint API of [`SliderBasic`](/components/slider-basic/) so the same mental model works whether you're laying out a static grid or a horizontal scroller.
+
+Anything you put inside renders as a child cell — the component doesn't shape its children, it just controls how many columns they sit in at each breakpoint.
+
+## Preview
+
+<Preview label="3-column on desktop, 2 on tablet, 1 on mobile">
+  <Grid mobile={1} tablet={2} desktop={3} gap="gap-4" class="w-full">
+    <div class="border border-stroke bg-canvas p-6 text-sm text-fg">Cell A</div>
+    <div class="border border-stroke bg-canvas p-6 text-sm text-fg">Cell B</div>
+    <div class="border border-stroke bg-canvas p-6 text-sm text-fg">Cell C</div>
+    <div class="border border-stroke bg-canvas p-6 text-sm text-fg">Cell D</div>
+    <div class="border border-stroke bg-canvas p-6 text-sm text-fg">Cell E</div>
+    <div class="border border-stroke bg-canvas p-6 text-sm text-fg">Cell F</div>
+  </Grid>
+</Preview>
+
+<Preview label="With CardFeatured children — common pattern">
+  <Grid mobile={1} tablet={2} desktop={3} gap="gap-4" class="w-full">
+    <CardFeatured title="Fast" description="Sub-second cold start." class="bg-canvas">
+      <span slot="eyebrow">Performance</span>
+    </CardFeatured>
+    <CardFeatured title="Safe" description="Zero-trust by default." class="bg-canvas">
+      <span slot="eyebrow">Security</span>
+    </CardFeatured>
+    <CardFeatured title="Open" description="Built on open standards." class="bg-canvas">
+      <span slot="eyebrow">Standards</span>
+    </CardFeatured>
+  </Grid>
+</Preview>
+
+<Preview label="Six columns at desktop, stepping down at each breakpoint">
+  <Grid mobile={1} mobileLandscape={2} tablet={3} desktop={6} gap="gap-2" class="w-full">
+    <div class="border border-stroke bg-panel-muted p-4 text-center text-xs text-fg-muted">1</div>
+    <div class="border border-stroke bg-panel-muted p-4 text-center text-xs text-fg-muted">2</div>
+    <div class="border border-stroke bg-panel-muted p-4 text-center text-xs text-fg-muted">3</div>
+    <div class="border border-stroke bg-panel-muted p-4 text-center text-xs text-fg-muted">4</div>
+    <div class="border border-stroke bg-panel-muted p-4 text-center text-xs text-fg-muted">5</div>
+    <div class="border border-stroke bg-panel-muted p-4 text-center text-xs text-fg-muted">6</div>
+  </Grid>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "mobile", type: "1 | 2 | … | 12", default: "1", description: "Columns at the base breakpoint (always applies)." },
+  { name: "mobileLandscape", type: "1 | 2 | … | 12", description: "Columns at the sm breakpoint (640px+). Skip to inherit from mobile." },
+  { name: "tablet", type: "1 | 2 | … | 12", description: "Columns at the md breakpoint (768px+). Skip to inherit from the previous breakpoint." },
+  { name: "desktop", type: "1 | 2 | … | 12", description: "Columns at the lg breakpoint (1024px+). Skip to inherit from the previous breakpoint." },
+  { name: "gap", type: "string", default: '"gap-6"', description: "Tailwind gap utility — `gap-2`, `gap-4`, `gap-6`, `gap-8`, etc." },
+  { name: "class", type: "string", description: "Extra classes on the grid container — e.g. `items-center`, `justify-items-stretch`." },
+]} />
+
+## Why use this instead of writing `<div class="grid grid-cols-...">` directly
+
+Two reasons:
+
+1. **Named breakpoints read better.** `<Grid mobile={1} tablet={2} desktop={3}>` describes intent at the call site. `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">` is the same shape but you have to mentally translate `md:` → "tablet". For one grid, fine. Across a project of 30 grids, the named version stays scannable.
+
+2. **Consistent breakpoint vocabulary.** The starter uses `mobile / mobileLandscape / tablet / desktop` as the shared breakpoint names across `Grid` and `SliderBasic`. Sticking to that vocabulary in the components page keeps the mental model uniform — when you read `tablet={2}` in either component, it means the same thing (md, 768px+).
+
+For one-off, exotic layouts (auto-fit, named grid areas, span tricks) you'll still drop down to raw `grid` utilities. The component is for the common case of "N equal columns at each breakpoint."
+
+## Usage
+
+```astro
+---
+import Grid from "@components/Grid.astro";
+import CardFeatured from "@components/CardFeatured.astro";
+---
+
+<Grid mobile={1} tablet={2} desktop={3} gap="gap-4">
+  <CardFeatured title="One" />
+  <CardFeatured title="Two" />
+  <CardFeatured title="Three" />
+</Grid>
+```
+
+### With alignment overrides via `class`
+
+```astro
+<Grid mobile={1} tablet={3} class="items-center justify-items-stretch py-8">
+  …
+</Grid>
+```
+
+The `class` prop appends to the component's own utilities — see the "Passing `class` to a component" pattern used across this starter.
+
+### Don't override structural props via `class`
+
+```astro
+{/* ❌ Don't — Tailwind specificity flat, last-emitted wins, hard to reason about */}
+<Grid mobile={1} class="gap-2" gap="gap-12" />
+
+{/* ✅ Use the typed prop */}
+<Grid mobile={1} gap="gap-2" />
+```
+
+Use `class` for orthogonal additions (alignment, padding, background) — not for things the component already exposes.
+
+## Mechanism
+
+Internally the component maps each prop to a Tailwind utility lookup table:
+
+```ts
+const base: Record<Cols, string> = { 1: "grid-cols-1", 2: "grid-cols-2", … };
+const md:   Record<Cols, string> = { 1: "md:grid-cols-1", 2: "md:grid-cols-2", … };
+```
+
+Then assembles them via `class:list` so falsy props (skipped breakpoints) drop out automatically:
+
+```astro
+<div class:list={[
+  "grid",
+  base[mobile],
+  mobileLandscape && sm[mobileLandscape],
+  tablet && md[tablet],
+  desktop && lg[desktop],
+  gap,
+  className,
+]}>
+  <slot />
+</div>
+```
+
+The lookup tables are required because Tailwind's content scanner only generates utilities it can see literally in the source. Building class names dynamically with template strings would generate utilities Tailwind never emits — see the example below.
+
+```ts
+// ❌ Tailwind doesn't see md:grid-cols-3 anywhere literally
+const cls = `md:grid-cols-${tablet}`;
+
+// ✅ Lookup table — every value appears literally
+const md = { 1: "md:grid-cols-1", 2: "md:grid-cols-2", 3: "md:grid-cols-3" };
+```
+
+## Gotchas
+
+1. **Breakpoint inheritance is `sm < md < lg`, not "skip and inherit."** If you set `mobile={1}` and `desktop={3}` but skip `tablet`, the tablet view inherits from `mobileLandscape` (or from `mobile` if that's also skipped) — *not* a midpoint between mobile and desktop. CSS doesn't interpolate column counts.
+2. **Max 12 columns.** The lookup tables go up to 12 because that's where Tailwind's `grid-cols-*` defaults stop. If you need 13+, extend the tables in `Grid.astro`.
+3. **`gap` is a string, not an enum.** This is intentional — it lets you pass any Tailwind gap utility (`gap-px`, `gap-x-4`, `gap-y-8`). The trade-off is no autocomplete, and a typo silently produces no gap.

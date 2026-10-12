@@ -1,0 +1,73 @@
+---
+interface Props {
+  region?: string;
+  portalId?: string;
+  formId?: string;
+}
+
+const {
+  region = "na1",
+  portalId = "40120329",
+  formId = "34f97be6-a435-4a54-a676-371efe148e70",
+} = Astro.props;
+---
+
+<div
+  data-hubspot-form
+  data-region={region}
+  data-portal-id={portalId}
+  data-form-id={formId}
+>
+  <div data-hubspot-target></div>
+</div>
+
+<script>
+  const containers = document.querySelectorAll<HTMLElement>("[data-hubspot-form]");
+  let sdkLoaded = false;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+
+        const el = entry.target as HTMLElement;
+        observer.unobserve(el);
+
+        const region = el.dataset.region;
+        const portalId = el.dataset.portalId;
+        const formId = el.dataset.formId;
+
+        // Give the target a unique ID for HubSpot's selector-based API
+        const targetEl = el.querySelector<HTMLElement>("[data-hubspot-target]")!;
+        const targetId = `hs-form-${Math.random().toString(36).slice(2, 8)}`;
+        targetEl.id = targetId;
+
+        function createForm() {
+          (window as any).hbspt.forms.create({
+            region,
+            portalId,
+            formId,
+            target: `#${targetId}`,
+          });
+        }
+
+        // Load SDK once, reuse for multiple forms
+        if (sdkLoaded) {
+          createForm();
+          return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "//js.hsforms.net/forms/embed/v2.js";
+        script.onload = () => {
+          sdkLoaded = true;
+          createForm();
+        };
+        document.head.appendChild(script);
+      });
+    },
+    { rootMargin: "200px" }
+  );
+
+  containers.forEach((el) => observer.observe(el));
+</script>

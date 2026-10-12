@@ -1,0 +1,171 @@
+---
+// AnimatedTags — radio-group of icon+label "tag" pills where the selected one
+// expands to show its label and the rest collapse to icon-only. Rebuilt with
+// zero JS.
+//
+// Why no JS:
+//   * Native <input type="radio"> handles selection state, keyboard nav
+//     (arrow keys move between radios in the same group), focus management,
+//     and form integration for free.
+//   * `:has(input:checked)` on the label detects the selected state in CSS.
+//   * The label animates from icon-only to icon+label using the
+//     `grid-template-columns: 0fr → 1fr` trick — this animates an element
+//     from "no width" to "intrinsic width" without measuring, with a spring
+//     easing curve for the bouncy feel the original had.
+//
+// Form integration: drop inside a <form> and submit — the selected `value`
+// posts under the configured `name` like any radio group.
+
+import { Icon } from "astro-icon/components";
+
+type Item = {
+  value: string;
+  label: string;
+  icon?: string;       // optional lucide name (e.g. "lucide:rabbit")
+};
+
+interface Props {
+  items: Item[];
+  name?: string;       // form field name (must be unique per group)
+  value?: string;      // initial selected value — defaults to first item
+  ariaLabel?: string;
+  class?: string;
+}
+
+const {
+  items,
+  name = `tags-${Math.random().toString(36).slice(2, 9)}`,
+  value,
+  ariaLabel = "Select an option",
+  class: className = "",
+} = Astro.props;
+
+const selectedValue = value ?? items[0]?.value;
+---
+
+<div
+  data-animated-tags
+  role="radiogroup"
+  aria-label={ariaLabel}
+  class:list={["animated-tags flex items-center gap-3", className]}
+>
+  {items.map((item) => {
+    const checked = item.value === selectedValue;
+    return (
+      <label class="cursor-pointer">
+        <input
+          type="radio"
+          name={name}
+          value={item.value}
+          checked={checked}
+          class="sr-only peer"
+        />
+        <div class="tag">
+          {item.icon && (
+            <Icon name={item.icon} class="h-5 w-5 shrink-0" aria-hidden="true" />
+          )}
+          <span class="tag-label">
+            <span>{item.label}</span>
+          </span>
+        </div>
+      </label>
+    );
+  })}
+</div>
+
+<style>
+  /* Bouncy spring curve for the layout shift (matches the visualDuration: 0.3,
+     bounce: 0.3 from the original Framer Motion source). Long literal but it's
+     what gives the snappy-then-settle feel. */
+  .animated-tags {
+    --duration: 0.32s;
+    --spring: linear(
+      0 0%, 0.2178 4.71%, 0.4571 9.49%, 0.6794 14.66%, 0.8675 20.27%,
+      1.0185 26.39%, 1.1313 33.18%, 1.2069 40.78%, 1.2402 48.71%,
+      1.2375 53.31%, 1.2148 57.51%, 1.0885 70.65%, 1.0245 79.14%,
+      0.9854 87.7%, 0.9758 92.6%, 0.9778 97.06%, 1 100%
+    );
+  }
+
+  /* The pill itself. NOTE: no flex `gap` here — flex gap reserves space
+     between items even when one has 0 width, leaking horizontal padding on
+     inactive tags. The icon-to-label spacing is instead applied as
+     `margin-inline-start` on the label and animated alongside its width. */
+  .animated-tags .tag {
+    display: flex;
+    align-items: center;
+    height: 2.75rem;
+    padding-inline: 1rem;
+    border-radius: 9999px;
+    color: var(--color-fg-subtle);
+    background-color: var(--color-panel-muted);
+    transition:
+      color var(--duration) ease,
+      background-color var(--duration) ease;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .animated-tags label:has(input:checked) .tag {
+    color: var(--color-canvas);
+    background-color: var(--color-intent);
+  }
+
+  /* The label's width animates via grid-template-columns: 0fr → 1fr, with
+     `minmax(0, 0fr)` so the track can actually collapse below min-content
+     (without it, white-space: nowrap text would force the track open).
+     `margin-inline-start` animates in lockstep so the gap between icon and
+     text appears only when the text does. */
+  .animated-tags .tag-label {
+    display: grid;
+    grid-template-columns: minmax(0, 0fr);
+    margin-inline-start: 0;
+    transition:
+      grid-template-columns var(--duration) var(--spring),
+      margin-inline-start var(--duration) var(--spring);
+  }
+  .animated-tags label:has(input:checked) .tag-label {
+    grid-template-columns: minmax(0, 1fr);
+    margin-inline-start: 0.5rem;
+  }
+
+  /* Inner span clips the text while the outer track is 0fr. */
+  .animated-tags .tag-label > span {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 0;
+    /* Fade in/out as the width animates. The shorter duration on opacity
+       keeps the text from appearing before the pill has room. */
+    transition: opacity calc(var(--duration) * 0.6) ease calc(var(--duration) * 0.2);
+  }
+  .animated-tags label:has(input:checked) .tag-label > span {
+    opacity: 1;
+  }
+  /* When NOT checked, fade out faster + no delay so it disappears as the
+     pill closes rather than being clipped while still opaque. */
+  .animated-tags label:not(:has(input:checked)) .tag-label > span {
+    transition: opacity calc(var(--duration) * 0.3) ease;
+  }
+
+  /* Hover state on inactive tags. */
+  @media (hover: hover) {
+    .animated-tags label:not(:has(input:checked)) .tag:hover {
+      color: var(--color-fg);
+    }
+  }
+
+  /* Keyboard focus ring on the visible pill (the input itself is sr-only). */
+  .animated-tags label:has(input:focus-visible) .tag {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animated-tags .tag,
+    .animated-tags .tag-label,
+    .animated-tags .tag-label > span {
+      transition: none;
+    }
+  }
+</style>

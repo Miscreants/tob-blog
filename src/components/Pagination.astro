@@ -1,0 +1,259 @@
+---
+// Pagination — page-N-of-M control with prev/next + numeric page buttons
+// and ellipsis truncation for long ranges.
+//
+// Two render modes:
+//   - href-based (default): pages render as <a> tags. Pass an `hrefFor`
+//     function that maps a page number to a URL — works perfectly without JS.
+//   - button-based: pass `buttons={true}` and listen for `pagination:change`
+//     events on the wrapper. Useful for in-page client-side filtering.
+//
+// Markup:
+//   <Pagination current={3} total={10} hrefFor={(p) => `?page=${p}`} />
+//   <Pagination current={3} total={10} buttons />
+
+interface Props {
+  /** 1-based current page. */
+  current: number;
+  /** Total number of pages. */
+  total: number;
+  /** Function mapping a page number to its URL. Required when using anchor mode. */
+  hrefFor?: (page: number) => string;
+  /** Use buttons + custom event instead of anchors. */
+  buttons?: boolean;
+  /** How many sibling pages to show on each side of the current page. Default 1. */
+  siblings?: number;
+  /** Always show first/last pages (with ellipsis if needed). Default true. */
+  boundaries?: boolean;
+  /** Accessible label for the wrapping <nav>. Default "Pagination". */
+  ariaLabel?: string;
+  /** Label for previous button. Default "Previous". */
+  prevLabel?: string;
+  /** Label for next button. Default "Next". */
+  nextLabel?: string;
+  class?: string;
+}
+
+const {
+  current,
+  total,
+  hrefFor,
+  buttons = false,
+  siblings = 1,
+  boundaries = true,
+  ariaLabel = "Pagination",
+  prevLabel = "Previous",
+  nextLabel = "Next",
+  class: className,
+} = Astro.props;
+
+if (!buttons && !hrefFor) {
+  throw new Error("Pagination: pass `hrefFor` or set `buttons={true}`.");
+}
+
+// Compute which page numbers to render. Result includes `null` for ellipsis
+// gaps. Algorithm: always show current, current±siblings, plus first/last if
+// boundaries; insert null between non-adjacent runs.
+function buildPageList(
+  current: number,
+  total: number,
+  siblings: number,
+  boundaries: boolean
+): (number | null)[] {
+  if (total <= 0) return [];
+  const pages = new Set<number>();
+  pages.add(current);
+  for (let i = 1; i <= siblings; i++) {
+    if (current - i >= 1) pages.add(current - i);
+    if (current + i <= total) pages.add(current + i);
+  }
+  if (boundaries) {
+    pages.add(1);
+    pages.add(total);
+  }
+  const sorted = Array.from(pages).sort((a, b) => a - b);
+  const out: (number | null)[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) out.push(null);
+    out.push(sorted[i]);
+  }
+  return out;
+}
+
+const pageList = buildPageList(current, total, siblings, boundaries);
+const hasPrev = current > 1;
+const hasNext = current < total;
+const Tag = buttons ? "button" : "a";
+---
+
+<nav
+  data-pagination
+  data-pagination-current={current}
+  data-pagination-total={total}
+  aria-label={ariaLabel}
+  class:list={["pagination", className]}
+>
+  <ol data-pagination-list>
+    <li>
+      <Tag
+        type={buttons ? "button" : undefined}
+        href={!buttons && hasPrev && hrefFor ? hrefFor(current - 1) : undefined}
+        data-pagination-prev
+        aria-label={prevLabel}
+        aria-disabled={!hasPrev ? "true" : undefined}
+        disabled={buttons && !hasPrev ? true : undefined}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18" />
+        </svg>
+        <span class="pagination__label">{prevLabel}</span>
+      </Tag>
+    </li>
+
+    {pageList.map((p) => (
+      p === null ? (
+        <li data-pagination-ellipsis aria-hidden="true">…</li>
+      ) : (
+        <li>
+          <Tag
+            type={buttons ? "button" : undefined}
+            href={!buttons && hrefFor ? hrefFor(p) : undefined}
+            data-pagination-page={p}
+            aria-label={`Page ${p}`}
+            aria-current={p === current ? "page" : undefined}
+          >
+            {p}
+          </Tag>
+        </li>
+      )
+    ))}
+
+    <li>
+      <Tag
+        type={buttons ? "button" : undefined}
+        href={!buttons && hasNext && hrefFor ? hrefFor(current + 1) : undefined}
+        data-pagination-next
+        aria-label={nextLabel}
+        aria-disabled={!hasNext ? "true" : undefined}
+        disabled={buttons && !hasNext ? true : undefined}
+      >
+        <span class="pagination__label">{nextLabel}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <polyline points="9 6 15 12 9 18" />
+        </svg>
+      </Tag>
+    </li>
+  </ol>
+</nav>
+
+<style is:global>
+  [data-pagination] [data-pagination-list] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  [data-pagination] [data-pagination-list] > li {
+    margin: 0;
+  }
+  [data-pagination] a,
+  [data-pagination] button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding: 0 0.625rem;
+    border: 1px solid var(--color-stroke);
+    background: var(--color-panel);
+    color: var(--color-fg);
+    font-size: 0.8125rem;
+    text-decoration: none;
+  }
+  [data-pagination] a:hover,
+  [data-pagination] button:hover:not([disabled]) {
+    background: var(--color-panel-muted);
+    border-color: var(--color-stroke-strong);
+  }
+  [data-pagination] [aria-current="page"] {
+    background: var(--color-intent);
+    color: var(--color-fg-on-intent);
+    border-color: var(--color-intent);
+    pointer-events: none;
+  }
+  [data-pagination] [aria-disabled="true"],
+  [data-pagination] [disabled] {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  [data-pagination-ellipsis] {
+    padding: 0 0.375rem;
+    color: var(--color-fg-subtle);
+    user-select: none;
+  }
+  [data-pagination] a:focus-visible,
+  [data-pagination] button:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Compact-on-mobile: hide prev/next text labels, keep arrows. */
+  @media (max-width: 480px) {
+    [data-pagination] .pagination__label {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  const initOne = (root: HTMLElement) => {
+    if (root.dataset.scriptInitialized) return;
+    root.dataset.scriptInitialized = "true";
+
+    // Only relevant in button mode — anchor mode uses real navigation.
+    const isButtonMode = !!root.querySelector("button[data-pagination-page], button[data-pagination-prev], button[data-pagination-next]");
+    if (!isButtonMode) return;
+
+    const total = Number(root.getAttribute("data-pagination-total")) || 1;
+    let current = Number(root.getAttribute("data-pagination-current")) || 1;
+
+    const dispatch = (next: number) => {
+      if (next < 1 || next > total || next === current) return;
+      const event = new CustomEvent("pagination:change", {
+        bubbles: true,
+        cancelable: true,
+        detail: { from: current, to: next },
+      });
+      const proceed = root.dispatchEvent(event);
+      if (proceed) {
+        current = next;
+        root.setAttribute("data-pagination-current", String(next));
+        // Caller should re-render. If they want optimistic UI, they can
+        // call preventDefault() above and manage state themselves.
+      }
+    };
+
+    root.addEventListener("click", (e) => {
+      const target = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-pagination-page], button[data-pagination-prev], button[data-pagination-next]");
+      if (!target || target.disabled) return;
+
+      const pageAttr = target.getAttribute("data-pagination-page");
+      if (pageAttr) {
+        dispatch(Number(pageAttr));
+      } else if (target.hasAttribute("data-pagination-prev")) {
+        dispatch(current - 1);
+      } else if (target.hasAttribute("data-pagination-next")) {
+        dispatch(current + 1);
+      }
+    });
+  };
+
+  const initAll = () =>
+    document.querySelectorAll<HTMLElement>("[data-pagination]").forEach(initOne);
+
+  initAll();
+  document.addEventListener("astro:page-load", initAll);
+</script>

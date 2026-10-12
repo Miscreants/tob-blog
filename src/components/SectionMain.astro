@@ -1,0 +1,68 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+type PadSize = "none" | "xs" | "sm" | "md" | "lg" | "xl";
+
+interface Props extends HTMLAttributes<"section"> {
+  padding?: PadSize;            // shorthand for both
+  paddingTop?: PadSize;         // overrides top
+  paddingBottom?: PadSize;      // overrides bottom
+  contentPadding?: "none" | "default";
+  contentClass?: string;
+  borderTop?: boolean;
+}
+const {
+  padding = "md",
+  paddingTop,
+  paddingBottom,
+  contentPadding = "default",
+  contentClass = "",
+  borderTop = false,
+  class: className,
+  ...rest
+} = Astro.props;
+
+const top = paddingTop ?? padding;
+const bot = paddingBottom ?? padding;
+
+const ptClass = {
+  none: "", xs: "section-pt-xs", sm: "section-pt-sm",
+  md: "section-pt-md", lg: "section-pt-lg", xl: "section-pt-xl",
+}[top];
+const pbClass = {
+  none: "", xs: "section-pb-xs", sm: "section-pb-sm",
+  md: "section-pb-md", lg: "section-pb-lg", xl: "section-pb-xl",
+}[bot];
+
+const contentPaddingClass = {
+  none: "px-0",
+  default: "px-2 md:px-6",
+}[contentPadding];
+---
+
+{/* STRUCTURE — three elements, one concern each:
+
+      <section>  FULL-BLEED. The background and any full-width effect lives
+                 here. Nothing caps its width.
+        <div>    the page box: max width plus the side padding that keeps
+                 content off the screen edges.
+          <div>  vertical rhythm and the side rules.
+
+    The width cap must NOT sit on the <section>. It used to, and that made a
+    whole class of thing impossible: a section set to `data-theme="dark"`, or
+    given any background, was clipped to the 90rem page box instead of bleeding
+    to the viewport, so full-width bands could not be built on this primitive
+    at all.
+
+    The vertical padding stays on the INNER div rather than moving up to the
+    section, because that div also draws the left and right rules — the
+    continuous vertical hairline running down the page. Padding on the section
+    would sit outside those rules, and they would shrink to the height of the
+    content instead of spanning the whole band. */}
+<section {...rest} class:list={[className]}>
+  <div class="container-page">
+    <div class:list={[ptClass, pbClass, "flex flex-col relative border-l border-r border-stroke", borderTop && "border-t border-stroke", contentPaddingClass, contentClass]}>
+      <slot />
+    </div>
+  </div>
+</section>

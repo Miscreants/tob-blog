@@ -1,0 +1,545 @@
+---
+import { Icon } from "astro-icon/components";
+import LogoMenu from "./LogoMenu.astro";
+import Button from "./Button.astro";
+
+type PlainLink = { label: string; href: string };
+type MenuLink = {
+  label: string;
+  type: "menu";
+  id: string;
+  items: { label: string; href: string }[];
+};
+type MegaLink = {
+  label: string;
+  type: "mega";
+  id: string;
+  columns: {
+    heading: string;
+    items: { label: string; href: string; description?: string }[];
+  }[];
+};
+type NavLink = PlainLink | MenuLink | MegaLink;
+
+const homeHref = "/";
+const cta = { label: "Get a Demo", href: "#" };
+const mobileFooterLinks: PlainLink[] = [{ label: "Log in", href: "#" }];
+
+const links: NavLink[] = [
+  {
+    label: "Products",
+    type: "mega",
+    id: "products",
+    columns: [
+      {
+        heading: "Platform",
+        items: [
+          { label: "Overview", href: "#", description: "Everything in one place" },
+          { label: "Analytics", href: "#", description: "Track what matters" },
+          { label: "Integrations", href: "#", description: "Connect your stack" },
+        ],
+      },
+      {
+        heading: "Developers",
+        items: [
+          { label: "API reference", href: "#", description: "REST + GraphQL" },
+          { label: "SDKs", href: "#", description: "JS, Python, Go" },
+          { label: "CLI", href: "#", description: "Ship from the terminal" },
+        ],
+      },
+      {
+        heading: "Resources",
+        items: [
+          { label: "Documentation", href: "#", description: "Read the guides" },
+          { label: "Changelog", href: "#", description: "What's new" },
+          { label: "Status", href: "#", description: "Live uptime" },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Company",
+    type: "menu",
+    id: "company",
+    items: [
+      { label: "About", href: "#" },
+      { label: "Careers", href: "#" },
+      { label: "Blog", href: "#" },
+      { label: "Contact", href: "#" },
+    ],
+  },
+  { label: "Pricing", href: "#" },
+  { label: "Docs", href: "#" },
+  { label: "Changelog", href: "#" },
+];
+
+const megaLinks = links.filter(
+  (link): link is MegaLink => "type" in link && link.type === "mega"
+);
+---
+
+<header
+  data-nav
+  class="container-page fixed inset-x-0 top-0 z-50 transition-all duration-300"
+>
+  <slot name="announcement" />
+
+  <div
+    data-nav-bar
+    class="relative flex h-14 items-center justify-between border border-stroke bg-panel/0 transition-all duration-300"
+  >
+    <LogoMenu href={homeHref} class="px-2" logoClass="h-5 w-auto" />
+
+
+    <nav
+      class="hidden self-stretch text-sm text-fg-muted md:flex"
+      aria-label="Primary"
+    >
+      {
+        links.map((link) => {
+          if ("type" in link && (link.type === "menu" || link.type === "mega")) {
+            const isMenu = link.type === "menu";
+            return (
+              <div class="relative flex" data-nav-item>
+                <button
+                  type="button"
+                  data-nav-trigger
+                  aria-haspopup={isMenu ? "menu" : "true"}
+                  aria-controls={`nav-panel-${link.id}`}
+                  aria-expanded="false"
+                  class="flex h-full items-center gap-1 px-4 transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                >
+                  {link.label}
+                  <Icon
+                    name="lucide:chevron-down"
+                    data-icon="chevron-down"
+                    class="h-3 w-3 mt-0.5"
+                    aria-hidden="true"
+                  />
+                </button>
+                {link.type === "menu" && (
+                  <div
+                    id={`nav-panel-${link.id}`}
+                    data-nav-panel
+                    data-nav-menu
+                    role="menu"
+                    aria-labelledby={`nav-panel-${link.id}`}
+                    class="absolute left-0 top-full hidden min-w-56 pt-2"
+                  >
+                    <div class="border border-stroke bg-panel p-2 shadow-popover">
+                      {link.items.map((item) => (
+                        <a
+                          href={item.href}
+                          role="menuitem"
+                          class="block px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg focus-visible:bg-panel-muted focus-visible:text-fg outline-none"
+                        >
+                          {item.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          const plain = link as PlainLink;
+          return (
+            <a
+              href={plain.href}
+              class="flex h-full items-center px-4 transition hover:text-fg focus-visible:text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            >
+              {plain.label}
+            </a>
+          );
+        })
+      }
+    </nav>
+
+    <div class="flex items-center gap-2 pr-2">
+      <div class="hidden md:flex">
+        <Button label={cta.label} href={cta.href} />
+      </div>
+
+      <button
+        type="button"
+        data-nav-toggle
+        aria-label="Open menu"
+        aria-expanded="false"
+        aria-controls="nav-mobile-panel"
+        class="ml-1 grid h-9 w-9 place-items-center border border-stroke text-fg-muted transition hover:border-stroke-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
+      >
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path data-nav-icon-open d="M3 6h18M3 12h18M3 18h18" />
+          <path data-nav-icon-close class="hidden" d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  {
+    megaLinks.map((link) => (
+      <div
+        id={`nav-panel-${link.id}`}
+        data-nav-panel
+        data-nav-mega
+        role="region"
+        aria-label={`${link.label} menu`}
+        class="hidden pt-2"
+      >
+        <div class="border border-stroke bg-panel p-8 shadow-popover">
+          <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+            {link.columns.map((column) => (
+              <div>
+                <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+                  {column.heading}
+                </h3>
+                <ul class="flex flex-col gap-1">
+                  {column.items.map((item) => (
+                    <li>
+                      <a
+                        href={item.href}
+                        class="block px-3 py-2 transition hover:bg-panel-muted focus-visible:bg-panel-muted outline-none"
+                      >
+                        <div class="text-sm text-fg">{item.label}</div>
+                        {item.description && (
+                          <div class="text-xs text-fg-muted">{item.description}</div>
+                        )}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    ))
+  }
+
+  <div
+    id="nav-mobile-panel"
+    data-nav-panel
+    data-nav-mobile
+    class="md:hidden mt-2 hidden overflow-hidden"
+  >
+    <div class=" border border-stroke bg-panel p-4 shadow-popover">
+      <nav class="flex flex-col gap-1 text-sm" aria-label="Mobile primary">
+        {
+          links.map((link) => {
+            if (!("type" in link)) {
+              return (
+                <a
+                  href={link.href}
+                  class="block  px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg"
+                >
+                  {link.label}
+                </a>
+              );
+            }
+
+            if (link.type === "menu") {
+              return (
+                <details class="group">
+                  <summary class="flex cursor-pointer list-none items-center justify-between  px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg">
+                    <span>{link.label}</span>
+                    <Icon
+                      name="lucide:chevron-down"
+                      class="h-4 w-4 transition group-open:rotate-180"
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <div class="mt-1 ml-3 flex flex-col gap-0.5 border-l border-stroke pl-3">
+                    {link.items.map((item) => (
+                      <a
+                        href={item.href}
+                        class="block  px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg"
+                      >
+                        {item.label}
+                      </a>
+                    ))}
+                  </div>
+                </details>
+              );
+            }
+
+            return (
+              <details class="group">
+                <summary class="flex cursor-pointer list-none items-center justify-between  px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg">
+                  <span>{link.label}</span>
+                  <Icon
+                    name="lucide:chevron-down"
+                    class="h-4 w-4 transition group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <div class="mt-1 ml-3 flex flex-col gap-3 border-l border-stroke pl-3 py-2">
+                  {link.columns.map((column) => (
+                    <div>
+                      <h3 class="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+                        {column.heading}
+                      </h3>
+                      <div class="flex flex-col gap-0.5">
+                        {column.items.map((item) => (
+                          <a
+                            href={item.href}
+                            class="block  px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg"
+                          >
+                            {item.label}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            );
+          })
+        }
+        {mobileFooterLinks.length > 0 && <hr class="my-2 border-stroke" />}
+        {
+          mobileFooterLinks.map((link) => (
+            <a
+              href={link.href}
+              class="block  px-3 py-2 text-fg-muted transition hover:bg-panel-muted hover:text-fg"
+            >
+              {link.label}
+            </a>
+          ))
+        }
+        <div class="mt-3">
+          <Button label={cta.label} href={cta.href} class="w-full justify-center" />
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<style>
+  [data-nav-bar].is-scrolled {
+    border-color: var(--color-stroke);
+    background-color: color-mix(in oklab, var(--color-canvas) 92%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: var(--shadow-header);
+  }
+  [data-nav-trigger] [data-icon="chevron-down"] {
+    transition: transform 0.2s ease-in-out;
+  }
+  [data-nav-trigger][aria-expanded="true"] [data-icon="chevron-down"] {
+    transform: rotate(180deg);
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+</style>
+
+<script>
+  type NavRoot = HTMLElement;
+
+  const HOVER_ENTER = 100;
+  const HOVER_LEAVE = 150;
+
+  const initNav = (root: NavRoot) => {
+    const navBar = root.querySelector<HTMLElement>("[data-nav-bar]");
+    const toggle = root.querySelector<HTMLButtonElement>("[data-nav-toggle]");
+    const mobilePanel = root.querySelector<HTMLElement>("[data-nav-mobile]");
+    const iconOpen = root.querySelector<SVGElement>("[data-nav-icon-open]");
+    const iconClose = root.querySelector<SVGElement>("[data-nav-icon-close]");
+    const triggers = Array.from(
+      root.querySelectorAll<HTMLButtonElement>("[data-nav-trigger]")
+    );
+    const navItems = Array.from(
+      root.querySelectorAll<HTMLElement>("[data-nav-item]")
+    );
+    const desktopPanels = Array.from(
+      root.querySelectorAll<HTMLElement>("[data-nav-panel]:not([data-nav-mobile])")
+    );
+
+    let isScrolled = false;
+    const updateScroll = () => {
+      if (!navBar) return;
+      const scrolled = window.scrollY > 12;
+      if (scrolled === isScrolled) return;
+      isScrolled = scrolled;
+      navBar.classList.toggle("is-scrolled", scrolled);
+    };
+    updateScroll();
+    window.addEventListener("scroll", updateScroll, { passive: true });
+
+    const setMobileOpen = (open: boolean) => {
+      if (!mobilePanel || !toggle) return;
+      mobilePanel.classList.toggle("hidden", !open);
+      iconOpen?.classList.toggle("hidden", open);
+      iconClose?.classList.toggle("hidden", !open);
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    };
+
+    toggle?.addEventListener("click", () => {
+      const isOpen = !mobilePanel?.classList.contains("hidden");
+      setMobileOpen(!isOpen);
+    });
+
+    mobilePanel?.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => setMobileOpen(false));
+    });
+
+    const getPanel = (trigger: HTMLButtonElement) => {
+      const id = trigger.getAttribute("aria-controls");
+      return id ? (root.querySelector<HTMLElement>(`#${CSS.escape(id)}`) ?? document.getElementById(id)) : null;
+    };
+
+    const getPanelItems = (panel: HTMLElement) =>
+      Array.from(panel.querySelectorAll<HTMLAnchorElement>("a[href]"));
+
+    const closeAll = () => {
+      triggers.forEach((t) => {
+        t.setAttribute("aria-expanded", "false");
+        const p = getPanel(t);
+        p?.classList.add("hidden");
+      });
+    };
+
+    const open = (trigger: HTMLButtonElement) => {
+      const panel = getPanel(trigger);
+      if (!panel || !panel.classList.contains("hidden")) return;
+      closeAll();
+      panel.classList.remove("hidden");
+      trigger.setAttribute("aria-expanded", "true");
+    };
+
+    const anyOpen = () =>
+      triggers.some((t) => t.getAttribute("aria-expanded") === "true");
+
+    let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+    let leaveTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearTimers = () => {
+      if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+    };
+    const cancelClose = () => clearTimers();
+    const scheduleClose = () => {
+      if (leaveTimer) clearTimeout(leaveTimer);
+      leaveTimer = setTimeout(closeAll, HOVER_LEAVE);
+    };
+
+    triggers.forEach((trigger) => {
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const panel = getPanel(trigger);
+        if (!panel) return;
+        const willOpen = panel.classList.contains("hidden");
+        closeAll();
+        if (willOpen) {
+          panel.classList.remove("hidden");
+          trigger.setAttribute("aria-expanded", "true");
+        }
+      });
+
+      trigger.addEventListener("mouseenter", () => {
+        clearTimers();
+        const delay = anyOpen() ? 0 : HOVER_ENTER;
+        hoverTimer = setTimeout(() => open(trigger), delay);
+      });
+
+      trigger.addEventListener("keydown", (e) => {
+        const panel = getPanel(trigger);
+        if (!panel) return;
+        const items = getPanelItems(panel);
+
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          open(trigger);
+          items[0]?.focus();
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          open(trigger);
+          items[items.length - 1]?.focus();
+        } else if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          const isOpen = !panel.classList.contains("hidden");
+          if (isOpen) {
+            closeAll();
+          } else {
+            open(trigger);
+            items[0]?.focus();
+          }
+        } else if (e.key === "Escape") {
+          if (!panel.classList.contains("hidden")) {
+            e.preventDefault();
+            closeAll();
+            trigger.focus();
+          }
+        }
+      });
+    });
+
+    desktopPanels.forEach((panel) => {
+      panel.addEventListener("mouseenter", cancelClose);
+      panel.addEventListener("mouseleave", scheduleClose);
+
+      panel.addEventListener("keydown", (e) => {
+        const items = getPanelItems(panel);
+        if (items.length === 0) return;
+        const current = document.activeElement as HTMLAnchorElement | null;
+        const idx = current ? items.indexOf(current) : -1;
+
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          items[(idx + 1) % items.length]?.focus();
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          items[(idx - 1 + items.length) % items.length]?.focus();
+        } else if (e.key === "Home") {
+          e.preventDefault();
+          items[0]?.focus();
+        } else if (e.key === "End") {
+          e.preventDefault();
+          items[items.length - 1]?.focus();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          const triggerId = panel.id;
+          const trigger = triggers.find(
+            (t) => t.getAttribute("aria-controls") === triggerId
+          );
+          closeAll();
+          trigger?.focus();
+        }
+      });
+    });
+
+    navItems.forEach((item) => {
+      item.addEventListener("mouseleave", scheduleClose);
+      item.addEventListener("mouseenter", cancelClose);
+    });
+
+    document.addEventListener("click", (e) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (root.contains(target)) return;
+      closeAll();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      closeAll();
+      if (mobilePanel && !mobilePanel.classList.contains("hidden")) {
+        setMobileOpen(false);
+        toggle?.focus();
+      }
+    });
+  };
+
+  document
+    .querySelectorAll<HTMLElement>("[data-nav]")
+    .forEach((root) => initNav(root));
+</script>

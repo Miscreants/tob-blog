@@ -1,0 +1,216 @@
+---
+// Avatar — image + initials fallback, optional name + position label, optional
+// status indicator dot. Image is optional; when missing or it fails to load,
+// initials derived from the name are shown instead.
+//
+// Usage:
+//   <Avatar name="Jane Doe" src="/img/jane.jpg" position="Designer" status="online" />
+//   <Avatar name="Sam Lee" />              {/* initials only */}
+//   <Avatar name="Sam Lee" hideLabel />    {/* avatar circle only, name still wired for a11y */}
+
+import type { ImageMetadata } from "astro";
+import { Image } from "astro:assets";
+
+interface Props {
+  /** Person's full name. Required — drives initials, alt text, and aria-label. */
+  name: string;
+  /** Avatar image — an imported asset (optimized via astro:assets) or a URL
+   *  string (CMS/remote). If omitted (or load fails) initials are shown instead. */
+  src?: string | ImageMetadata;
+  /** Image alt text. Defaults to `name`. Set to "" only if a sibling label
+   *  already names the person (avoids duplicate announcement). */
+  alt?: string;
+  /** Optional sub-label rendered under the name (job title, team, etc.). */
+  position?: string;
+  /** Avatar diameter. */
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
+  /** Avatar shape. */
+  shape?: "circle" | "square";
+  /** Status indicator. Shows a small dot at the corner of the avatar. */
+  status?: "online" | "offline" | "away" | "busy";
+  /** Hide the visible name + position; the avatar circle still gets an
+   *  accessible name from `name`. */
+  hideLabel?: boolean;
+  class?: string;
+}
+
+const {
+  name,
+  src,
+  alt,
+  position,
+  size = "md",
+  shape = "circle",
+  status,
+  hideLabel = false,
+  class: className,
+} = Astro.props;
+
+// Alt text: explicit `alt` wins; else the name when the label is hidden,
+// otherwise empty (a visible sibling label already names the person).
+const imgAlt = alt ?? (hideLabel ? name : "");
+
+const initials = (() => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+})();
+
+const statusLabels: Record<NonNullable<Props["status"]>, string> = {
+  online: "Online",
+  offline: "Offline",
+  away: "Away",
+  busy: "Busy",
+};
+---
+
+<span
+  data-avatar
+  data-avatar-size={size}
+  data-avatar-shape={shape}
+  class:list={["avatar", className]}
+>
+  <span
+    data-avatar-figure
+    role="img"
+    aria-label={hideLabel ? name : undefined}
+  >
+    <span data-avatar-initials aria-hidden="true">{initials}</span>
+    {src && (typeof src === "string"
+      ? (
+        <img
+          data-avatar-img
+          src={src}
+          alt={imgAlt}
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        <Image
+          data-avatar-img
+          src={src}
+          alt={imgAlt}
+          loading="lazy"
+          decoding="async"
+        />
+      ))}
+    {status && (
+      <span
+        data-avatar-status={status}
+        role="status"
+        aria-label={statusLabels[status]}
+      ></span>
+    )}
+  </span>
+
+  {!hideLabel && (
+    <span data-avatar-label>
+      <span data-avatar-name>{name}</span>
+      {position && <span data-avatar-position>{position}</span>}
+    </span>
+  )}
+</span>
+
+<style is:global>
+  [data-avatar] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    line-height: 1.2;
+  }
+
+  [data-avatar-figure] {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: var(--color-panel-muted);
+    color: var(--color-fg);
+    border: 1px solid var(--color-stroke);
+    font-weight: 500;
+    user-select: none;
+  }
+
+  [data-avatar-shape="circle"] [data-avatar-figure] { border-radius: 9999px; }
+  [data-avatar-shape="square"] [data-avatar-figure] { border-radius: 0.25rem; }
+
+  /* Sizes — figure dimensions + label scaling */
+  [data-avatar-size="xs"] [data-avatar-figure] { width: 1.5rem;  height: 1.5rem;  font-size: 0.625rem; }
+  [data-avatar-size="sm"] [data-avatar-figure] { width: 2rem;    height: 2rem;    font-size: 0.75rem; }
+  [data-avatar-size="md"] [data-avatar-figure] { width: 2.5rem;  height: 2.5rem;  font-size: 0.875rem; }
+  [data-avatar-size="lg"] [data-avatar-figure] { width: 3.5rem;  height: 3.5rem;  font-size: 1.125rem; }
+  [data-avatar-size="xl"] [data-avatar-figure] { width: 4.5rem;  height: 4.5rem;  font-size: 1.5rem; }
+
+  [data-avatar-size="xs"] [data-avatar-name]     { font-size: 0.75rem;   }
+  [data-avatar-size="xs"] [data-avatar-position] { font-size: 0.6875rem; }
+  [data-avatar-size="sm"] [data-avatar-name]     { font-size: 0.8125rem; }
+  [data-avatar-size="sm"] [data-avatar-position] { font-size: 0.75rem;   }
+  [data-avatar-size="md"] [data-avatar-name]     { font-size: 0.875rem;  }
+  [data-avatar-size="md"] [data-avatar-position] { font-size: 0.8125rem; }
+  [data-avatar-size="lg"] [data-avatar-name]     { font-size: 1rem;      }
+  [data-avatar-size="lg"] [data-avatar-position] { font-size: 0.875rem;  }
+  [data-avatar-size="xl"] [data-avatar-name]     { font-size: 1.125rem;  }
+  [data-avatar-size="xl"] [data-avatar-position] { font-size: 0.9375rem; }
+
+  [data-avatar-img] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* JS hides this on error so the initials show through. */
+  }
+
+  [data-avatar-label] {
+    display: inline-flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  [data-avatar-name] {
+    font-weight: 500;
+    color: var(--color-fg);
+  }
+  [data-avatar-position] {
+    color: var(--color-fg-muted);
+    margin-top: 0.125rem;
+  }
+
+  /* Status indicator — small dot at the bottom-right of the figure, with a
+     ring matching the page background so it visually detaches. */
+  [data-avatar-status] {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 28%;
+    height: 28%;
+    min-width: 0.5rem;
+    min-height: 0.5rem;
+    border-radius: 9999px;
+    box-shadow: 0 0 0 2px var(--color-canvas);
+  }
+  [data-avatar-status="online"]  { background: var(--color-success); }
+  [data-avatar-status="offline"] { background: var(--color-fg-subtle); }
+  [data-avatar-status="away"]    { background: var(--color-warning); }
+  [data-avatar-status="busy"]    { background: var(--color-error); }
+</style>
+
+<script>
+  // Swap to initials if the avatar image fails to load. The initials sit
+  // beneath the img in the DOM; hiding the img reveals them.
+  const init = (img: HTMLImageElement) => {
+    if (img.dataset.scriptInitialized) return;
+    img.dataset.scriptInitialized = "true";
+    const handle = () => { img.style.display = "none"; };
+    img.addEventListener("error", handle);
+    // Already-broken images (cached error before listener attached).
+    if (img.complete && img.naturalWidth === 0) handle();
+  };
+
+  const initAll = () =>
+    document.querySelectorAll<HTMLImageElement>("[data-avatar-img]").forEach(init);
+
+  initAll();
+  document.addEventListener("astro:page-load", initAll);
+</script>

@@ -1,0 +1,173 @@
+---
+title: Tabs
+description: Tabbed interface with optional autoplay, GSAP transitions, URL deep-linking, and mobile-accordion conversion.
+category: pattern
+order: 50
+sourceFile: src/components/Tabs.astro
+status: stable
+related: [Accordion, FlowSteps]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Tabs from "@components/Tabs.astro";
+
+A feature-rich tab system. Optional GSAP fade or slide transitions, autoplay with a progress bar, URL-driven deep-linking (`?tab-id=...`), prev/next controls, and automatic conversion to an accordion below a configurable breakpoint.
+
+## Preview
+
+<Preview label="Three tabs, fade transition" align="stretch">
+  <div class="w-full max-w-2xl">
+    <Tabs id="docs-tabs" duration={0.3}>
+      <div data-tab="button-list" class="flex gap-2 border-b border-stroke">
+        <button data-tab="button" data-tab-item-id="overview" class="relative px-4 py-3 text-sm font-medium text-fg">
+          Overview
+          <div data-tab="line" class="absolute bottom-0 left-0 h-0.5 w-0 bg-intent"></div>
+        </button>
+        <button data-tab="button" data-tab-item-id="features" class="relative px-4 py-3 text-sm font-medium text-fg">
+          Features
+          <div data-tab="line" class="absolute bottom-0 left-0 h-0.5 w-0 bg-intent"></div>
+        </button>
+        <button data-tab="button" data-tab-item-id="pricing" class="relative px-4 py-3 text-sm font-medium text-fg">
+          Pricing
+          <div data-tab="line" class="absolute bottom-0 left-0 h-0.5 w-0 bg-intent"></div>
+        </button>
+      </div>
+
+      <div data-tab="content-wrap">
+        <div data-tab="panel-list">
+          <div data-tab="panel" class="p-6 text-fg-muted">
+            <p>The overview gives you a high-level look at what the product does and who it's for.</p>
+          </div>
+          <div data-tab="panel" class="p-6 text-fg-muted">
+            <p>Feature panel — typed schemas, native primitives, and a tiny client runtime.</p>
+          </div>
+          <div data-tab="panel" class="p-6 text-fg-muted">
+            <p>Pricing panel — straightforward tiers, no per-seat fees, no surprises.</p>
+          </div>
+        </div>
+      </div>
+    </Tabs>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "id", type: "string", description: "Unique ID for URL deep-linking (?tab-id=<id>-<item-id>)." },
+  { name: "autoplay", type: "number", default: "0", description: "Auto-advance interval in seconds. 0 = off." },
+  { name: "duration", type: "number", default: "0.3", description: "Transition duration in seconds." },
+  { name: "slideTabs", type: "boolean", default: "false", description: "Use horizontal slide animation instead of fade. Requires GSAP (already a dep)." },
+  { name: "convertAccordion", type: "boolean", default: "false", description: "Convert to accordion layout below the breakpoint." },
+  { name: "accordionBreakpoint", type: "number", default: "768", description: "Viewport width in px where accordion kicks in." },
+  { name: "loopControls", type: "boolean", default: "false", description: "Prev/next buttons wrap around instead of disabling at the ends." },
+  { name: "allowMultiple", type: "boolean", default: "false", description: "Allow multiple accordion panels open at once (accordion mode only)." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Markup contract
+
+The component expects this structure inside its slot:
+
+```html
+<div data-tab="button-list">
+  <div data-tab="button" data-tab-item-id="overview">Tab 1</div>
+  <div data-tab="button" data-tab-item-id="features">Tab 2</div>
+</div>
+
+<div data-tab="content-wrap">
+  <div data-tab="panel-list">
+    <div data-tab="panel">Panel 1 content</div>
+    <div data-tab="panel">Panel 2 content</div>
+  </div>
+</div>
+```
+
+### Slots
+
+| Slot       | Purpose                            |
+|------------|------------------------------------|
+| (default)  | Tab buttons, panel list, and content. |
+| `controls` | Optional prev/next navigation buttons. |
+
+For controls, use `data-tab="prev"` and `data-tab="next"` on `<button>` elements.
+
+### Optional inner data attributes
+
+| Attribute                | Purpose                                                        |
+|--------------------------|----------------------------------------------------------------|
+| `data-tab="line"`        | Progress bar element — width animates via `--tab-progress`.    |
+| `data-tab="icon"`        | Chevron icon that rotates in accordion mode.                   |
+| `data-tab="button-mask"` | Expandable content area inside a button (grid-row animation).  |
+
+## Mechanism
+
+### Tab mode (desktop)
+
+- Buttons get `role="tab"`, panels `role="tabpanel"`, button list `role="tablist"`.
+- Roving `tabindex` on buttons; arrow keys move focus between tabs.
+- Transitions use GSAP — fade by default, horizontal slide when `slideTabs` is set.
+
+### Accordion mode (mobile)
+
+- When `convertAccordion` is enabled and the viewport is below the breakpoint, the DOM is restructured: each button is paired with its panel inside an accordion wrapper.
+- ARIA switches from `aria-selected` (tabs) to `aria-expanded` (accordion).
+- Height animation uses the CSS grid `0fr` / `1fr` technique.
+- Switching back to desktop restores the original tab layout and state.
+
+### Autoplay
+
+- Uses a GSAP timeline that drives a `--tab-progress` CSS variable (for a progress bar).
+- Pauses on hover, focus, out-of-viewport (IntersectionObserver), accordion mode, and `prefers-reduced-motion`.
+
+### URL deep-linking
+
+- If the URL contains `?tab-id=<component-id>-<item-id>`, that tab is activated on load and the component scrolls into view.
+- After activation, the query param is cleaned from the URL.
+
+## Usage
+
+```astro
+---
+import Tabs from "@components/Tabs.astro";
+---
+
+<Tabs id="features" convertAccordion={true} autoplay={5} slideTabs={true}>
+  <div data-tab="button-list" class="flex gap-2">
+    <button data-tab="button" data-tab-item-id="overview" class="px-4 py-2">
+      Overview
+      <div data-tab="line" class="h-0.5 w-0 bg-intent"></div>
+    </button>
+    <button data-tab="button" data-tab-item-id="features" class="px-4 py-2">
+      Features
+      <div data-tab="line" class="h-0.5 w-0 bg-intent"></div>
+    </button>
+  </div>
+
+  <div data-tab="content-wrap">
+    <div data-tab="panel-list">
+      <div data-tab="panel">
+        <div data-tab="content">Overview content here</div>
+      </div>
+      <div data-tab="panel">
+        <div data-tab="content">Features content here</div>
+      </div>
+    </div>
+  </div>
+
+  <div slot="controls">
+    <button data-tab="prev">Previous</button>
+    <button data-tab="next">Next</button>
+  </div>
+</Tabs>
+```
+
+## Dependencies
+
+- **GSAP** + **ScrollTrigger** — imported in the component's `<script>`. Required for transitions and autoplay.
+
+## Notes
+
+- **FOUC prevention** — all panels except the first are hidden via CSS (`display: none`) before JS runs.
+- Multiple instances on the same page are safe — each is independently initialized.
+- `data-tab-item-id` on buttons drives URL deep-linking. If omitted, falls back to the 1-based index.

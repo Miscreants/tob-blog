@@ -1,0 +1,13 @@
+---
+interface Props {
+  message?: string;
+  class?: string;
+}
+const { message, class: className = "" } = Astro.props;
+
+---
+
+<div class:list={["px-6 pt-8 relative", className]}>
+  <p class="h4 ">Hello, {message}!</p>
+  <p>Welcome to my Astro website.</p>
+</div>

@@ -1,0 +1,67 @@
+---
+title: LogoMarquee
+description: Infinitely scrolling row of logos with a centered "Trusted by" label, pure CSS animation.
+category: block
+order: 30
+sourceFile: src/components/LogoMarquee.astro
+status: stable
+related: [Logo]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import LogoMarquee from "@components/LogoMarquee.astro";
+import { Icon } from "astro-icon/components";
+
+A continuous, JS-free marquee. The slot is rendered twice — when the first set scrolls out, the duplicate is already in place, so the loop is seamless.
+
+## Preview
+
+<Preview label="Lucide-icon marquee">
+  <LogoMarquee class="border-y border-stroke py-8 w-full">
+    <Icon name="lucide:figma" class="h-6 w-auto shrink-0 text-fg-muted" />
+    <Icon name="lucide:github" class="h-6 w-auto shrink-0 text-fg-muted" />
+    <Icon name="lucide:slack" class="h-6 w-auto shrink-0 text-fg-muted" />
+    <Icon name="lucide:linkedin" class="h-6 w-auto shrink-0 text-fg-muted" />
+    <Icon name="lucide:youtube" class="h-6 w-auto shrink-0 text-fg-muted" />
+    <Icon name="lucide:twitch" class="h-6 w-auto shrink-0 text-fg-muted" />
+    <Icon name="lucide:dribbble" class="h-6 w-auto shrink-0 text-fg-muted" />
+    <Icon name="lucide:codepen" class="h-6 w-auto shrink-0 text-fg-muted" />
+  </LogoMarquee>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "class", type: "string", default: '""', description: "Extra classes on the overflow container — typically borders and vertical padding." },
+]} />
+
+Children are passed via the default `<slot />`.
+
+## Mechanism
+
+- Outer container has `overflow-hidden` to clip content at the viewport edges.
+- A flex inner container uses the `animate-marquee` utility (defined in `global.css`) — `translateX(0)` to `translateX(-50%)` over 30 seconds.
+- The `<slot />` is rendered **twice**. When the first set translates out of view, the duplicate has scrolled in to replace it — no visible seam.
+- A "Trusted by leading data companies" label is absolutely positioned above the marquee with a `bg-canvas` background to punch through the border.
+
+## Usage
+
+```astro
+---
+import LogoMarquee from "@components/LogoMarquee.astro";
+---
+
+<LogoMarquee class="border-t border-stroke py-6">
+  <img src="/logos/company-1.svg" alt="Company 1" class="h-6 w-auto shrink-0" />
+  <img src="/logos/company-2.svg" alt="Company 2" class="h-6 w-auto shrink-0" />
+  <img src="/logos/company-3.svg" alt="Company 3" class="h-6 w-auto shrink-0" />
+</LogoMarquee>
+```
+
+## Gotchas
+
+- You need enough children to fill the container width — otherwise the seam between the two duplicate sets is visible as a gap.
+- The slot is duplicated in HTML, so each child appears in the DOM twice. Avoid putting interactive elements inside (clickable logos will have two activations registering against analytics, etc.).
+- The animation is pure CSS. Speed comes from the `marquee` keyframes in `global.css` (currently 30s linear).
+- The "Trusted by" label assumes the page background matches `--color-canvas` so its `bg-canvas` punches through any overlapping border cleanly.

@@ -1,0 +1,117 @@
+---
+title: LogoMenu
+description: Logo home link with a custom right-click context menu — copy SVG to clipboard, plus configurable links (brand assets, guidelines).
+category: pattern
+order: 25
+sourceFile: src/components/LogoMenu.astro
+status: stable
+related: [Logo, Nav, NavMorph]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import LogoMenu from "@components/LogoMenu.astro";
+
+Wraps the site `Logo` in a normal home link and overrides the browser's right-click menu with a small custom one. The default single item copies the inline `<svg>` markup to the clipboard, which works on any build with no setup. Pass `items` to add arbitrary links alongside it (brand assets, press kit, guidelines, Figma file, etc.) once those pages exist on the project. Wired into `NavMorph` by default — right-click the wordmark in the header to see it.
+
+## Preview
+
+<Preview label="Right-click the wordmark" align="start">
+  <LogoMenu logoClass="h-5 w-auto" />
+</Preview>
+
+<Preview label="Custom items" align="start">
+  <LogoMenu
+    logoClass="h-5 w-auto"
+    items={[
+      { type: "action", label: "Copy logo as SVG", action: "copy-svg" },
+      { type: "link", label: "Press kit", href: "/press/" },
+      { type: "link", label: "Figma file", href: "https://figma.com/file/abc", target: "_blank" },
+      { type: "link", label: "Brand guidelines", href: "/brand/guidelines/" },
+    ]}
+  />
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "href", type: "string", default: '"/"', description: "Destination of the logo home link (left-click)." },
+  { name: "ariaLabel", type: "string", default: '"Home"', description: "Accessible label for the trigger anchor and prefix on the menu's aria-label." },
+  { name: "items", type: "Item[]", default: "Copy logo as SVG", description: "Menu entries. See item shape below. Defaults to the copy-SVG action alone — add link items per project, once the pages they point at exist." },
+  { name: "class", type: "string", description: "Extra classes on the wrapping <div> (e.g. layout padding)." },
+  { name: "logoClass", type: "string", default: '"h-5 w-auto"', description: "Classes forwarded to the inner <Logo /> SVG." },
+]} />
+
+### Item shape
+
+```ts
+type Item =
+  | { type: "action"; label: string; action: "copy-svg" }
+  | { type?: "link"; label: string; href: string; target?: string };
+```
+
+- `action` items render as `<button>` and run the named action. Currently only `"copy-svg"` is supported — extend the `panel.click` handler in the component script to add more.
+- `link` items render as `<a>`. When `target="_blank"`, `rel="noopener noreferrer"` is added automatically.
+
+## Mechanism
+
+### Trigger
+
+- The whole logo is a single `<a href={href}>` so left-click navigates home.
+- A `contextmenu` listener on that anchor calls `preventDefault()` and toggles the panel.
+
+### Panel
+
+- `role="menu"` with `role="menuitem"` children.
+- Positioned absolutely (`top-full mt-2 left-0`); only visible while not `hidden`.
+- Closes on: outside click, `Escape`, `Tab`, or after an item is chosen.
+- Arrow Up/Down/Home/End move focus through items.
+- `aria-expanded` on the trigger reflects panel state.
+
+### Copy SVG
+
+- Clones the inline `<svg>`, ensures `xmlns` is present, serializes via `XMLSerializer`.
+- Writes to clipboard via `navigator.clipboard.writeText`; falls back to a hidden `<textarea>` + `document.execCommand("copy")` if the modern API rejects (e.g. insecure context).
+- On success, fires the toast with "Logo copied to clipboard"; on failure, "Copy failed".
+
+### Toast
+
+- Single `role="status" aria-live="polite"` element fixed at `bottom-4 right-4`.
+- Fades + slides in (180 ms), holds 1.8 s, fades out (200 ms).
+- Honours `prefers-reduced-motion: reduce` (no transitions).
+- Lives inside the component instance, so multiple `LogoMenu` mounts each get their own toast.
+
+## Usage
+
+```astro
+---
+import LogoMenu from "@components/LogoMenu.astro";
+---
+
+{/* Default — copy-SVG only */}
+<LogoMenu />
+
+{/* Custom items */}
+<LogoMenu
+  href="/"
+  items={[
+    { type: "action", label: "Copy logo as SVG", action: "copy-svg" },
+    { type: "link", label: "Press kit", href: "/press/" },
+    { type: "link", label: "Figma file", href: "https://figma.com/file/abc", target: "_blank" },
+  ]}
+/>
+```
+
+## Extending
+
+To add a new action (e.g. "Copy logo as PNG"):
+
+1. Extend the `ActionItem` union with the new action name.
+2. Render it as a `<button data-action="…">`.
+3. Branch on the action in the `panel.click` handler inside the script and call your handler.
+4. Resolve to `true` on success so the toast confirms.
+
+## Notes
+
+- The script is module-scoped and queries `[data-logo-menu]` once on load. If you mount one dynamically, call `init()` manually.
+- Right-click on touch devices doesn't apply — left-click still navigates home; the menu is desktop-only by intent. A long-press handler can be added if needed.

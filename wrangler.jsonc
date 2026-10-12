@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "astro-miscreants-starter-v1",
+  "compatibility_date": "2026-04-04",
+  // Pure static site (no adapter): the build emits the whole tree to dist/.
+  // No `main` worker — Cloudflare just serves the static assets.
+  "assets": { "directory": "./dist" },
+  "observability": { "enabled": true }
+
+  // ── Contact form ─────────────────────────────────────────────────────────
+  // The endpoint is a Pages Function at functions/api/contact.ts — outside the
+  // Astro build, so the site stays static and no adapter is needed. It runs as
+  // soon as it's deployed, validating submissions and returning success.
+  //
+  // To make it actually deliver mail, add the binding and vars below. Fill in
+  // the client's addresses; the starter deliberately ships none:
+  //
+  //   "send_email": [{ "name": "NOTIFY_EMAIL", "destination_address": "<client-inbox>" }],
+  //   "vars": {
+  //     "ALLOWED_ORIGIN": "https://<client-domain>",
+  //     "FROM_EMAIL": "noreply@<client-domain>",
+  //     "FROM_NAME": "<Client name>",
+  //     "NOTIFY_TO": "<client-inbox>"
+  //   }
+  //
+  // Cloudflare Email Routing must be enabled on the domain with the
+  // destination address verified, or sends fail at runtime.
+  //
+  // Rate limiting is NOT configured here and cannot be — add a WAF
+  // rate-limiting rule covering /api/* in the dashboard. See the forms rule in
+  // docs/rules/components.md.
+}

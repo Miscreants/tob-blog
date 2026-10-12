@@ -1,0 +1,132 @@
+---
+interface Props {
+  href?: string;
+  dismissible?: boolean;
+  class?: string;
+}
+
+const {
+  href,
+  dismissible = true,
+  class: className,
+} = Astro.props;
+
+const Tag = href ? "a" : "div";
+---
+
+<div
+  data-announcement="banner"
+  role="status"
+  aria-label="Site announcement"
+  class:list={[
+    "col-span-full md:col-span-1 md:col-start-3 overflow-hidden",
+    className,
+  ]}
+>
+  <Tag
+    {...(href ? { href } : {})}
+    class:list={[
+      "flex items-center justify-center gap-2 px-4 py-2 text-center text-sm",
+      href && "hover:opacity-80 transition-opacity",
+    ]}
+  >
+    <slot />
+
+    {href && (
+      <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M5 12h14M12 5l7 7-7 7" />
+      </svg>
+    )}
+  </Tag>
+
+  {dismissible && (
+    <button
+      data-announcement="close"
+      class="absolute right-3 top-1/2 -translate-y-1/2 p-1 opacity-50 hover:opacity-100 transition-opacity"
+      aria-label="Dismiss announcement"
+    >
+      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    </button>
+  )}
+</div>
+
+<style>
+  [data-announcement="banner"] {
+    position: relative;
+    transition: height 0.3s ease, margin 0.3s ease;
+    will-change: height;
+  }
+</style>
+
+<script>
+  const banner = document.querySelector<HTMLElement>('[data-announcement="banner"]');
+  if (banner) {
+    const closeBtn = banner.querySelector<HTMLButtonElement>('[data-announcement="close"]');
+    const STORAGE_KEY = "announcement-dismissed";
+
+    if (sessionStorage.getItem(STORAGE_KEY)) {
+      banner.style.display = "none";
+    } else {
+      let naturalHeight = banner.offsetHeight;
+      banner.style.height = naturalHeight + "px";
+
+      let isHidden = false;
+      let isDismissed = false;
+      let lastScrollY = window.scrollY;
+
+      window.addEventListener("resize", () => {
+        if (isDismissed) return;
+        banner.style.height = "auto";
+        naturalHeight = banner.offsetHeight;
+        if (!isHidden) banner.style.height = naturalHeight + "px";
+      });
+
+      const show = () => {
+        if (isDismissed || !isHidden) return;
+        isHidden = false;
+        banner.style.height = naturalHeight + "px";
+        banner.style.marginTop = "";
+      };
+
+      const hide = () => {
+        if (isDismissed || isHidden) return;
+        isHidden = true;
+        banner.style.height = "0px";
+        banner.style.marginTop = "0px";
+      };
+
+      const dismiss = () => {
+        isDismissed = true;
+        sessionStorage.setItem(STORAGE_KEY, "1");
+        banner.style.height = "0px";
+        banner.style.marginTop = "0px";
+        banner.addEventListener(
+          "transitionend",
+          () => {
+            banner.style.display = "none";
+            const next = document.querySelector<HTMLElement>('[data-nav-bar] a, [data-nav-bar] button');
+            next?.focus();
+          },
+          { once: true }
+        );
+      };
+
+      window.addEventListener("scroll", () => {
+        if (isDismissed) return;
+        const y = window.scrollY;
+        const delta = y - lastScrollY;
+        if (delta > 5) hide();
+        else if (delta < -5) show();
+        lastScrollY = y;
+      }, { passive: true });
+
+      closeBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dismiss();
+      });
+    }
+  }
+</script>

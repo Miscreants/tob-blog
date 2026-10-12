@@ -1,0 +1,192 @@
+---
+// FilterBar — reusable, content-agnostic category filter + optional search.
+//
+// Contract (how it finds items to show/hide):
+//   - The bar has  data-filter-bar={group}
+//   - Each filterable item has  data-filter-group={group}  data-filter-value={value}
+//     (or a comma-separated list on data-filter-value for multi-tag items)
+//   - For search, each item also carries  data-search="lowercased haystack"
+//   - An optional empty-state element:  data-filter-empty={group}
+//
+// Category and search are AND-combined. Both are synced to the URL:
+//   ?filter-${group}=Blog&q-${group}=evals
+
+export interface FilterOption {
+  value: string;
+  label: string;
+  count?: number;
+}
+
+interface Props {
+  group: string;
+  options: FilterOption[];
+  allLabel?: string;
+  showCounts?: boolean;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  paramKey?: string;
+  queryParamKey?: string;
+  class?: string;
+}
+
+const {
+  group,
+  options,
+  allLabel = "All",
+  showCounts = true,
+  searchable = false,
+  searchPlaceholder = "Search…",
+  paramKey,
+  queryParamKey,
+  class: className = "",
+} = Astro.props;
+
+const param = paramKey ?? `filter-${group}`;
+const queryParam = queryParamKey ?? `q-${group}`;
+const totalCount = options.reduce((n, o) => n + (o.count ?? 0), 0);
+---
+
+<div
+  class:list={[
+    "filter-bar flex flex-col gap-4 md:flex-row md:items-center md:justify-between",
+    className,
+  ]}
+  data-filter-bar={group}
+  data-filter-param={param}
+  data-query-param={queryParam}
+>
+  <div
+    class="flex flex-wrap items-center gap-2"
+    role="toolbar"
+    aria-label={`Filter ${group} by category`}
+  >
+    <button
+      type="button"
+      data-filter="all"
+      aria-pressed="true"
+      class="filter-btn is-active border px-3 py-1.5 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer"
+    >
+      {allLabel}
+      {showCounts && totalCount > 0 && (
+        <span class="ml-2 opacity-60">({totalCount})</span>
+      )}
+    </button>
+    {
+      options.map((o) => (
+        <button
+          type="button"
+          data-filter={o.value}
+          aria-pressed="false"
+          class="filter-btn border px-3 py-1.5 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer"
+        >
+          {o.label}
+          {showCounts && typeof o.count === "number" && (
+            <span class="ml-2 opacity-60">({o.count})</span>
+          )}
+        </button>
+      ))
+    }
+  </div>
+
+  {
+    searchable && (
+      <label class="relative block md:w-72">
+        <span class="sr-only">{`Search ${group}`}</span>
+        <input
+          type="search"
+          data-search-input
+          placeholder={searchPlaceholder}
+          class="w-full border bg-transparent px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-current placeholder:opacity-50 focus:outline-none"
+        />
+      </label>
+    )
+  }
+</div>
+
+<style>
+  .filter-bar .filter-btn.is-active {
+    border-color: currentColor;
+    opacity: 1;
+  }
+  .filter-bar .filter-btn {
+    opacity: 0.7;
+  }
+  .filter-bar .filter-btn:hover {
+    opacity: 1;
+  }
+</style>
+
+<script>
+  type Bar = HTMLElement;
+  type State = { filter: string; query: string };
+
+  const matches = (value: string | undefined, filter: string) => {
+    if (filter === "all") return true;
+    if (!value) return false;
+    return value.split(",").map((v) => v.trim()).includes(filter);
+  };
+
+  const apply = (bar: Bar, state: State, pushUrl = true) => {
+    const group = bar.dataset.filterBar!;
+    const items = document.querySelectorAll<HTMLElement>(
+      `[data-filter-group="${group}"]`
+    );
+    let visible = 0;
+    items.forEach((el) => {
+      const catOk = matches(el.dataset.filterValue, state.filter);
+      const qOk =
+        !state.query || (el.dataset.search?.includes(state.query) ?? false);
+      const show = catOk && qOk;
+      el.hidden = !show;
+      if (show) visible++;
+    });
+
+    bar.querySelectorAll<HTMLButtonElement>(".filter-btn").forEach((b) => {
+      const active = b.dataset.filter === state.filter;
+      b.classList.toggle("is-active", active);
+      b.setAttribute("aria-pressed", String(active));
+    });
+
+    const empty = document.querySelector<HTMLElement>(
+      `[data-filter-empty="${group}"]`
+    );
+    if (empty) empty.hidden = visible > 0;
+
+    if (pushUrl) {
+      const url = new URL(window.location.href);
+      const fp = bar.dataset.filterParam!;
+      const qp = bar.dataset.queryParam!;
+      if (state.filter === "all") url.searchParams.delete(fp);
+      else url.searchParams.set(fp, state.filter);
+      if (state.query) url.searchParams.set(qp, state.query);
+      else url.searchParams.delete(qp);
+      history.replaceState(null, "", url);
+    }
+  };
+
+  document.querySelectorAll<Bar>("[data-filter-bar]").forEach((bar) => {
+    const state: State = { filter: "all", query: "" };
+
+    bar.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
+        "[data-filter]"
+      );
+      if (btn?.dataset.filter) {
+        state.filter = btn.dataset.filter;
+        apply(bar, state);
+      }
+    });
+
+    const input = bar.querySelector<HTMLInputElement>("[data-search-input]");
+    input?.addEventListener("input", () => {
+      state.query = input.value.trim().toLowerCase();
+      apply(bar, state);
+    });
+
+    const params = new URL(window.location.href).searchParams;
+    state.filter = params.get(bar.dataset.filterParam!) ?? "all";
+    state.query = (params.get(bar.dataset.queryParam!) ?? "").toLowerCase();
+    if (input && state.query) input.value = state.query;
+    apply(bar, state, false);
+  });
+</script>

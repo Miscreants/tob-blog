@@ -1,0 +1,13 @@
+# Redirects — same format on Cloudflare Pages and Netlify.
+# One rule per line:   /old-path   /new-path   301
+# 301 = permanent (use for migrations); 302 = temporary.
+#
+# ESSENTIAL FOR MIGRATIONS (e.g. Webflow → Astro): map every old URL to its new
+# home so inbound links and SEO ranking survive the cutover. Pull the old URL
+# list from the previous site's sitemap, and verify with the pre-launch checklist.
+#
+# Examples (delete these; add the real ones):
+# /old-blog/:slug     /resources/:slug   301
+# /home               /                  301
+# /pricing.html       /pricing           301
+# /about-us           /about             301

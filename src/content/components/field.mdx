@@ -1,0 +1,106 @@
+---
+title: Field
+description: Labeled form input row. Wraps text/email/password/url/tel/number/search/textarea/select/checkbox/radio with label, helper, and inline error region — ARIA wired automatically.
+category: form
+order: 11
+sourceFile: src/components/Field.astro
+status: stable
+related: [Form]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Field from "@components/Field.astro";
+
+A single-input row that handles the boring-but-easy-to-get-wrong parts of form fields: associating a `<label>` to its input, wiring `aria-describedby` to helper and error text, surfacing `aria-invalid` for invalid state, and reserving space so the form doesn't jump when an error appears.
+
+Designed to be paired with `Form`, which surfaces native validation messages into each Field's error region automatically. Works standalone too.
+
+## Preview
+
+<Preview label="Text + email + textarea + select + checkbox" align="stretch">
+  <div class="w-full max-w-md space-y-2">
+    <Field label="Full name" name="name" placeholder="Jane Doe" required helper="As it appears on your ID." />
+    <Field label="Email" name="email" type="email" placeholder="jane@example.com" required />
+    <Field label="Message" name="message" type="textarea" rows={3} />
+    <Field label="Plan" name="plan" type="select" options={[
+      { value: "free", label: "Free" },
+      { value: "pro", label: "Pro" },
+      { value: "team", label: "Team" },
+    ]} />
+    <Field label="Subscribe to newsletter" name="newsletter" type="checkbox" />
+  </div>
+</Preview>
+
+<Preview label="Pre-set error state" align="stretch">
+  <div class="w-full max-w-md">
+    <Field label="Email" name="email" type="email" value="not-an-email" error="Please enter a valid email address." />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "label", type: "string", required: true, description: "Visible label text." },
+  { name: "name", type: "string", required: true, description: "Form data key." },
+  { name: "type", type: '"text" | "email" | "password" | "url" | "tel" | "number" | "search" | "textarea" | "select" | "checkbox" | "radio"', default: '"text"', description: "Input type." },
+  { name: "id", type: "string", description: "Stable ID. Auto-generated if omitted." },
+  { name: "value", type: "string | number", description: "Initial value." },
+  { name: "placeholder", type: "string", description: "Placeholder text (text-like inputs)." },
+  { name: "helper", type: "string", description: "Helper text shown under the input." },
+  { name: "error", type: "string", description: "Pre-set error message. Live validation overrides this." },
+  { name: "required", type: "boolean", default: "false" },
+  { name: "disabled", type: "boolean", default: "false" },
+  { name: "readonly", type: "boolean", default: "false" },
+  { name: "autocomplete", type: "string", description: 'Native autocomplete hint, e.g. "email", "name", "off".' },
+  { name: "pattern", type: "string", description: "Pattern attribute for text inputs." },
+  { name: "minlength / maxlength", type: "number", description: "String length bounds." },
+  { name: "min / max / step", type: "string | number", description: "Number / date input bounds." },
+  { name: "rows", type: "number", default: "4", description: "Textarea row count." },
+  { name: "options", type: "{ value: string; label: string }[]", description: 'Select options (when type="select" and no slot is provided).' },
+  { name: "labelHidden", type: "boolean", default: "false", description: "Visually hide the label (kept for screen readers)." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Slots
+
+For `type="select"`, the default slot can be used to write your own `<option>` elements (overrides `options`):
+
+```astro
+<Field label="Country" name="country" type="select">
+  <option value="">Select country</option>
+  <option value="us">United States</option>
+  <option value="uk">United Kingdom</option>
+</Field>
+```
+
+## Accessibility
+
+- `<label for="…">` matched to input id.
+- `aria-describedby` points at helper text, error text, or both.
+- `aria-invalid="true"` set whenever an error is present (either from the `error` prop or from live validation).
+- Required fields show a red `*` next to the label (decorative — `aria-hidden`); the actual signal to screen readers is the input's `required` attribute.
+- The error region uses `aria-live="polite"` so changes are announced without interrupting.
+- The error region reserves `min-height: 1em` so the form doesn't jump when an error message appears.
+- For `checkbox` / `radio`, label and input are wrapped together in a single `<label>` so clicking either toggles the input.
+
+## Working with Form
+
+When wrapped in `Form`, validation messages flow automatically:
+
+```astro
+<Form action="/api/contact" method="POST">
+  <Field label="Email" name="email" type="email" required />
+  <button type="submit">Send</button>
+</Form>
+```
+
+If the user submits with an invalid email, the Field's error region populates with the browser's native `validationMessage`, focus jumps to the first invalid input, and `aria-invalid` is set. As the user fixes the input, the error clears.
+
+Outside a Form, the `error` prop is the only error path — set it from your own validation logic.
+
+## Notes
+
+- For radio groups, render multiple Field components with the same `name` and different `value` props.
+- For file uploads, currently bypass Field and use a plain `<input type="file">` — file inputs have unique label/styling needs that didn't fit cleanly. May get its own component later.
+- The `sr-only` class is provided by Tailwind v4 — `labelHidden` relies on it.

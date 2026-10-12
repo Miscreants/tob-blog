@@ -1,0 +1,146 @@
+---
+title: NavMorph
+description: Nav with a single shared dropdown panel that morphs in width, height, and position between triggers.
+category: layout
+order: 22
+sourceFile: src/components/NavMorph.astro
+status: stable
+related: [Nav, NavMega, AnnouncementBanner]
+---
+
+A navigation header with a single shared dropdown panel that **morphs** between triggers — width, height, horizontal position, content, and indicator arrow all animate when you hover from one dropdown to another. Models the shadcn / Radix NavigationMenu "viewport" pattern. Drop-in replacement for `Nav.astro`: same slot (`announcement`), same layout, same scroll-aware bar, same mobile details/summary panel.
+
+Use this when you have two or more dropdowns and want polished motion between them. Use `Nav` when the overhead isn't justified.
+
+## What's different from `Nav`
+
+| Concern              | `Nav`                                     | `NavMorph`                                                    |
+|----------------------|-------------------------------------------|---------------------------------------------------------------|
+| Dropdown panels      | One per trigger (independent)             | One shared panel, content swaps and resizes                   |
+| Trigger → trigger    | Close → open (discrete)                   | Morph: width, height, translateX animate together             |
+| Content stacking     | Rendered inside each trigger's wrapper    | All contents stacked inside the shared viewport               |
+| Measurement          | Not needed                                | `scrollWidth` / `scrollHeight` measured per content           |
+| JS footprint         | ~140 lines                                | ~190 lines                                                    |
+
+## Usage
+
+```astro
+---
+import NavMorph from "@components/NavMorph.astro";
+import AnnouncementBanner from "@components/AnnouncementBanner.astro";
+---
+
+<NavMorph>
+  <AnnouncementBanner
+    slot="announcement"
+    href="/series-a"
+    class="bg-intent text-fg-on-intent text-sm"
+  >
+    <span><strong>New:</strong> Announcing our Series A</span>
+  </AnnouncementBanner>
+</NavMorph>
+```
+
+To switch the default Layout to use `NavMorph` instead of `Nav`, change the import in `src/layouts/Layout.astro`:
+
+```astro
+import Nav from "../components/NavMorph.astro";  // was: "./Nav.astro"
+```
+
+No other layout changes needed — the component accepts the same `announcement` slot and renders the same bar chrome.
+
+## Mechanism
+
+Three things animate simultaneously when the caller moves hover from trigger A to trigger B:
+
+### 1. Size
+
+The panel's `width` and `height` are driven by CSS vars `--panel-width` and `--panel-height`. On hover, the script:
+
+- Measures the target content's natural dimensions via `scrollWidth` / `scrollHeight`.
+- Writes the new values to the panel's inline style.
+- CSS transitions `width` and `height` over 300ms with a cubic-bezier ease.
+
+Contents are absolutely positioned inside the viewport, so they don't contribute to the viewport's intrinsic height (the viewport uses `h-full` to fill the panel). The `overflow: hidden` on the viewport crops content outside the current dimensions during the morph.
+
+### 2. Horizontal position
+
+The panel's `transform: translateX(var(--panel-x))` moves the whole panel horizontally. The panel is a sibling of the bar inside `<header>`, so its `left: 0` origin is the **header**, not the bar. Centering math reads the trigger center in header coordinates:
+
+```js
+const hdrRect = root.getBoundingClientRect();        // the <header>
+const trRect  = trigger.getBoundingClientRect();
+const trCenter = trRect.left - hdrRect.left + trRect.width / 2;
+let panelX = trCenter - contentWidth / 2;
+panelX = Math.max(0, Math.min(panelX, hdrRect.width - contentWidth));
+```
+
+Clamping to the header's width (not the bar's) lets the panel bleed slightly past the bar's own bounds if content is wider — usually desired, since the bar is a narrow pill in the middle of the header and mega panels want to extend.
+
+### 3. Content crossfade
+
+All dropdown contents are stacked inside the viewport with `data-active="false"` by default (opacity 0, `translateY(4px)`, `visibility: hidden`). Setting `data-active="true"` on the target fades it in with a 4px Y-slide over 180ms; the previous active content fades back out.
+
+### First-open vs. morph
+
+When the panel transitions from fully closed to open, the width/height transitions would otherwise animate from 0 → target size (the panel "unfurls"). To match shadcn's instant-size-then-fade behavior, the script:
+
+1. Adds a `.no-size-transition` class that disables the `width`/`height`/`transform` transitions.
+2. Sets the CSS vars.
+3. Forces a reflow.
+4. Removes the class on the next frame.
+5. Sets `data-open="true"`, which triggers the opacity fade.
+
+On subsequent trigger changes the class isn't applied, so the size transitions run normally.
+
+## Props & slots
+
+Same contract as `Nav`:
+
+| Slot           | Purpose                                                  |
+|----------------|----------------------------------------------------------|
+| `announcement` | Optional banner (AnnouncementBanner, a `<div>`, etc.)    |
+
+Links, CTA, and mobile footer links are inline constants at the top of the component's frontmatter — edit the file directly to change them, same as `Nav`.
+
+## Keyboard & accessibility
+
+- Each trigger is a native `<button type="button">`.
+- ArrowDown on a trigger: opens the panel, moves focus to first link in the content.
+- ArrowUp / ArrowDown / Home / End inside the panel: navigate links.
+- Enter / Space on a trigger: toggles its panel.
+- Escape: closes the panel and returns focus to the active trigger.
+- Click outside the header: closes the panel.
+- `aria-haspopup="true"`, `aria-controls="nav-morph-panel"`, `aria-expanded` on triggers.
+- `role="region"` with `aria-label="Primary menu panel"` on the shared panel.
+- Chevron icon on trigger rotates 180° when `aria-expanded="true"` (CSS-driven).
+- Panel, content, and arrow all respect `prefers-reduced-motion: reduce` — transitions are disabled and the crossfade becomes instant.
+
+## Mobile
+
+Same as `Nav`: the morph system is desktop-only (`md:block` on the panel). Below the `md` breakpoint, the hamburger toggles a details/summary-based panel where mega and menu types expand in place. No animation costs on mobile.
+
+## Tradeoffs vs. `Nav`
+
+**Choose `NavMorph` when:**
+
+- You have two or more dropdowns.
+- The design budget supports polished motion.
+- Your dropdowns have different widths (mega vs. short menu) — the morph is especially satisfying here.
+
+**Stay on `Nav` when:**
+
+- You have one dropdown or none.
+- You want the smallest possible JS footprint.
+- You prefer a simpler mental model for future contributors.
+
+## Gotchas
+
+1. **The viewport needs `h-full`.** Without it, the viewport collapses to 0 height (children are absolutely positioned) and `overflow: hidden` clips everything. Handled via the `h-full` Tailwind class in the component; don't remove it if you ever rework the markup.
+2. **Content width comes from `scrollWidth`.** The wider of the content's children wins, including padding. If you add content wider than expected, the panel will size up to it — constrain via explicit widths on the content root if you need control.
+3. **Clamp math is bar-local.** The panel is clamped to the nav bar's width, not the viewport. If your bar is narrower than the largest content, you'll get overflow. Either widen the bar or narrow the content.
+4. **Multiple instances.** The script scopes to `[data-nav-morph]` but the panel's shared ID (`nav-morph-panel`) collides if you render two NavMorph instances on the same page. Realistically you'll never have two headers, but worth knowing if you build a style-guide page.
+
+## Notes
+
+- No live preview here — the nav needs full-page context (fixed positioning, page grid, header coordinates for the morph math). View the live site.

@@ -1,0 +1,184 @@
+---
+// Tag — small chip used for status, category, and filter labels. Variants
+// are driven by semantic tokens so they flip automatically in dark/brand
+// themes.
+//
+// Variants: neutral | success | warning | error | intent
+// Sizes:    sm | md
+//
+// Optional `closable` adds a × button that dispatches a `tag:close` event
+// (and removes the tag from the DOM unless prevented).
+
+interface Props {
+  variant?: "neutral" | "success" | "warning" | "error" | "intent";
+  size?: "sm" | "md";
+  /** Add a close button. */
+  closable?: boolean;
+  /** Accessible label for the close button. Default "Remove". */
+  closeLabel?: string;
+  /** Use an outlined style instead of solid fill. */
+  outline?: boolean;
+  class?: string;
+}
+
+const {
+  variant = "neutral",
+  size = "md",
+  closable = false,
+  closeLabel = "Remove",
+  outline = false,
+  class: className,
+} = Astro.props;
+---
+
+<span
+  data-tag
+  data-tag-variant={variant}
+  data-tag-size={size}
+  data-tag-outline={outline ? "true" : undefined}
+  class:list={["tag", className]}
+>
+  <span data-tag-icon><slot name="icon" /></span>
+  <span data-tag-label><slot /></span>
+  {closable && (
+    <button
+      type="button"
+      data-tag-close
+      aria-label={closeLabel}
+    >
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+        <path d="M3 3l6 6M9 3l-6 6" />
+      </svg>
+    </button>
+  )}
+</span>
+
+<style is:global>
+  [data-tag] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid transparent;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* Sizes */
+  [data-tag][data-tag-size="sm"] {
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    gap: 0.1875rem;
+  }
+  [data-tag][data-tag-size="md"] {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  /* Icon slot — hidden if empty so the gap doesn't render. */
+  [data-tag-icon]:empty {
+    display: none;
+  }
+  [data-tag-icon] svg {
+    width: 1em;
+    height: 1em;
+    display: block;
+  }
+
+  /* Variants — solid fill (default) */
+  [data-tag][data-tag-variant="neutral"] {
+    background: var(--color-panel-muted);
+    color: var(--color-fg);
+    border-color: var(--color-stroke);
+  }
+  [data-tag][data-tag-variant="success"] {
+    background: color-mix(in srgb, var(--color-success) 15%, var(--color-panel));
+    color: var(--color-success);
+    border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-stroke));
+  }
+  [data-tag][data-tag-variant="warning"] {
+    background: color-mix(in srgb, var(--color-warning) 15%, var(--color-panel));
+    color: var(--color-warning);
+    border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-stroke));
+  }
+  [data-tag][data-tag-variant="error"] {
+    background: color-mix(in srgb, var(--color-error) 15%, var(--color-panel));
+    color: var(--color-error);
+    border-color: color-mix(in srgb, var(--color-error) 40%, var(--color-stroke));
+  }
+  [data-tag][data-tag-variant="intent"] {
+    background: var(--color-intent);
+    color: var(--color-fg-on-intent);
+    border-color: var(--color-intent);
+  }
+
+  /* Variants — outlined (color on transparent) */
+  [data-tag][data-tag-outline="true"] {
+    background: transparent;
+  }
+  [data-tag][data-tag-outline="true"][data-tag-variant="neutral"] {
+    color: var(--color-fg-muted);
+    border-color: var(--color-stroke);
+  }
+  [data-tag][data-tag-outline="true"][data-tag-variant="success"] {
+    color: var(--color-success);
+    border-color: var(--color-success);
+  }
+  [data-tag][data-tag-outline="true"][data-tag-variant="warning"] {
+    color: var(--color-warning);
+    border-color: var(--color-warning);
+  }
+  [data-tag][data-tag-outline="true"][data-tag-variant="error"] {
+    color: var(--color-error);
+    border-color: var(--color-error);
+  }
+  [data-tag][data-tag-outline="true"][data-tag-variant="intent"] {
+    color: var(--color-intent);
+    border-color: var(--color-intent);
+  }
+
+  /* Close button */
+  [data-tag-close] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    height: 1em;
+    margin-left: 0.125rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: currentColor;
+    opacity: 0.7;
+  }
+  [data-tag-close]:hover { opacity: 1; }
+  [data-tag-close]:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+    opacity: 1;
+  }
+</style>
+
+<script>
+  const init = (btn: HTMLButtonElement) => {
+    if (btn.dataset.scriptInitialized) return;
+    btn.dataset.scriptInitialized = "true";
+    btn.addEventListener("click", () => {
+      const tag = btn.closest<HTMLElement>("[data-tag]");
+      if (!tag) return;
+      const event = new CustomEvent("tag:close", {
+        bubbles: true,
+        cancelable: true,
+        detail: { value: tag.querySelector('[data-tag-label]')?.textContent?.trim() ?? "" },
+      });
+      const proceed = tag.dispatchEvent(event);
+      if (proceed) tag.remove();
+    });
+  };
+
+  const initAll = () =>
+    document.querySelectorAll<HTMLButtonElement>("[data-tag-close]").forEach(init);
+
+  initAll();
+  document.addEventListener("astro:page-load", initAll);
+</script>

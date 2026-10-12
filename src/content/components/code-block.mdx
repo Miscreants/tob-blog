@@ -1,0 +1,76 @@
+---
+title: CodeBlock
+description: Syntax-highlighted code with title bar, language badge, copy button, optional line numbers, and optional line highlighting. Wraps astro:components <Code />.
+category: pattern
+order: 58
+sourceFile: src/components/CodeBlock.astro
+status: stable
+related: [CopyButton]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import CodeBlock from "@components/CodeBlock.astro";
+
+A pragmatic code block primitive for docs and marketing pages. Built on top of Astro's built-in `<Code />` component (so syntax highlighting is server-rendered shiki — zero client JS for highlighting), with a small client script for the copy button.
+
+## Preview
+
+<Preview label="Default" align="stretch">
+  <div class="w-full max-w-2xl">
+    <CodeBlock
+      lang="ts"
+      title="example.ts"
+      code={`function greet(name: string) {\n  return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("world"));`}
+    />
+  </div>
+</Preview>
+
+<Preview label="With line numbers and highlight" align="stretch">
+  <div class="w-full max-w-2xl">
+    <CodeBlock
+      lang="js"
+      title="config.js"
+      showLineNumbers
+      highlight={[3, 4]}
+      code={`export default {\n  name: "starter",\n  version: "1.0.0",\n  features: ["tooltip", "code-block"],\n};`}
+    />
+  </div>
+</Preview>
+
+<Preview label="Minimal — no toolbar" align="stretch">
+  <div class="w-full max-w-2xl">
+    <CodeBlock
+      lang="bash"
+      hideLang
+      hideCopy
+      code={`npm install\nnpm run dev`}
+    />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "code", type: "string", required: true, description: "Source code to render and highlight." },
+  { name: "lang", type: "string", default: '"plaintext"', description: "Shiki language id (e.g. \"ts\", \"jsx\", \"bash\")." },
+  { name: "title", type: "string", description: "Filename or label shown in the title bar." },
+  { name: "highlight", type: "number[]", default: "[]", description: "1-based line numbers to highlight." },
+  { name: "showLineNumbers", type: "boolean", default: "false", description: "Show a 1-based line-number gutter (CSS counter)." },
+  { name: "hideLang", type: "boolean", default: "false", description: "Hide the language badge in the toolbar." },
+  { name: "hideCopy", type: "boolean", default: "false", description: "Hide the copy button in the toolbar." },
+  { name: "class", type: "string", description: "Additional classes on the figure element." },
+]} />
+
+## Mechanism
+
+- **Highlighting** — Astro's `<Code />` runs shiki at build/SSR time. No client-side highlighter is shipped to the browser.
+- **Line highlight** — implemented as a one-line shiki transformer (`name: "codeblock-highlight"`) that adds `data-line-highlight="true"` to matching `<span class="line">` rows. CSS draws the highlight band.
+- **Line numbers** — pure CSS counter on `.line` elements. No per-line markup needed.
+- **Copy button** — the `CopyButton` component reads the literal `code` string from the prop, so what gets copied is exactly what was rendered (no whitespace surprises from copying DOM text).
+
+## Notes
+
+- The `<Code />` component must be imported from `astro:components` — that's the project rule (see `feedback_astro_shiki_cloudflare.md`). Don't shell out to `shiki.codeToHtml` directly; static HTML truncates on Cloudflare builds.
+- Shiki appends a trailing empty line to its output. The CSS rule `.line:last-child:empty::before { content: ""; }` suppresses the number for that ghost line.
+- For inline code, use the standard markdown `` `like this` `` — this component is for block-level snippets only.

@@ -1,0 +1,581 @@
+---
+interface Props {
+  /** Unique ID for URL deep-linking */
+  id?: string;
+  /** Auto-advance interval in seconds. 0 = off */
+  autoplay?: number;
+  /** Transition duration in seconds */
+  duration?: number;
+  /** Slide animation instead of fade (requires GSAP) */
+  slideTabs?: boolean;
+  /** Convert to accordion below this breakpoint (px). Matches Tailwind md: by default */
+  convertAccordion?: boolean;
+  /** Breakpoint in px for accordion conversion. Default: 768 (Tailwind md) */
+  accordionBreakpoint?: number;
+  /** Prev/next buttons loop around */
+  loopControls?: boolean;
+  /** Allow multiple accordion panels open */
+  allowMultiple?: boolean;
+  class?: string;
+}
+
+const {
+  id,
+  autoplay,
+  duration,
+  slideTabs,
+  convertAccordion,
+  accordionBreakpoint = 768,
+  loopControls,
+  allowMultiple,
+  class: className,
+} = Astro.props;
+
+const hasControls = Astro.slots.has("controls");
+---
+
+<div
+  data-tab="component"
+  data-tab-component-id={id}
+  data-autoplay-duration={autoplay || undefined}
+  data-duration={duration || undefined}
+  data-slide-tabs={slideTabs || undefined}
+  data-convert-accordion={convertAccordion || undefined}
+  data-accordion-breakpoint={convertAccordion ? accordionBreakpoint : undefined}
+  data-loop-controls={loopControls || undefined}
+  data-allow-multiple={allowMultiple || undefined}
+  class:list={[className]}
+>
+  <slot />
+  {hasControls && (
+    <div data-tab="control-wrap">
+      <slot name="controls" />
+    </div>
+  )}
+</div>
+
+<style is:global>
+  /* ---- Config ---- */
+  [data-tab="component"] {
+    --tab-duration: 0.3s;
+    --tab-progress: 1;
+  }
+
+  /* ---- Panel list containment (needed for slide transitions) ---- */
+   [data-tab="panel-list"] {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ---- Hide all panels, show first (FOUC prevention) ---- */
+  [data-tab="panel-list"] > * {
+    display: none;
+  }
+  [data-tab="panel-list"] > :first-child {
+    display: block;
+  }
+
+  /* ---- Autoplay progress bar ---- */
+  [data-tab="button"].is-active [data-tab="line"] {
+    width: calc(100% * var(--tab-progress, 1));
+    opacity: 1;
+  }
+
+  /* ---- Accordion button full width ---- */
+  [data-tab="button"].is-accordion {
+    width: 100%;
+  }
+
+  /* ---- Accordion content animation ---- */
+  [data-tab="panel"].is-accordion {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--tab-duration) ease;
+    overflow: hidden;
+  }
+  [data-tab="panel"].is-accordion > * {
+    overflow: hidden;
+  }
+  [data-tab="panel"].is-accordion.is-active {
+    grid-template-rows: 1fr;
+  }
+
+  /* ---- Accordion icon rotation ---- */
+  [data-tab="icon"].is-accordion {
+    transition: transform var(--tab-duration) ease;
+  }
+  [data-tab="button"].is-active [data-tab="icon"].is-accordion {
+    transform: rotate(180deg);
+  }
+
+  /* ---- Accordion structural ---- */
+  [data-tab="content-wrap"].is-accordion {
+    display: contents;
+  }
+
+  /* ---- Button content mask ---- */
+  [data-tab="button-mask"] {
+    transition: grid-template-rows var(--tab-duration) ease;
+  }
+  [data-tab="button"].is-active [data-tab="button-mask"] {
+    grid-template-rows: 1fr;
+  }
+</style>
+
+<script>
+  // GSAP (~21 KB) is the heaviest script on the page, and every Tabs instance
+  // on the site sits below the fold — so defer it: dynamically import GSAP and
+  // run setup only once a tab component nears the viewport. This keeps GSAP's
+  // parse/eval off the initial critical path (lower Total Blocking Time)
+  // without changing any behavior once a component is initialized.
+  // (Ported from ghost-build's Tabs.)
+  let gsap: any;
+  let ScrollTrigger: any;
+  let tabsStarted = false;
+
+  async function startTabs() {
+    if (tabsStarted) return;
+    tabsStarted = true;
+
+    gsap = (await import("gsap")).default;
+    ScrollTrigger = (await import("gsap/ScrollTrigger")).ScrollTrigger;
+    gsap.registerPlugin(ScrollTrigger);
+
+    document.querySelectorAll<HTMLElement>('[data-tab="component"]').forEach((tabWrap, componentIndex) => {
+    if (tabWrap.dataset.scriptInitialized) return;
+    tabWrap.dataset.scriptInitialized = "true";
+
+    // Configuration
+    const loopControls = tabWrap.getAttribute("data-loop-controls") === "true";
+    const slideTabs = tabWrap.getAttribute("data-slide-tabs") === "true";
+    const autoplay = Number(tabWrap.getAttribute("data-autoplay-duration")) || 0;
+    const duration = Number(tabWrap.getAttribute("data-duration")) || 0.3;
+    const convertAccordion = tabWrap.getAttribute("data-convert-accordion") === "true";
+    const allowMultiple = tabWrap.getAttribute("data-allow-multiple") === "true";
+    const buttonList = tabWrap.querySelector<HTMLElement>('[data-tab="button-list"]');
+    const panelList = tabWrap.querySelector<HTMLElement>('[data-tab="panel-list"]');
+    const previousButton = tabWrap.querySelector<HTMLButtonElement>('[data-tab="prev"]');
+    const nextButton = tabWrap.querySelector<HTMLButtonElement>('[data-tab="next"]');
+
+    if (!buttonList || !panelList) {
+      console.warn("Tabs: missing [data-tab='button-list'] or [data-tab='panel-list'] in:", tabWrap);
+      return;
+    }
+
+    let animating = false;
+    let autoplayTl: any;
+
+    // Accordion state
+    const originalParent = buttonList.parentElement!;
+    const accordionItems: HTMLElement[] = [];
+    let isAccordion = false;
+
+    const buttonItems = Array.from(buttonList.querySelectorAll<HTMLElement>(':scope > [data-tab="button"]'));
+    const panelItems = Array.from(panelList.querySelectorAll<HTMLElement>(':scope > [data-tab="panel"]'));
+
+    if (!buttonItems.length || !panelItems.length) {
+      console.warn("Tabs: no [data-tab='button'] or [data-tab='panel'] items in:", tabWrap);
+      return;
+    }
+
+    // Initialize ARIA
+    panelItems.forEach((panel) => {
+      panel.style.display = "none";
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("tabindex", "0");
+    });
+    buttonItems.forEach((button) => {
+      button.setAttribute("role", "tab");
+    });
+    panelList.removeAttribute("role");
+    buttonList.setAttribute("role", "tablist");
+
+    let activeIndex = 0;
+    const urlParams = new URLSearchParams(location.search);
+
+    // --- Tab activation ---
+    const initTabActive = (index: number, focus = false, animate = true, pause = true) => {
+      if (animating || isAccordion) return;
+
+      buttonItems.forEach((btn, i) => {
+        btn.classList.toggle("is-active", i === index);
+        btn.setAttribute("aria-selected", i === index ? "true" : "false");
+        btn.setAttribute("tabindex", i === index ? "0" : "-1");
+      });
+      panelItems.forEach((panel, i) => panel.classList.toggle("is-active", i === index));
+
+      if (nextButton) nextButton.disabled = index === buttonItems.length - 1 && !loopControls;
+      if (previousButton) previousButton.disabled = index === 0 && !loopControls;
+      if (focus) buttonItems[index].focus();
+
+      const previousPanel = activeIndex !== index ? panelItems[activeIndex] : null;
+      const currentPanel = panelItems[index];
+      const direction = activeIndex > index ? -1 : 1;
+
+      // GSAP animations (if available)
+      if (animate && previousPanel) {
+        if (autoplayTl && typeof autoplayTl.restart === "function") {
+          autoplayTl.restart();
+          if (pause) {
+            autoplayTl.progress(0);
+            autoplayTl.pause();
+            gsap.set(tabWrap, { "--tab-progress": 1 });
+          }
+        }
+        animating = true;
+        const tl = gsap.timeline({
+          onComplete: () => {
+            animating = false;
+            ScrollTrigger.refresh();
+          },
+          defaults: { duration: duration, ease: "power1.out" },
+        });
+
+        if (slideTabs) {
+          tl.set(currentPanel, { display: "block", position: "relative" });
+          tl.set(previousPanel, { position: "absolute", top: 0, left: 0, width: "100%" });
+          tl.fromTo(previousPanel, { xPercent: 0 }, { xPercent: -120 * direction });
+          tl.fromTo(currentPanel, { xPercent: 120 * direction }, { xPercent: 0 }, "<");
+          tl.set(previousPanel, { display: "none" });
+        } else {
+          tl.to(previousPanel, { opacity: 0 });
+          tl.set(previousPanel, { display: "none" });
+          tl.set(currentPanel, { display: "block" });
+          tl.fromTo(currentPanel, { opacity: 0 }, { opacity: 1 });
+        }
+      } else {
+        // No GSAP — just swap display
+        if (previousPanel) previousPanel.style.display = "none";
+        if (currentPanel) currentPanel.style.display = "block";
+      }
+
+      // Scroll button into view if needed
+      const btn = buttonItems[index];
+      const listRect = buttonList.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+      if (btnRect.left < listRect.left || btnRect.right > listRect.right) {
+        buttonList.scrollTo({ left: btn.offsetLeft, behavior: "smooth" });
+      }
+
+      activeIndex = index;
+    };
+
+    // --- Accordion toggle ---
+    const initAccordionToggle = (index: number) => {
+      const button = buttonItems[index];
+      const panel = panelItems[index];
+      const isActive = button.classList.contains("is-active");
+
+      if (!allowMultiple) {
+        buttonItems.forEach((btn, i) => {
+          if (i !== index) {
+            btn.classList.remove("is-active");
+            btn.setAttribute("aria-expanded", "false");
+            panelItems[i].classList.remove("is-active");
+          }
+        });
+      }
+
+      button.classList.toggle("is-active");
+      panel.classList.toggle("is-active");
+      button.setAttribute("aria-expanded", String(!isActive));
+
+      ScrollTrigger.refresh();
+    };
+
+    // --- Collect elements that need .is-accordion ---
+    const contentWrap = tabWrap.querySelector<HTMLElement>('[data-tab="content-wrap"]');
+    const controlWrap = tabWrap.querySelector<HTMLElement>('[data-tab="control-wrap"]');
+
+    const toggleAccordionClasses = (add: boolean) => {
+      const method = add ? "add" : "remove";
+      buttonItems.forEach((btn) => {
+        btn.classList[method]("is-accordion");
+        btn.querySelectorAll<HTMLElement>('[data-tab="line"], [data-tab="icon"]').forEach(
+          (el) => el.classList[method]("is-accordion")
+        );
+      });
+      panelItems.forEach((panel) => {
+        panel.classList[method]("is-accordion");
+        panel.querySelectorAll<HTMLElement>('[data-tab="content"]').forEach(
+          (el) => el.classList[method]("is-accordion")
+        );
+      });
+      if (contentWrap) contentWrap.classList[method]("is-accordion");
+      if (controlWrap) controlWrap.classList[method]("is-accordion");
+    };
+
+    // --- Transform: tabs → accordion ---
+    const initAccordionTransform = () => {
+      if (isAccordion) return;
+      isAccordion = true;
+      tabWrap.classList.add("is-accordion");
+      toggleAccordionClasses(true);
+
+      if (autoplayTl) {
+        autoplayTl.pause();
+        gsap.set(tabWrap, { "--tab-progress": 1 });
+      }
+
+      buttonItems.forEach((button, index) => {
+        const panel = panelItems[index];
+        const wrapper = document.createElement("div");
+        wrapper.className = "accordion_item";
+        wrapper.setAttribute("data-tab", "accordion-item");
+
+        const contentInner = document.createElement("div");
+        contentInner.className = "accordion_content_inner";
+        contentInner.setAttribute("data-tab", "accordion-inner");
+
+        while (panel.firstChild) {
+          contentInner.appendChild(panel.firstChild);
+        }
+        panel.appendChild(contentInner);
+        panel.style.cssText = "";
+
+        const isCurrentlyActive = index === activeIndex;
+        button.classList.toggle("is-active", isCurrentlyActive);
+        panel.classList.toggle("is-active", isCurrentlyActive);
+
+        button.setAttribute("role", "button");
+        button.setAttribute("aria-expanded", isCurrentlyActive ? "true" : "false");
+        button.removeAttribute("aria-selected");
+        button.removeAttribute("tabindex");
+        panel.removeAttribute("role");
+
+        wrapper.appendChild(button);
+        wrapper.appendChild(panel);
+        accordionItems.push(wrapper);
+
+        if (index === 0) {
+          originalParent.appendChild(wrapper);
+        } else {
+          accordionItems[index - 1].after(wrapper);
+        }
+      });
+
+      buttonList.style.display = "none";
+      panelList.style.display = "none";
+
+      ScrollTrigger.refresh();
+    };
+
+    // --- Transform: accordion → tabs ---
+    const initTabsTransform = () => {
+      if (!isAccordion) return;
+      isAccordion = false;
+      tabWrap.classList.remove("is-accordion");
+      toggleAccordionClasses(false);
+
+      const activeStates = buttonItems.map((btn) => btn.classList.contains("is-active"));
+      const firstActiveIndex = activeStates.findIndex((state) => state);
+      if (firstActiveIndex !== -1) activeIndex = firstActiveIndex;
+
+      accordionItems.forEach((wrapper, index) => {
+        const button = buttonItems[index];
+        const panel = panelItems[index];
+        const contentInner = panel.querySelector('[data-tab="accordion-inner"]');
+
+        if (contentInner) {
+          while (contentInner.firstChild) {
+            panel.appendChild(contentInner.firstChild);
+          }
+          contentInner.remove();
+        }
+
+        panel.style.display = "none";
+
+        button.setAttribute("role", "tab");
+        button.setAttribute("aria-selected", "false");
+        button.setAttribute("tabindex", "-1");
+        button.removeAttribute("aria-expanded");
+        panel.setAttribute("role", "tabpanel");
+        panel.setAttribute("tabindex", "0");
+
+        buttonList.appendChild(button);
+        panelList.appendChild(panel);
+        wrapper.remove();
+      });
+
+      accordionItems.length = 0;
+      buttonList.style.display = "";
+      panelList.style.display = "";
+      animating = false;
+      initTabActive(activeIndex, false, false);
+
+      if (autoplayTl && autoplay !== 0) {
+        autoplayTl.play();
+      }
+    };
+
+    // --- Viewport check ---
+    const initViewportCheck = () => {
+      if (!convertAccordion) return;
+      const breakpoint = Number(tabWrap.getAttribute("data-accordion-breakpoint")) || 768;
+      const isMobile = window.innerWidth < breakpoint;
+      if (isMobile && !isAccordion) initAccordionTransform();
+      else if (!isMobile && isAccordion) initTabsTransform();
+    };
+
+    // Initialize first tab
+    initTabActive(0, false, false);
+
+    // Navigation helpers
+    const updateIndex = (delta: number, focus = false, pause = true) => {
+      initTabActive((activeIndex + delta + buttonItems.length) % buttonItems.length, focus, true, pause);
+    };
+
+    nextButton?.addEventListener("click", () => updateIndex(1));
+    previousButton?.addEventListener("click", () => updateIndex(-1));
+
+    // --- Button setup: IDs, events, URL deep-linking ---
+    buttonItems.forEach((btn, index) => {
+      let tabId = tabWrap.getAttribute("data-tab-component-id");
+      tabId = tabId ? tabId.toLowerCase().replace(/[^a-z0-9-]/g, "-") : String(componentIndex + 1);
+      let itemId = btn.getAttribute("data-tab-item-id");
+      itemId = itemId ? itemId.toLowerCase().replace(/[^a-z0-9-]/g, "-") : String(index + 1);
+
+      btn.setAttribute("id", `tab-button-${tabId}-${itemId}`);
+      btn.setAttribute("aria-controls", `tab-panel-${tabId}-${itemId}`);
+      panelItems[index].setAttribute("id", `tab-panel-${tabId}-${itemId}`);
+      panelItems[index].setAttribute("aria-labelledby", btn.id);
+
+      // URL deep-link
+      if (urlParams.get("tab-id") === `${tabId}-${itemId}`) {
+        initTabActive(index);
+        tabWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+        const cleanUrl = new URL(location.href);
+        cleanUrl.searchParams.delete("tab-id");
+        history.replaceState({}, "", cleanUrl);
+      }
+
+      // Click
+      btn.addEventListener("click", () => {
+        if (isAccordion) initAccordionToggle(index);
+        else initTabActive(index);
+      });
+
+      // Keyboard navigation
+      btn.addEventListener("keydown", (e) => {
+        if (isAccordion) {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            initAccordionToggle(index);
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            const next = buttonItems[index + 1] || buttonItems[0];
+            next.focus();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            const prev = buttonItems[index - 1] || buttonItems[buttonItems.length - 1];
+            prev.focus();
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            buttonItems[0].focus();
+          } else if (e.key === "End") {
+            e.preventDefault();
+            buttonItems[buttonItems.length - 1].focus();
+          }
+        } else {
+          if (["ArrowRight", "ArrowDown"].includes(e.key)) {
+            e.preventDefault();
+            updateIndex(1, true);
+          } else if (["ArrowLeft", "ArrowUp"].includes(e.key)) {
+            e.preventDefault();
+            updateIndex(-1, true);
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            initTabActive(0, true);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            initTabActive(buttonItems.length - 1, true);
+          }
+        }
+      });
+    });
+
+    // --- Autoplay ---
+    if (autoplay !== 0) {
+      autoplayTl = gsap.timeline({ repeat: -1 }).fromTo(
+        tabWrap,
+        { "--tab-progress": 0 },
+        {
+          onComplete: () => updateIndex(1, false, false),
+          "--tab-progress": 1,
+          ease: "none",
+          duration: autoplay,
+        }
+      );
+
+      let isHovered = false;
+      let hasFocusInside = false;
+      let prefersReducedMotion = false;
+      let inView = true;
+
+      function updateAuto() {
+        if (prefersReducedMotion || !inView || isHovered || hasFocusInside || isAccordion) {
+          autoplayTl.pause();
+        } else {
+          autoplayTl.play();
+        }
+      }
+
+      const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      prefersReducedMotion = motionQuery.matches;
+      motionQuery.addEventListener("change", (e) => {
+        prefersReducedMotion = e.matches;
+        updateAuto();
+      });
+
+      tabWrap.addEventListener("mouseenter", () => { isHovered = true; updateAuto(); });
+      tabWrap.addEventListener("mouseleave", () => { hasFocusInside = false; isHovered = false; updateAuto(); });
+      tabWrap.addEventListener("focusin", () => { hasFocusInside = true; updateAuto(); });
+      tabWrap.addEventListener("focusout", (e: FocusEvent) => {
+        if (!e.relatedTarget || !tabWrap.contains(e.relatedTarget as Node)) {
+          hasFocusInside = false;
+          updateAuto();
+        }
+      });
+
+      new IntersectionObserver(
+        (entries) => {
+          inView = entries[0].isIntersecting;
+          updateAuto();
+        },
+        { threshold: 0 }
+      ).observe(tabWrap);
+    }
+
+    // --- Responsive accordion conversion ---
+    if (convertAccordion) {
+      initViewportCheck();
+      let resizeTimer: ReturnType<typeof setTimeout>;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(initViewportCheck, 250);
+      });
+    }
+  });
+
+  }
+
+  // Kick off once any tab component is within 200px of the viewport. If one is
+  // already on-screen at load, the observer fires on the first callback.
+  function observeTabs() {
+    const comps = document.querySelectorAll<HTMLElement>('[data-tab="component"]');
+    if (!comps.length) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          startTabs();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    comps.forEach((c) => io.observe(c));
+  }
+
+  observeTabs();
+  document.addEventListener("astro:page-load", observeTabs);
+</script>

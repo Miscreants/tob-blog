@@ -1,0 +1,230 @@
+---
+title: Dropdown
+description: Accessible popover-based dropdown with three modes — action menu, single-select, and multi-select. Built on the native Popover API for free top-layer rendering, light dismiss, and Escape handling.
+category: pattern
+order: 56
+sourceFile: src/components/Dropdown.astro
+status: stable
+related: [Modal, ComboboxGrouped, FilterBar]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Dropdown from "@components/Dropdown.astro";
+
+A single dropdown primitive that handles the three real-world patterns marketing and product UI need:
+
+- **Menu** — list of actions or links (user menu, language switcher).
+- **Select** — one-of-many picker, like a styled `<select>`.
+- **Multiselect** — many-of-many picker for filters and tag pickers.
+
+Built on the native [Popover API](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API) so you get top-layer rendering (no clipping inside `overflow:hidden`), click-outside dismiss, and Escape-to-close without a single line of JS for those parts. Positioning uses CSS Anchor Positioning where supported and falls back to a small JS positioner everywhere else.
+
+## Preview
+
+<Preview label="Action menu" align="stretch">
+  <Dropdown id="preview-menu" mode="menu">
+    <button data-dropdown="trigger" class="inline-flex items-center gap-2  border border-stroke bg-panel px-4 py-2 text-sm text-fg">
+      <span data-dropdown="label">Account</span>
+      <svg data-dropdown="arrow" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2 4l4 4 4-4z"/></svg>
+    </button>
+    <div data-dropdown="list" class="min-w-48 p-1">
+      <a data-dropdown="item" href="#profile" class="text-sm">Profile</a>
+      <a data-dropdown="item" href="#billing" class="text-sm">Billing</a>
+      <a data-dropdown="item" href="#team" class="text-sm">Team</a>
+      <button data-dropdown="item" type="button" class="text-sm text-error">Sign out</button>
+    </div>
+  </Dropdown>
+</Preview>
+
+<Preview label="Single-select (radio)" align="stretch">
+  <Dropdown id="preview-select" mode="select">
+    <button data-dropdown="trigger" class="inline-flex items-center gap-2  border border-stroke bg-panel px-4 py-2 text-sm text-fg">
+      <span data-dropdown="label">Category</span>
+      <svg data-dropdown="arrow" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2 4l4 4 4-4z"/></svg>
+    </button>
+    <div data-dropdown="list" class="min-w-48 p-1">
+      <label data-dropdown="item" class="text-sm">
+        <input type="radio" name="preview-cat" value="news" />
+        News
+      </label>
+      <label data-dropdown="item" class="text-sm">
+        <input type="radio" name="preview-cat" value="updates" />
+        Updates
+      </label>
+      <label data-dropdown="item" class="text-sm">
+        <input type="radio" name="preview-cat" value="releases" />
+        Releases
+      </label>
+    </div>
+  </Dropdown>
+</Preview>
+
+<Preview label="Multi-select (checkboxes)" align="stretch">
+  <Dropdown id="preview-multi" mode="multiselect">
+    <button data-dropdown="trigger" class="inline-flex items-center gap-2  border border-stroke bg-panel px-4 py-2 text-sm text-fg">
+      <span data-dropdown="label">Tags</span>
+      <svg data-dropdown="arrow" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2 4l4 4 4-4z"/></svg>
+    </button>
+    <div data-dropdown="list" class="min-w-48 p-1">
+      <label data-dropdown="item" class="text-sm">
+        <input type="checkbox" name="preview-tags" value="design" />
+        Design
+      </label>
+      <label data-dropdown="item" class="text-sm">
+        <input type="checkbox" name="preview-tags" value="engineering" />
+        Engineering
+      </label>
+      <label data-dropdown="item" class="text-sm">
+        <input type="checkbox" name="preview-tags" value="product" />
+        Product
+      </label>
+      <label data-dropdown="item" class="text-sm">
+        <input type="checkbox" name="preview-tags" value="marketing" />
+        Marketing
+      </label>
+    </div>
+  </Dropdown>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "id", type: "string", description: "Stable wrapper ID. Auto-generated if omitted." },
+  { name: "mode", type: '"menu" | "select" | "multiselect"', default: '"menu"', description: "Behavior + ARIA pattern. menu = role=menu/menuitem; select = role=radiogroup with native radios; multiselect = role=group with native checkboxes." },
+  { name: "align", type: '"start" | "end"', default: '"start"', description: "Horizontal alignment of the popover relative to the trigger." },
+  { name: "closeOnSelect", type: "boolean", description: "Close after a selection. Default: true for menu/select, false for multiselect." },
+  { name: "staticLabel", type: "boolean", description: "Don't replace the trigger label with the selected option(s). Default: true for menu, false otherwise." },
+  { name: "multiselectFormat", type: '"count" | "list"', default: '"count"', description: '"count" → "Tags (3)"; "list" → "Design, Engineering, Product".' },
+  { name: "matchTriggerWidth", type: "boolean", default: "true", description: "Apply the trigger width as a min-width on the popover (JS-positioned fallback only)." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+## Markup contract
+
+The component expects this structure inside its slot:
+
+```html
+<button data-dropdown="trigger">
+  <span data-dropdown="label">Category</span>     <!-- optional, replaced on selection -->
+  <svg data-dropdown="arrow"><!-- chevron --></svg>  <!-- optional, rotates when open -->
+</button>
+
+<div data-dropdown="list">
+  <!-- For mode="menu": <a> or <button> elements -->
+  <a data-dropdown="item" href="/profile">Profile</a>
+  <button data-dropdown="item" type="button">Sign out</button>
+
+  <!-- For mode="select": <label> wrapping a radio -->
+  <label data-dropdown="item">
+    <input type="radio" name="cat" value="news" />
+    News
+  </label>
+
+  <!-- For mode="multiselect": <label> wrapping a checkbox -->
+  <label data-dropdown="item">
+    <input type="checkbox" name="tags" value="design" />
+    Design
+  </label>
+</div>
+```
+
+### Inner data attributes
+
+| Attribute                       | Purpose                                                              |
+|---------------------------------|----------------------------------------------------------------------|
+| `data-dropdown="trigger"`       | The button. The script wires `popovertarget`, `aria-controls`, `aria-expanded`, `aria-haspopup`. |
+| `data-dropdown="list"`          | The popover panel. The script adds the `popover` attribute, an ID, and the appropriate `role`. |
+| `data-dropdown="item"`          | One option / menu item.                                              |
+| `data-dropdown="label"`         | Span inside the trigger whose text gets replaced on selection.       |
+| `data-dropdown="arrow"`         | Chevron that gets `transform: rotate(180deg)` while open.            |
+| `data-dropdown="item-label"`    | Optional — explicit element whose text is used for the selection label, when the item contains extra markup. |
+
+## Modes in detail
+
+### `menu` — action menu
+
+ARIA: `role="menu"` on the list, `role="menuitem"` on each item with `tabindex="-1"`.
+
+Keyboard:
+- ArrowDown/ArrowUp from the trigger opens the popover and focuses first/last item.
+- ArrowDown/ArrowUp inside the menu cycle through items.
+- Home / End jump to first / last.
+- Tab closes and lets focus continue naturally.
+- Enter/Space activate the focused item (native `<a>` / `<button>` behavior).
+- Escape closes (native popover).
+
+The trigger label is **not** replaced — this is an action menu, not a selection.
+
+### `select` — single-choice picker
+
+ARIA: `role="radiogroup"` on the list. Native `<input type="radio">` does the rest — screen readers announce "1 of 3" automatically and arrow-key navigation between radios is built in.
+
+Behavior:
+- Selecting a radio updates the trigger label to that option's text.
+- The popover closes after selection (configurable via `closeOnSelect={false}`).
+
+### `multiselect` — multi-choice picker
+
+ARIA: `role="group"` on the list with `aria-labelledby` pointing at the trigger. Native `<input type="checkbox">` provides accessible toggle, with Space-to-toggle and screen-reader announcements.
+
+Behavior:
+- Trigger label updates to a count (`Tags (3)`) or comma-separated list, controlled by `multiselectFormat`.
+- The popover stays open while the user picks; closes on click-outside (native), Escape (native), or when focus leaves the popover entirely.
+
+## Accessibility
+
+- Trigger gets `aria-haspopup="menu"` (menu mode) or `"listbox"` (select / multiselect).
+- `aria-expanded` reflects the popover state in real time via the `toggle` event.
+- For form modes (select / multiselect), the chosen ARIA roles wrap **native** radios and checkboxes — these are accessible by default and submit naturally inside `<form>`.
+- `role="menuitem"` items are managed via roving tabindex; the menu pattern matches WAI-ARIA's APG specification.
+- The popover lives in the top layer, so a dropdown inside an `overflow:hidden` parent is never clipped.
+- Disabled items: add `disabled` (form inputs / buttons) or `aria-disabled="true"` to the wrapping `[data-dropdown="item"]`. The script skips them in keyboard navigation.
+
+## Positioning
+
+By default the popover is anchored below the trigger and aligned to its left edge.
+
+- **Browsers with CSS Anchor Positioning** (Chromium 125+, Safari 26+) get a pure-CSS implementation that follows the trigger as the page scrolls, with automatic flip-up when there's no room below.
+- **Other browsers** use a small JS positioner: position computed on `toggle`, updated on scroll/resize while the popover is open, clamped to the viewport edges.
+
+Use `align="end"` to right-align the popover with the trigger.
+
+## Forms
+
+Because select and multiselect modes use native radios and checkboxes, dropping a `<Dropdown>` inside a `<form>` Just Works:
+
+```astro
+<form action="/search" method="get">
+  <Dropdown mode="multiselect">
+    <button data-dropdown="trigger" type="button" class="…">
+      <span data-dropdown="label">Tags</span>
+    </button>
+    <div data-dropdown="list">
+      <label data-dropdown="item">
+        <input type="checkbox" name="tags" value="design" />
+        Design
+      </label>
+      <label data-dropdown="item">
+        <input type="checkbox" name="tags" value="eng" />
+        Engineering
+      </label>
+    </div>
+  </Dropdown>
+  <button type="submit">Search</button>
+</form>
+```
+
+Submitting the form sends `tags=design&tags=eng` exactly like a normal checkbox group — no JS post-processing required.
+
+## Dependencies
+
+- **None.** Native [Popover API](https://caniuse.com/mdn-html_global_attributes_popover) (Baseline 2024 — all evergreen browsers).
+- CSS Anchor Positioning is used as a progressive enhancement; the JS positioning fallback handles everything else.
+
+## Notes
+
+- **`data-dropdown-open`** on the wrapper mirrors the popover state in the DOM, so non-Anchor-Positioning CSS hooks (like the chevron rotation) work everywhere.
+- **Multiple instances** on a page are independent — each gets its own popover ID and its own listeners. No shared module state.
+- **View transitions** — re-init runs on `astro:page-load`, idempotent via `data-script-initialized`.
+- **`matchTriggerWidth`** only affects the JS-positioned fallback. Anchor-positioned popovers size themselves naturally; add `min-width: anchor-size(width)` in your styles if you want it there too.

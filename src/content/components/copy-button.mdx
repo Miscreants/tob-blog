@@ -1,0 +1,63 @@
+---
+title: CopyButton
+description: Tiny button that copies a string (or referenced element's text) to the clipboard with momentary feedback.
+category: primitive
+order: 12
+sourceFile: src/components/CopyButton.astro
+status: stable
+related: [CodeBlock]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import CopyButton from "@components/CopyButton.astro";
+
+Small, focused copy-to-clipboard button. Useful next to inline tokens, share URLs, install commands — and used as the copy affordance inside `CodeBlock`.
+
+## Preview
+
+<Preview label="Literal value" align="center">
+  <div class="flex items-center gap-3 py-4">
+    <code class="border border-stroke bg-panel px-2 py-1 text-sm">npm install astro</code>
+    <CopyButton value="npm install astro" label="Copy install command" class="border border-stroke bg-panel px-2 py-1 text-sm" />
+  </div>
+</Preview>
+
+<Preview label="Targeted element" align="center">
+  <div class="flex items-center gap-3 py-4">
+    <code id="copy-share-url" class="border border-stroke bg-panel px-2 py-1 text-sm">https://example.com/share/abc123</code>
+    <CopyButton target="#copy-share-url" class="border border-stroke bg-panel px-2 py-1 text-sm" />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "value", type: "string", description: "Literal string to copy. Use this OR `target`, not both." },
+  { name: "target", type: "string", description: "CSS selector for the element whose `.textContent` is copied." },
+  { name: "label", type: "string", default: '"Copy"', description: "Accessible label and idle button text." },
+  { name: "copiedLabel", type: "string", default: '"Copied"', description: "Feedback text shown briefly after a successful copy." },
+  { name: "feedbackDuration", type: "number", default: "1500", description: "Time in ms the feedback state remains visible." },
+  { name: "class", type: "string", description: "Additional classes on the button." },
+]} />
+
+## Slots
+
+| Slot          | Purpose                                                              |
+|---------------|----------------------------------------------------------------------|
+| (default)     | Button text. Defaults to the `label` prop.                            |
+| `icon-idle`   | Custom idle-state icon. Defaults to a clipboard SVG.                 |
+| `icon-copied` | Custom copied-state icon. Defaults to a checkmark SVG.               |
+
+## Accessibility
+
+- Real `<button type="button">` — focusable, keyboard-activatable.
+- `aria-label` set to `label` prop — screen readers announce the action even if the visible text is just an icon.
+- A visually-hidden `aria-live="polite"` region announces "Copied to clipboard" / "Copy failed" to assistive tech.
+- The state swap (idle ↔ copied) uses a `data-copy-state` attribute that CSS reads — no inline style manipulation, no flash.
+
+## Notes
+
+- Falls back gracefully — if the Clipboard API is denied (insecure context, permissions), the live region announces "Copy failed" and the visual state stays idle.
+- `value` takes precedence over `target` if both are set.
+- Reads `target.textContent.trim()` — appropriate for code/URL snippets but be aware of trailing whitespace stripping if you depend on it.

@@ -1,0 +1,161 @@
+---
+title: AnnouncementBanner
+description: Top-of-page banner with optional link, dismiss, scroll-aware hide, and a content-collection-driven publishing flow.
+category: block
+order: 40
+sourceFile: src/components/AnnouncementBanner.astro
+status: stable
+related: [Nav, NavMega, NavMorph]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import AnnouncementBanner from "@components/AnnouncementBanner.astro";
+
+Site-wide announcement banner. Optionally a link, optionally dismissible, hides on scroll-down and reappears on scroll-up. Content and scheduling live in the `announcements` content collection — editors publish, queue, or expire banners by editing markdown files, no code changes.
+
+## Preview
+
+<Preview label="Plain — no link, dismissible">
+  <div class="relative w-full">
+    <AnnouncementBanner class="bg-intent text-fg-on-intent">
+      <span><strong>New:</strong> Component showcase is live</span>
+    </AnnouncementBanner>
+  </div>
+</Preview>
+
+<Preview label="As a link with arrow">
+  <div class="relative w-full">
+    <AnnouncementBanner href="/series-a" class="bg-intent text-fg-on-intent" dismissible={false}>
+      <span><strong>Read the post:</strong> Announcing our Series A</span>
+    </AnnouncementBanner>
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "href", type: "string", description: "When set, the banner becomes a clickable link with a trailing arrow icon." },
+  { name: "dismissible", type: "boolean", default: "true", description: "Show a close button that dismisses for the session." },
+  { name: "class", type: "string", description: "Additional classes — typically background + text color (e.g. bg-intent text-fg-on-intent)." },
+]} />
+
+Banner copy is passed via the default slot. Inline markdown (`**bold**`, links) is supported when rendering from the content collection.
+
+## Mechanism
+
+- Renders as `<a>` when `href` is set, otherwise `<div>`. A trailing arrow icon is appended in link mode.
+- The dismiss button is absolutely positioned on the right when `dismissible` is true.
+
+### Scroll behavior
+
+- On page load, the banner's natural height is measured and set explicitly so CSS height transitions can run.
+- **Scroll down** (delta > 5px): banner collapses to `height: 0`.
+- **Scroll up** (delta < -5px): banner expands back to its natural height.
+- **Dismiss**: sets `height: 0`, stores `"announcement-dismissed"` in `sessionStorage`, then `display: none` after the transition ends. Focus moves to the first focusable element in `[data-nav-bar]`.
+
+### A11y
+
+- `role="status"` and `aria-label="Site announcement"` on the wrapper.
+- Close button has `aria-label="Dismiss announcement"`.
+- Arrow icon is `aria-hidden="true"`.
+
+## Data source: the `announcements` content collection
+
+Banners are **not** hardcoded — they're markdown files in `src/content/announcements/`. The layout reads the collection at build time, picks the currently-active entry, and renders it. Empty directory → no banner.
+
+### Schema (`src/content.config.ts`)
+
+```ts
+const announcements = defineCollection({
+  loader: glob({ pattern: "**/*.md", base: "./src/content/announcements" }),
+  schema: z.object({
+    href: z.string().optional(),
+    dismissible: z.boolean().default(true),
+    startsAt: z.coerce.date().optional(),
+    endsAt: z.coerce.date().optional(),
+    enabled: z.boolean().default(true),
+    priority: z.number().default(0),
+  }),
+});
+```
+
+### Frontmatter fields
+
+| Field         | Type      | Default | Purpose                                                                   |
+|---------------|-----------|---------|---------------------------------------------------------------------------|
+| `href`        | `string?` | —       | Makes the banner a link                                                   |
+| `dismissible` | `boolean` | `true`  | Passed through to the component's dismiss button                          |
+| `startsAt`    | `Date?`   | —       | Banner is hidden before this date (UTC, ISO format)                       |
+| `endsAt`      | `Date?`   | —       | Banner auto-expires after this date                                       |
+| `enabled`     | `boolean` | `true`  | Manual on/off — useful to stage content without deleting                  |
+| `priority`    | `number`  | `0`     | Tie-breaker when multiple entries are active; highest wins                |
+
+### Selection logic (in Layout.astro)
+
+1. Load all entries via `getCollection("announcements")`.
+2. Keep only entries where `enabled === true`.
+3. Keep only entries whose `startsAt` is in the past (or missing).
+4. Keep only entries whose `endsAt` is in the future (or missing).
+5. Sort by `priority` desc, then `startsAt` desc.
+6. Take the first; if nothing remains, no banner is rendered.
+
+## Usage patterns
+
+### Publish a banner now
+
+Create `src/content/announcements/launch.md`:
+
+```md
+---
+href: "/launch"
+dismissible: true
+enabled: true
+---
+
+**Launching today:** our new dashboard
+```
+
+Commit and deploy. Banner appears immediately.
+
+### Schedule a banner for later
+
+```md
+---
+href: "/series-a"
+startsAt: "2026-05-01"
+endsAt: "2026-05-15"
+enabled: true
+---
+
+**New:** Announcing our Series A
+```
+
+Hidden before May 1, 2026. Auto-expires after May 15.
+
+### Temporarily hide without deleting
+
+```md
+---
+enabled: false
+---
+
+Content stays here for when you want it back.
+```
+
+## Build-time gotcha
+
+Filtering uses `new Date()` evaluated **at build time**, not in the browser. If `endsAt` passes between deploys, the banner is still shown until the next rebuild.
+
+Common mitigations:
+
+- **Scheduled rebuilds** — Netlify, Vercel, and Cloudflare Pages all support cron-triggered deploys. Nightly is usually enough.
+- **Client-side expiry check** — add a small script that hides the banner if `endsAt < now`. The data is in the DOM at build time; JS just re-validates.
+
+For most marketing sites, nightly rebuilds are fine. Add the client-side check if you publish time-sensitive banners ("sale ends at midnight").
+
+## Notes
+
+- Dismissal uses `sessionStorage`, so it resets per session (not persistent).
+- Designed to be rendered into `Nav.astro`'s `announcement` slot — that's where it sits inside the grid layout.
+- The component itself knows nothing about collections — it just receives slot content and props. That keeps it reusable for any data source (JSON, CMS, env var, etc.).

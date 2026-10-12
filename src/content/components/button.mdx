@@ -1,0 +1,74 @@
+---
+title: Button
+description: Primary CTA button with variants, optional arrow animation, and link/button mode.
+category: primitive
+order: 10
+sourceFile: src/components/Button.astro
+status: stable
+related: [ButtonGroup]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import Button from "@components/Button.astro";
+import ButtonGroup from "@components/ButtonGroup.astro";
+
+The base interactive primitive. Renders as a `<button>` by default, or as an `<a>` when an `href` is provided. Three visual variants and an optional sliding-arrow indicator.
+
+## Preview
+
+<Preview label="Variants">
+  <ButtonGroup>
+    <Button label="Primary" />
+    <Button label="Secondary" variant="secondary" />
+    <Button label="Tertiary" variant="tertiary" />
+  </ButtonGroup>
+</Preview>
+
+<Preview label="As link" align="start">
+  <Button label="Read the docs" href="https://docs.astro.build" target="_blank" />
+</Preview>
+
+<Preview label="Without arrow">
+  <Button label="No arrow" withArrow={false} />
+</Preview>
+
+<Preview label="Disabled">
+  <Button label="Disabled" disabled />
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "label", type: "string", default: '"Learn More"', description: "Button text. Falls back to slot content if provided." },
+  { name: "variant", type: '"primary" | "secondary" | "tertiary"', default: '"primary"', description: "Visual variant. Primary uses the intent color." },
+  { name: "href", type: "string", description: "When set, renders as an <a> instead of a <button>." },
+  { name: "type", type: '"button" | "submit" | "reset"', default: '"button"', description: "Button type (ignored when href is set)." },
+  { name: "target", type: "string", description: 'Anchor target. Auto-adds rel="noopener noreferrer" when target="_blank".' },
+  { name: "withArrow", type: "boolean", default: "true", description: "Render the sliding arrow indicator." },
+  { name: "arrowDirection", type: '"right" | "left"', default: '"right"', description: "Direction of the arrow + slide animation." },
+  { name: "disabled", type: "boolean", default: "false", description: "Disables the button. Sets aria-disabled when href is provided (since <a> doesn't support disabled)." },
+  { name: "class", type: "string", description: "Extra classes on the rendered element." },
+]} />
+
+The component also forwards arbitrary attributes via `...rest` — so `data-modal-open`, `aria-*`, `onclick`, etc. all pass through to the rendered tag without being declared in the props interface.
+
+## Usage
+
+```astro
+---
+import Button from "@components/Button.astro";
+---
+
+<Button label="Submit" />
+<Button label="Cancel" variant="secondary" />
+<Button label="Read more" href="/docs" />
+<Button label="Sign up" data-modal-open="signup" />   {/* arbitrary attrs forwarded */}
+```
+
+## Tokens
+
+- `primary`: `bg-intent text-fg-on-intent hover:bg-intent-hover`
+- `secondary`: `border border-stroke text-fg hover:bg-panel-muted`
+- `tertiary`: `text-fg hover:bg-panel-muted` (no border)
+- Focus ring: `focus-visible:ring-focus` with `ring-offset-canvas`

@@ -1,0 +1,22 @@
+---
+// Custom 404. Cloudflare Pages and Netlify both serve this automatically for
+// unknown static routes. `noindex` keeps it out of search results.
+import Layout from "@layouts/Layout.astro";
+import Button from "@components/Button.astro";
+---
+
+<Layout title="Page not found — 404" noindex>
+  <main id="main">
+    <section class="section-gutter section-padding-lg">
+      <div class="container-large flex flex-col items-start gap-6">
+        <p class="text-body-sm text-fg-muted uppercase tracking-wide">Error 404</p>
+        <h1 class="h1">This page wandered off.</h1>
+        <p class="text-body-lg text-fg-muted max-w-prose">
+          The page you're looking for doesn't exist or may have moved. Check the URL,
+          or head back to safe ground.
+        </p>
+        <Button href="/" withArrow>Back to home</Button>
+      </div>
+    </section>
+  </main>
+</Layout>

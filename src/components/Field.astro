@@ -1,0 +1,297 @@
+---
+// Field — labeled input row. Wraps a single form control with a <label>,
+// optional helper text, and an inline error region. ARIA wiring (label-for,
+// aria-describedby, aria-invalid) is generated automatically.
+//
+// Supported types via the `type` prop:
+//   "text" | "email" | "password" | "url" | "tel" | "number" | "search"
+//   | "textarea" | "select" | "checkbox" | "radio"
+//
+// For `select`, pass `options` as `[{ value, label }]` or use the default
+// slot to write your own `<option>` elements.
+//
+// Usage:
+//   <Field label="Email" name="email" type="email" required />
+//   <Field label="Message" name="message" type="textarea" rows={4} />
+//   <Field label="Plan" name="plan" type="select" options={[
+//     { value: "free", label: "Free" },
+//     { value: "pro", label: "Pro" },
+//   ]} />
+
+type FieldType =
+  | "text" | "email" | "password" | "url" | "tel" | "number" | "search"
+  | "textarea" | "select" | "checkbox" | "radio";
+
+interface Option {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  /** Visible label text. Required. */
+  label: string;
+  /** Field name (form data key). Required. */
+  name: string;
+  /** Input type. */
+  type?: FieldType;
+  /** Stable ID. Auto-generated if omitted. */
+  id?: string;
+  /** Initial value. */
+  value?: string | number;
+  /** Placeholder text (text-like inputs). */
+  placeholder?: string;
+  /** Helper text shown below the input. */
+  helper?: string;
+  /** Pre-set error message (overridden by live validation). */
+  error?: string;
+  /** Mark required. */
+  required?: boolean;
+  /** Disable the input. */
+  disabled?: boolean;
+  /** Read-only. */
+  readonly?: boolean;
+  /** Native autocomplete hint. */
+  autocomplete?: string;
+  /** Pattern attribute for text inputs. */
+  pattern?: string;
+  /** Min length. */
+  minlength?: number;
+  /** Max length. */
+  maxlength?: number;
+  /** Min (number/date inputs). */
+  min?: string | number;
+  /** Max (number/date inputs). */
+  max?: string | number;
+  /** Number step. */
+  step?: string | number;
+  /** Textarea rows. */
+  rows?: number;
+  /** Select options. Ignored if `type !== "select"` or default slot is used. */
+  options?: Option[];
+  /** Visually hide the label (kept for screen readers). */
+  labelHidden?: boolean;
+  class?: string;
+}
+
+const {
+  label,
+  name,
+  type = "text",
+  id,
+  value,
+  placeholder,
+  helper,
+  error,
+  required = false,
+  disabled = false,
+  readonly: readOnly = false,
+  autocomplete,
+  pattern,
+  minlength,
+  maxlength,
+  min,
+  max,
+  step,
+  rows = 4,
+  options,
+  labelHidden = false,
+  class: className,
+} = Astro.props;
+
+const fieldId = id ?? `field-${name}-${Math.random().toString(36).slice(2, 8)}`;
+const helperId = helper ? `${fieldId}-helper` : undefined;
+const errorId = `${fieldId}-error`;
+const describedBy = [helperId, errorId].filter(Boolean).join(" ") || undefined;
+
+const isCheckable = type === "checkbox" || type === "radio";
+---
+
+<div
+  data-field="component"
+  data-field-type={type}
+  data-field-invalid={error ? "true" : undefined}
+  class:list={["field", className]}
+>
+  {!isCheckable && (
+    <label for={fieldId} class:list={["field__label", labelHidden && "sr-only"]}>
+      {label}
+      {required && <span class="field__required" aria-hidden="true">*</span>}
+    </label>
+  )}
+
+  {type === "textarea" && (
+    <textarea
+      id={fieldId}
+      name={name}
+      placeholder={placeholder}
+      required={required}
+      disabled={disabled}
+      readonly={readOnly}
+      minlength={minlength}
+      maxlength={maxlength}
+      rows={rows}
+      autocomplete={autocomplete}
+      aria-describedby={describedBy}
+      aria-invalid={error ? "true" : undefined}
+      class="field__input"
+    >{value}</textarea>
+  )}
+
+  {type === "select" && (
+    <select
+      id={fieldId}
+      name={name}
+      required={required}
+      disabled={disabled}
+      autocomplete={autocomplete}
+      aria-describedby={describedBy}
+      aria-invalid={error ? "true" : undefined}
+      class="field__input"
+    >
+      <slot>
+        {options?.map((opt) => (
+          <option value={opt.value} selected={String(value) === String(opt.value)}>
+            {opt.label}
+          </option>
+        ))}
+      </slot>
+    </select>
+  )}
+
+  {isCheckable && (
+    <label class="field__check">
+      <input
+        id={fieldId}
+        name={name}
+        type={type}
+        value={value as string}
+        required={required}
+        disabled={disabled}
+        readonly={readOnly}
+        aria-describedby={describedBy}
+        aria-invalid={error ? "true" : undefined}
+      />
+      <span class:list={["field__check-label", labelHidden && "sr-only"]}>
+        {label}
+        {required && <span class="field__required" aria-hidden="true">*</span>}
+      </span>
+    </label>
+  )}
+
+  {type !== "textarea" && type !== "select" && !isCheckable && (
+    <input
+      id={fieldId}
+      name={name}
+      type={type}
+      value={value as string | number}
+      placeholder={placeholder}
+      required={required}
+      disabled={disabled}
+      readonly={readOnly}
+      autocomplete={autocomplete}
+      pattern={pattern}
+      minlength={minlength}
+      maxlength={maxlength}
+      min={min}
+      max={max}
+      step={step}
+      aria-describedby={describedBy}
+      aria-invalid={error ? "true" : undefined}
+      class="field__input"
+    />
+  )}
+
+  {helper && (
+    <p id={helperId} class="field__helper">{helper}</p>
+  )}
+
+  <p id={errorId} data-field-error class="field__error" aria-live="polite">{error}</p>
+</div>
+
+<style is:global>
+  [data-field="component"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0 0 1rem;
+  }
+
+  .field__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-fg);
+  }
+
+  .field__required {
+    color: var(--color-error);
+  }
+
+  .field__input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    color: var(--color-fg);
+    background: var(--color-panel);
+    border: 1px solid var(--color-stroke);
+    transition: border-color 100ms ease, box-shadow 100ms ease;
+  }
+  .field__input:focus-visible {
+    outline: none;
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 20%, transparent);
+  }
+  .field__input::placeholder {
+    color: var(--color-fg-subtle);
+  }
+  .field__input:disabled {
+    background: var(--color-panel-muted);
+    color: var(--color-fg-muted);
+    cursor: not-allowed;
+  }
+
+  textarea.field__input {
+    resize: vertical;
+    min-height: 5rem;
+  }
+
+  /* Invalid state. */
+  [data-field-invalid="true"] .field__input {
+    border-color: var(--color-error);
+  }
+  [data-field-invalid="true"] .field__input:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 20%, transparent);
+  }
+
+  .field__helper {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--color-fg-muted);
+  }
+
+  .field__error {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--color-error);
+    min-height: 1em; /* reserve space so the form doesn't jump on error */
+  }
+  .field__error:empty {
+    display: none;
+  }
+
+  /* Checkable variants (checkbox / radio). */
+  .field__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.9375rem;
+  }
+  .field__check input {
+    margin: 0;
+  }
+</style>

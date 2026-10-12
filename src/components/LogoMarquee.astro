@@ -1,0 +1,17 @@
+---
+interface Props {
+    class?: string;
+}
+const { class: className = "" } = Astro.props;
+---
+<div class="relative">
+<div class="text-body-xsm text-fg-muted text-center absolute -mt-3 left-1/2 -translate-x-1/2 bg-canvas px-2" >Trusted by leading data companies</div>
+<div class:list={["overflow-hidden", className]}>
+    <div class="flex animate-marquee gap-8">
+      <!-- First set -->
+      <slot />
+      <!-- Duplicate for seamless loop -->
+      <slot />
+    </div>
+  </div>
+</div>

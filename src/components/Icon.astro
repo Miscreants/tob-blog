@@ -1,0 +1,85 @@
+---
+type Size = "xs" | "sm" | "md" | "lg" | "xl";
+
+interface Props {
+    size?: Size;
+    fluid?: boolean;
+    label?: string;
+    class?: string;
+}
+
+const {
+    size = "md",
+    fluid = false,
+    label,
+    class: className = "",
+} = Astro.props;
+
+const role = label ? "img" : undefined;
+const ariaHidden = label ? undefined : "true";
+---
+
+<span
+    class:list={[
+        "icon",
+        `icon--${size}`,
+        fluid && "icon--fluid",
+        className,
+    ]}
+    role={role}
+    aria-label={label}
+    aria-hidden={ariaHidden}
+>
+    <slot />
+</span>
+
+<style>
+    .icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--icon-size);
+        height: var(--icon-size);
+        flex-shrink: 0;
+        line-height: 0;
+    }
+
+    .icon :global(svg),
+    .icon :global(img) {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    .icon--xs {
+        --icon-size: 0.75rem;
+    }
+    .icon--sm {
+        --icon-size: 0.875rem;
+    }
+    .icon--md {
+        --icon-size: 1rem;
+    }
+    .icon--lg {
+        --icon-size: 1.25rem;
+    }
+    .icon--xl {
+        --icon-size: 1.5rem;
+    }
+
+    .icon--fluid.icon--xs {
+        --icon-size: clamp(0.625rem, 0.589rem + 0.179cqi, 0.75rem);
+    }
+    .icon--fluid.icon--sm {
+        --icon-size: clamp(0.75rem, 0.714rem + 0.179cqi, 0.875rem);
+    }
+    .icon--fluid.icon--md {
+        --icon-size: clamp(0.875rem, 0.839rem + 0.179cqi, 1rem);
+    }
+    .icon--fluid.icon--lg {
+        --icon-size: clamp(1rem, 0.929rem + 0.357cqi, 1.25rem);
+    }
+    .icon--fluid.icon--xl {
+        --icon-size: clamp(1.125rem, 1.018rem + 0.536cqi, 1.5rem);
+    }
+</style>

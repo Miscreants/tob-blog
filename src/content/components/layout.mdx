@@ -1,0 +1,128 @@
+---
+title: Layout
+description: Base HTML layout — document shell, fonts, global styles, nav, optional Partytown'd Google Analytics.
+category: layout
+order: 5
+sourceFile: src/layouts/Layout.astro
+status: stable
+related: [Nav, NavMega, NavMorph, SectionMain, Footer]
+---
+
+import PropsTable from "@components/_docs/PropsTable.astro";
+
+The base HTML layout wrapper for every page. Sets up `<html>`, `<head>`, and `<body>`, loads global styles and fonts, includes the navigation, and optionally injects Google Analytics via Partytown.
+
+## Props
+
+<PropsTable props={[
+  { name: "title", type: "string", default: '"Astro Playground"', description: "Page <title> tag." },
+  { name: "theme", type: '"light" | "dark" | "brand"', default: '"light"', description: "Sets the `data-theme` attribute on `<html>`. Flips every CSS token (canvas, fg, stroke, etc.) for the whole page — including the nav and announcement bar." },
+]} />
+
+## Mechanism
+
+### `<head>`
+
+- Imports the Archivo Variable font via `@fontsource-variable/archivo`.
+- Imports `global.css` (all theme tokens, utilities, and base styles).
+- Sets charset, viewport, favicon, and generator meta tags.
+
+### Google Analytics (optional)
+
+- Reads `PUBLIC_GTAG_ID` from environment variables.
+- If set, loads the gtag script with `type="text/partytown"` — this offloads the analytics script to a web worker via `@astrojs/partytown`, keeping the main thread clean.
+- If not set, no tracking code runs at all.
+
+### `<body>`
+
+- Renders `<Nav />` at the top of every page.
+- Includes a **skip-to-content** link (`<a href="#main">`) — visually hidden by default, becomes visible on focus for keyboard users.
+- Page content is injected via `<slot />`.
+
+## Usage
+
+### Astro page
+
+```astro
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Features">
+  <main id="main">
+    {/* page content */}
+  </main>
+</Layout>
+```
+
+### Astro page with dark theme
+
+Pass `theme="dark"` as a prop. The attribute lands on `<html>`, so every component on the page — including the nav, announcement bar, and any `SectionMain` — picks up dark tokens automatically.
+
+```astro
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Manifesto" theme="dark">
+  <main id="main">
+    {/* renders against the dark token set */}
+  </main>
+</Layout>
+```
+
+### MDX page
+
+`.mdx` files in `src/pages/` can use `Layout` directly via the `layout:` frontmatter key. All other frontmatter keys are forwarded as props — including `title` and `theme`.
+
+```mdx
+---
+layout: ../layouts/Layout.astro
+title: Brand
+theme: dark
+---
+
+import Grainient from "@components/Grainient.astro";
+
+# Brand
+
+The whole page is dark — no per-section overrides needed.
+
+<div class="relative h-[50vh]">
+  <Grainient />
+</div>
+```
+
+The same works for any `.md`/`.mdx` page — blog posts, changelog entries, marketing one-offs.
+
+### Per-section theme island
+
+If most of the page is light but one section needs to flip (e.g. a dark "pricing" band on a light landing page), don't change the layout — set `data-theme` on a wrapper around just that section. The token cascade handles the rest:
+
+```astro
+<Layout title="Pricing">
+  <main id="main">
+    {/* light by default */}
+    <SectionMain padding="lg">…</SectionMain>
+
+    {/* dark island */}
+    <div data-theme="dark">
+      <SectionMain padding="lg">
+        {/* fg / canvas / stroke all swap inside this wrapper */}
+      </SectionMain>
+    </div>
+
+    {/* back to light */}
+    <SectionMain padding="lg">…</SectionMain>
+  </main>
+</Layout>
+```
+
+Valid theme values are `light`, `dark`, and `brand` — see `src/styles/global.css` for the token definitions of each.
+
+## Notes
+
+- The skip link targets `#main` — pages should include `id="main"` on their `<main>` element.
+- The skip link sits **after** `<Nav />` in the DOM, so it appears after the nav in tab order. Intentional — the nav's own skip logic handles initial focus.
+- Google Analytics only loads when `PUBLIC_GTAG_ID` is set in `.env`.
+- `theme` is read from either `Astro.props.theme` (Astro pages) or `Astro.props.frontmatter.theme` (MDX/Markdown pages with `layout:`), so the same prop works in both contexts.

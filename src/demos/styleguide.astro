@@ -1,0 +1,411 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SectionMain from "../components/SectionMain.astro";
+import Button from "../components/Button.astro";
+
+// ──────────────────────────────────────────────────────────────────────────
+// Token reference data — kept inline so the styleguide is a single file and
+// can be skimmed alongside `src/styles/global.css`.
+// ──────────────────────────────────────────────────────────────────────────
+
+const semanticColors = [
+  { name: "canvas",       var: "--color-canvas",       role: "Whole-page background" },
+  { name: "panel",        var: "--color-panel",        role: "Cards, popovers, elevated panels" },
+  { name: "panel-muted",  var: "--color-panel-muted",  role: "Subtle surfaces, hover states" },
+  { name: "fg",           var: "--color-fg",           role: "Default text" },
+  { name: "fg-muted",     var: "--color-fg-muted",     role: "Captions, labels, secondary copy" },
+  { name: "fg-subtle",    var: "--color-fg-subtle",    role: "Placeholders, disabled" },
+  { name: "fg-on-intent", var: "--color-fg-on-intent", role: "Text on intent-colored surfaces" },
+  { name: "intent",       var: "--color-intent",       role: "Primary action color" },
+  { name: "intent-hover", var: "--color-intent-hover", role: "Hover state for intent" },
+  { name: "stroke",       var: "--color-stroke",       role: "Default border" },
+  { name: "stroke-strong",var: "--color-stroke-strong",role: "Emphasized borders, dividers" },
+  { name: "focus",        var: "--color-focus",        role: "Focus ring color" },
+  { name: "error",        var: "--color-error",        role: "Status: error / destructive" },
+  { name: "success",      var: "--color-success",      role: "Status: success / positive" },
+];
+
+const themeModes = [
+  { id: "light", label: "Light",  desc: "Default — used when no [data-theme] is set or when explicitly set to 'light'." },
+  { id: "dark",  label: "Dark",   desc: "Inverted palette. Apply data-theme='dark' on <html> for full-page dark, or any ancestor for a scoped island." },
+  { id: "brand", label: "Brand",  desc: "Brand palette — currently dark-leaning but semantically distinct from 'dark'." },
+];
+
+const typeScale = [
+  { class: "h1", desc: "44 → 84px",  example: "The quick brown fox" },
+  { class: "h2", desc: "32 → 56px",  example: "The quick brown fox" },
+  { class: "h3", desc: "24 → 36px",  example: "The quick brown fox" },
+  { class: "h4", desc: "20 → 28px",  example: "The quick brown fox" },
+  { class: "h5", desc: "18 → 22px",  example: "The quick brown fox" },
+  { class: "h6", desc: "16 → 18px",  example: "The quick brown fox" },
+];
+
+const bodyScale = [
+  { class: "text-body-xl",  desc: "16 → 20px — hero subhead, lead paragraphs", example: "Body XL — for hero subheads and standout copy that should breathe." },
+  { class: "text-body-lg",  desc: "15 → 18px — default body",                 example: "Body LG — the default body size for most prose content." },
+  { class: "text-body-md",  desc: "14 → 16px — secondary body, cards",        example: "Body MD — secondary body, denser card text." },
+  { class: "text-body-sm",  desc: "13 → 15px — captions, labels",             example: "Body SM — captions and labels." },
+  { class: "text-body-xsm", desc: "12px — micro-labels (not fluid)",          example: "Body XSM — micro labels and uppercase tracking-wider treatments." },
+];
+
+const sectionPaddings = [
+  { class: "section-padding-xs", height: "py-8 md:py-10",  px: "32 → 40px" },
+  { class: "section-padding-sm", height: "py-12 md:py-16", px: "48 → 64px" },
+  { class: "section-padding-md", height: "py-16 md:py-24", px: "64 → 96px" },
+  { class: "section-padding-lg", height: "py-24 md:py-32", px: "96 → 128px" },
+  { class: "section-padding-xl", height: "py-32 md:py-48", px: "128 → 192px" },
+];
+
+const radii = [
+  { name: "rounded-sm",  cls: "rounded-sm",  size: "0.125rem" },
+  { name: "rounded",     cls: "rounded",     size: "0.25rem" },
+  { name: "rounded-md",  cls: "rounded-md",  size: "0.375rem" },
+  { name: "rounded-lg",  cls: "rounded-lg",  size: "0.5rem" },
+  { name: "rounded-xl",  cls: "rounded-xl",  size: "0.75rem" },
+  { name: "rounded-2xl", cls: "rounded-2xl", size: "1rem" },
+  { name: "rounded-card",cls: "rounded-card",size: "0.875rem (--radius-card)" },
+  { name: "rounded-pill",cls: "rounded-pill",size: "9999px (--radius-pill)" },
+];
+
+const shadows = [
+  { name: "shadow-popover", cls: "shadow-popover", desc: "Used by dropdowns, popovers, modals, slide-out cards" },
+  { name: "shadow-header",  cls: "shadow-header",  desc: "Applied to the nav bar when scrolled" },
+];
+
+const motionDurations = [
+  { name: "duration-default-quarter", value: "0.2s",  desc: "Micro: hover, focus state changes" },
+  { name: "duration-default-half",    value: "0.4s",  desc: "Default for most UI transitions" },
+  { name: "duration-default",         value: "0.8s",  desc: "Larger choreographies, page-section reveals" },
+  { name: "duration-default-onehalf", value: "1.2s",  desc: "Slow, deliberate animations" },
+  { name: "duration-default-double",  value: "1.6s",  desc: "Marquee-style continuous loops" },
+];
+
+const motionEasings = [
+  { name: "--cubic-default", desc: "Smooth in-out — most UI transitions" },
+  { name: "--cubic-bounce",  desc: "Spring with overshoot — accent reveals" },
+  { name: "--hover-effect",  desc: "Slight overshoot tuned for hover feedback" },
+];
+---
+
+<Layout title="Styleguide">
+  <main id="main" class="border-y border-stroke">
+
+    {/* ────────────────────────────────────────────────────────────────── */}
+    {/* HEADER */}
+    {/* ────────────────────────────────────────────────────────────────── */}
+    <SectionMain id="styleguide-hero" paddingTop="lg" paddingBottom="sm" contentPadding="default">
+      <h1 class="h2">Styleguide</h1>
+      <p class="mt-3 max-w-prose text-fg-muted">
+        Visual reference for every token in the design system: colors, themes, typography, spacing, radius, shadows, and motion. Tokens are defined in <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">src/styles/global.css</code>; components reference them via semantic Tailwind utilities (<code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">bg-canvas</code>, <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">text-fg</code>, etc.).
+      </p>
+    </SectionMain>
+
+    {/* ────────────────────────────────────────────────────────────────── */}
+    {/* THEMES */}
+    {/* ────────────────────────────────────────────────────────────────── */}
+    <SectionMain id="themes" padding="md" contentPadding="default" borderTop>
+      <header class="mb-6">
+        <h2 class="h3">Themes</h2>
+        <p class="mt-2 max-w-prose text-fg-muted">
+          Three modes keyed on the <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">[data-theme]</code> attribute. Setting it on <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">&lt;html&gt;</code> swaps the whole page; setting it on any descendant scopes the swap to that subtree.
+        </p>
+      </header>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {themeModes.map((mode) => (
+          <div data-theme={mode.id} class="border border-stroke bg-canvas">
+            <header class="border-b border-stroke px-5 py-3">
+              <div class="flex items-baseline justify-between">
+                <h3 class="h6 font-medium">{mode.label}</h3>
+                <code class="font-mono text-xs text-fg-muted">data-theme="{mode.id}"</code>
+              </div>
+              <p class="mt-1 text-xs text-fg-muted">{mode.desc}</p>
+            </header>
+            <div class="p-5 flex flex-col gap-4">
+              <div>
+                <p class="h5 mb-1">Heading on canvas</p>
+                <p class="text-sm text-fg-muted">Body copy in <span class="text-fg-muted">muted</span>, with <span class="text-fg-subtle">subtle</span> notes.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <Button label="Primary" withArrow={false} />
+                <Button label="Secondary" variant="secondary" withArrow={false} />
+              </div>
+              <div class="border border-stroke bg-panel p-3 text-xs text-fg-muted">
+                Panel surface with <span class="text-fg">stroke</span> border.
+              </div>
+              <div class="bg-panel-muted px-3 py-2 text-xs text-fg-muted">Panel-muted band</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionMain>
+
+    {/* ────────────────────────────────────────────────────────────────── */}
+    {/* COLORS */}
+    {/* ────────────────────────────────────────────────────────────────── */}
+    <SectionMain id="colors" padding="md" contentPadding="default" borderTop>
+      <header class="mb-6">
+        <h2 class="h3">Colors</h2>
+        <p class="mt-2 max-w-prose text-fg-muted">
+          Semantic role tokens. Each one resolves to a different value per theme, so components built on these "just work" when the theme flips.
+        </p>
+      </header>
+
+      <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {semanticColors.map((c) => (
+          <li class="border border-stroke bg-canvas">
+            <div
+              class="h-20 border-b border-stroke"
+              style={`background-color: var(${c.var});`}
+              aria-hidden="true"
+            ></div>
+            <div class="p-4">
+              <div class="flex items-baseline justify-between gap-2">
+                <code class="font-mono text-sm text-fg">{c.name}</code>
+                <code
+                  class="font-mono text-xs text-fg-subtle"
+                  data-resolve-css-var={c.var}
+                >…</code>
+              </div>
+              <code class="mt-1 block font-mono text-[10px] text-fg-subtle">{c.var}</code>
+              <p class="mt-2 text-xs text-fg-muted">{c.role}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </SectionMain>
+
+    {/* ────────────────────────────────────────────────────────────────── */}
+    {/* TYPOGRAPHY */}
+    {/* ────────────────────────────────────────────────────────────────── */}
+    <SectionMain id="typography" padding="md" contentPadding="default" borderTop>
+      <header class="mb-6">
+        <h2 class="h3">Typography</h2>
+        <p class="mt-2 max-w-prose text-fg-muted">
+          Fluid scale via <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">clamp()</code> keyed to the nearest container's inline size (<code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">cqi</code>). Sizes interpolate linearly from 20rem container width (min) up to 90rem (max). Drop <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">.cq</code> on any wrapper to re-anchor the scale to that container.
+        </p>
+      </header>
+
+      <h3 class="h5 mt-8 mb-4">Headings</h3>
+      <ul class="flex flex-col">
+        {typeScale.map((t) => (
+          <li class="grid grid-cols-[5rem_1fr_auto_auto] items-baseline gap-4 py-4 border-t border-stroke">
+            <code class="font-mono text-xs text-fg-subtle">{t.class}</code>
+            <span class={t.class} data-resolve-font-size>{t.example}</span>
+            <code class="font-mono text-xs text-fg-subtle whitespace-nowrap" data-resolve-font-size-target>…</code>
+            <span class="text-xs text-fg-muted whitespace-nowrap">{t.desc}</span>
+          </li>
+        ))}
+      </ul>
+
+      <h3 class="h5 mt-12 mb-4">Body</h3>
+      <ul class="flex flex-col">
+        {bodyScale.map((t) => (
+          <li class="grid grid-cols-[8rem_1fr_auto_auto] items-baseline gap-4 py-4 border-t border-stroke">
+            <code class="font-mono text-xs text-fg-subtle">{t.class}</code>
+            <span class={t.class} data-resolve-font-size>{t.example}</span>
+            <code class="font-mono text-xs text-fg-subtle whitespace-nowrap" data-resolve-font-size-target>…</code>
+            <span class="text-xs text-fg-muted whitespace-nowrap">{t.desc}</span>
+          </li>
+        ))}
+      </ul>
+
+      <h3 class="h5 mt-12 mb-4">Font families</h3>
+      <ul class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <li class="border border-stroke bg-canvas p-5">
+          <code class="font-mono text-xs text-fg-subtle">--font-heading</code>
+          <p class="mt-2 h4">Archivo</p>
+          <p class="text-xs text-fg-muted mt-2">Used by .h1–.h6 utilities for headings.</p>
+        </li>
+        <li class="border border-stroke bg-canvas p-5">
+          <code class="font-mono text-xs text-fg-subtle">--font-sans</code>
+          <p class="mt-2 text-base font-sans">Inter (default body)</p>
+          <p class="text-xs text-fg-muted mt-2">System fallback chain for body copy.</p>
+        </li>
+        <li class="border border-stroke bg-canvas p-5">
+          <code class="font-mono text-xs text-fg-subtle">--font-mono</code>
+          <p class="mt-2 text-base font-mono">JetBrains Mono</p>
+          <p class="text-xs text-fg-muted mt-2">Code blocks, inline code, prop tables.</p>
+        </li>
+      </ul>
+    </SectionMain>
+
+    {/* ────────────────────────────────────────────────────────────────── */}
+    {/* SPACING */}
+    {/* ────────────────────────────────────────────────────────────────── */}
+    <SectionMain id="spacing" padding="md" contentPadding="default" borderTop>
+      <header class="mb-6">
+        <h2 class="h3">Spacing</h2>
+        <p class="mt-2 max-w-prose text-fg-muted">
+          Section padding presets that drive vertical rhythm at the page-section level. Used via the <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">padding</code> prop on <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">&lt;SectionMain&gt;</code>.
+        </p>
+      </header>
+
+      <h3 class="h5 mb-4">Section padding presets</h3>
+      <ul class="flex flex-col gap-3">
+        {sectionPaddings.map((s) => (
+          <li class="border border-stroke bg-canvas">
+            <div class="grid grid-cols-[10rem_1fr_auto] items-center gap-4 px-5 py-3 border-b border-stroke">
+              <code class="font-mono text-xs text-fg">{s.class}</code>
+              <code class="font-mono text-xs text-fg-muted">{s.height}</code>
+              <span class="text-xs text-fg-muted">{s.px}</span>
+            </div>
+            <div class={`${s.class} bg-panel-muted px-5`}>
+              <div class="border border-stroke bg-canvas px-3 py-2 text-xs text-fg-muted">Content</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <h3 class="h5 mt-12 mb-4">Spacing primitives</h3>
+      <p class="text-sm text-fg-muted mb-4">Tailwind's standard spacing scale. Each step is 0.25rem (4px).</p>
+      <ul class="flex flex-col gap-2">
+        {[1, 2, 3, 4, 6, 8, 12, 16, 24].map((n) => (
+          <li class="grid grid-cols-[5rem_8rem_1fr] items-center gap-4">
+            <code class="font-mono text-xs text-fg-muted">p-{n}</code>
+            <code class="font-mono text-xs text-fg-subtle">{n * 0.25}rem</code>
+            <div class="bg-fg" style={`height: ${n * 0.25}rem;`}></div>
+          </li>
+        ))}
+      </ul>
+    </SectionMain>
+
+    {/* ────────────────────────────────────────────────────────────────── */}
+    {/* RADIUS */}
+    {/* ────────────────────────────────────────────────────────────────── */}
+    <SectionMain id="radius" padding="md" contentPadding="default" borderTop>
+      <header class="mb-6">
+        <h2 class="h3">Radius</h2>
+        <p class="mt-2 max-w-prose text-fg-muted">
+          Standard Tailwind radius scale plus two semantic handles for the most common shapes in the design system.
+        </p>
+      </header>
+
+      <ul class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+        {radii.map((r) => (
+          <li class="flex flex-col items-center gap-2">
+            <div class={`h-20 w-20 border border-stroke bg-panel-muted ${r.cls}`} aria-hidden="true"></div>
+            <code class="font-mono text-xs text-fg">{r.name}</code>
+            <code class="font-mono text-[10px] text-fg-subtle text-center">{r.size}</code>
+          </li>
+        ))}
+      </ul>
+    </SectionMain>
+
+    {/* ────────────────────────────────────────────────────────────────── */}
+    {/* SHADOWS */}
+    {/* ────────────────────────────────────────────────────────────────── */}
+    <SectionMain id="shadows" padding="md" contentPadding="default" borderTop>
+      <header class="mb-6">
+        <h2 class="h3">Shadows</h2>
+        <p class="mt-2 max-w-prose text-fg-muted">
+          Theme-aware shadow tokens. Both flip in dark mode to use deeper, more saturated values.
+        </p>
+      </header>
+
+      <ul class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {shadows.map((s) => (
+          <li class="flex flex-col gap-3">
+            <div class={`h-32 border border-stroke bg-canvas ${s.cls}`} aria-hidden="true"></div>
+            <div class="flex flex-col gap-1">
+              <code class="font-mono text-xs text-fg">{s.name}</code>
+              <p class="text-xs text-fg-muted">{s.desc}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </SectionMain>
+
+    {/* ────────────────────────────────────────────────────────────────── */}
+    {/* MOTION */}
+    {/* ────────────────────────────────────────────────────────────────── */}
+    <SectionMain id="motion" padding="md" contentPadding="default" borderTop>
+      <header class="mb-6">
+        <h2 class="h3">Motion</h2>
+        <p class="mt-2 max-w-prose text-fg-muted">
+          Durations and easings as CSS custom properties. The <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">--timing-*</code> partials combine duration and easing into a single value you can pass to <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">transition</code> or <code class="font-mono text-sm bg-panel-muted border border-stroke px-1.5 py-0.5">animation</code>.
+        </p>
+      </header>
+
+      <h3 class="h5 mb-4">Durations <span class="text-xs font-normal text-fg-muted">(hover any swatch to play)</span></h3>
+      <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-12">
+        {motionDurations.map((d) => (
+          <li
+            class="motion-swatch border border-stroke bg-canvas p-4 flex flex-col gap-2 cursor-pointer"
+            style={`--swatch-duration: var(--${d.name});`}
+            data-resolve-css-var-on-style={`--${d.name}`}
+          >
+            <div class="motion-swatch-bar h-8 bg-panel-muted relative overflow-hidden">
+              <div class="motion-swatch-fill absolute inset-0 bg-fg" style="transform-origin: left;"></div>
+            </div>
+            <code class="font-mono text-xs text-fg">{d.name}</code>
+            <code class="font-mono text-[10px] text-fg-subtle" data-resolve-css-var={`--${d.name}`}>…</code>
+            <p class="text-xs text-fg-muted">{d.desc}</p>
+          </li>
+        ))}
+      </ul>
+
+      <h3 class="h5 mb-4">Easings</h3>
+      <ul class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {motionEasings.map((e) => (
+          <li class="border border-stroke bg-canvas p-4 flex flex-col gap-2">
+            <code class="font-mono text-xs text-fg">{e.name}</code>
+            <p class="text-xs text-fg-muted">{e.desc}</p>
+          </li>
+        ))}
+      </ul>
+    </SectionMain>
+
+  </main>
+</Layout>
+
+<style>
+  /* Hover-to-animate motion swatches: scale a fill from 0 → 1 over the
+     swatch's --swatch-duration so each box takes its own duration to fill. */
+  .motion-swatch .motion-swatch-fill {
+    transform: scaleX(0);
+    transition: transform var(--swatch-duration, 0.4s) var(--cubic-default);
+  }
+  .motion-swatch:hover .motion-swatch-fill,
+  .motion-swatch:focus-visible .motion-swatch-fill {
+    transform: scaleX(1);
+  }
+</style>
+
+<script>
+  // Resolve every CSS custom-property reference written into the page, so
+  // displayed values stay in sync with whatever's in global.css. Re-runs
+  // when Vite HMR pushes a CSS update, so editing a token live-updates the
+  // labels without a full reload.
+  const resolve = () => {
+    const docStyle = getComputedStyle(document.documentElement);
+
+    // Color/duration var → text content
+    document.querySelectorAll<HTMLElement>("[data-resolve-css-var]").forEach((el) => {
+      const name = el.dataset.resolveCssVar;
+      if (!name) return;
+      const value = docStyle.getPropertyValue(name).trim();
+      el.textContent = value || "(unset)";
+    });
+
+    // Computed font-size for typography rows
+    document.querySelectorAll<HTMLElement>("[data-resolve-font-size]").forEach((sample) => {
+      const target = sample.parentElement?.querySelector<HTMLElement>(
+        "[data-resolve-font-size-target]"
+      );
+      if (!target) return;
+      const px = parseFloat(getComputedStyle(sample).fontSize);
+      target.textContent = `${px.toFixed(1)}px`;
+    });
+  };
+
+  resolve();
+
+  // Re-resolve on viewport change (fluid type) and on any CSS HMR push.
+  window.addEventListener("resize", resolve);
+  // @ts-ignore — Vite's `import.meta.hot` is only present in dev
+  if (import.meta.hot) {
+    // @ts-ignore
+    import.meta.hot.on("vite:afterUpdate", resolve);
+  }
+</script>

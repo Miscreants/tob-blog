@@ -1,0 +1,110 @@
+---
+title: TimelineVertical
+description: Vertical timeline for changelogs, company history, and roadmap. Data-driven via an `items` array with optional rich-content slot fallback. Status variants drive marker styling.
+category: pattern
+order: 65
+sourceFile: src/components/TimelineVertical.astro
+status: stable
+related: [FlowSteps, AccordionFAQ]
+---
+
+import Preview from "@components/_docs/Preview.astro";
+import PropsTable from "@components/_docs/PropsTable.astro";
+import TimelineVertical from "@components/TimelineVertical.astro";
+
+A vertical timeline you can drop into a roadmap, changelog, or company-history section without rebuilding the dot/line/connector dance every time. Pass an `items` array and you're done; reach for the slot only when you need links, badges, or other rich content per row.
+
+## Preview
+
+<Preview label="Company milestones — mixed statuses" align="stretch">
+  <div class="w-full max-w-md">
+    <TimelineVertical
+      ariaLabel="Company history"
+      items={[
+        { date: "Jan 2023", title: "Founded", description: "Three engineers in a Berlin co-working space, one whiteboard, one shared bank account.", status: "complete" },
+        { date: "Jul 2023", title: "First customer", description: "Signed a regional bank as design partner. Their feedback shipped most of v1.", status: "complete" },
+        { date: "Mar 2024", title: "Series A", description: "$12M led by a tier-1 fund. Hired heads of design and infra in the same week.", status: "complete" },
+        { date: "Now", title: "Public beta", description: "Self-serve sign-up open to the world.", status: "current" },
+        { date: "Q4 2025", title: "Enterprise tier", description: "SAML, SCIM, audit logs, and a real on-call rotation.", status: "future" },
+      ]}
+    />
+  </div>
+</Preview>
+
+<Preview label="Plain — no statuses, outlined markers" align="stretch">
+  <div class="w-full max-w-md">
+    <TimelineVertical
+      outlineMarkers
+      items={[
+        { date: "v1.0", title: "Initial release", description: "Public launch with core feature set." },
+        { date: "v1.1", title: "Search overhaul", description: "Replaced the in-memory matcher with FTS5." },
+        { date: "v1.2", title: "Async exports", description: "Long-running CSV exports moved off the request path." },
+        { date: "v1.3", title: "Workspaces", description: "Multi-tenancy plus role-based access control." },
+      ]}
+    />
+  </div>
+</Preview>
+
+## Props
+
+<PropsTable props={[
+  { name: "items", type: "Item[]", description: "Array of timeline entries. Omit to drive via the default slot instead." },
+  { name: "outlineMarkers", type: "boolean", default: "false", description: "Use outlined ring markers instead of filled dots." },
+  { name: "ariaLabel", type: "string", description: "Accessible label for the timeline region (e.g. \"Company history\", \"Release timeline\")." },
+  { name: "class", type: "string", description: "Additional classes on the wrapper." },
+]} />
+
+### `Item` shape
+
+```ts
+type Item = {
+  date?: string;            // Display text — "Jan 2024", "Q3", "v1.4.0", "Now"
+  dateAttribute?: string;   // ISO date for <time datetime="..."> (optional)
+  title: string;            // Required heading
+  description?: string;     // Plain-text body
+  status?: "default" | "complete" | "current" | "future";
+};
+```
+
+### Status variants
+
+| Status     | Marker                                        | When                                       |
+|------------|-----------------------------------------------|--------------------------------------------|
+| `default`  | Filled dark circle                            | Generic entry, no temporal positioning.    |
+| `complete` | Green filled circle                           | Past milestone, done.                      |
+| `current`  | Intent-coloured dot with a soft halo          | "You are here."                             |
+| `future`   | Empty ring + faded text                       | Planned, not yet shipped.                  |
+
+## Rich content via slot
+
+When you need links, code, badges, or any non-text content inside an item, drop the `items` prop and write the list directly:
+
+```astro
+<TimelineVertical ariaLabel="Release timeline">
+  <li data-timeline-item data-timeline-status="complete">
+    <span data-timeline-marker aria-hidden="true"></span>
+    <time data-timeline-date datetime="2024-03-12">v1.2.0 — Mar 12, 2024</time>
+    <h3 data-timeline-title>Async exports</h3>
+    <p data-timeline-description>
+      Long-running CSV exports now run in a background worker —
+      see the <a href="/blog/async-exports">deep-dive</a>.
+    </p>
+  </li>
+</TimelineVertical>
+```
+
+The component recognizes the same `data-timeline-*` markup contract as it generates internally, so styling stays consistent.
+
+## Accessibility
+
+- Renders an ordered list (`<ol>`/`<li>`) so screen readers announce position ("3 of 5") naturally.
+- Each date uses `<time>`; pass `dateAttribute` (ISO 8601) for machine-readable dates without losing the human-readable display string.
+- The connector line is a CSS `::before` pseudo-element — never appears in the accessibility tree.
+- Markers carry `aria-hidden="true"` because they're purely decorative; semantics come from the date / title / description.
+- The status variants are visual only — if "current" or "complete" is meaningful for assistive tech, repeat the information in the title or description (e.g. "Series A — completed Mar 2024").
+
+## Notes
+
+- The connector line stops at the last marker — no trailing stub past the end of the list.
+- For *horizontal* timelines (process flows, onboarding step indicators), see `FlowSteps` instead — different pattern, different ergonomics.
+- `outlineMarkers` and per-item `status` can coexist: a `current` item still renders with its filled-intent dot regardless of the outline preference.

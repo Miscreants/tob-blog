@@ -1,0 +1,256 @@
+---
+// TableOfContents — auto-generated table of contents with active-section
+// highlighting. Two modes:
+//
+//   1. Server-side (preferred for docs pages): pass the `headings` array
+//      from MDX's `getHeadings()`. The list renders during SSR — no flash,
+//      no client-side scan required.
+//
+//        ---
+//        const { headings } = await render(entry);
+//        ---
+//        <TableOfContents headings={headings} />
+//
+//   2. Client-side scan: omit `headings`. The script scans the configured
+//      selector at page load and builds the list.
+//
+//        <TableOfContents selector=".prose-doc" minLevel={2} maxLevel={3} />
+//
+// Active-section tracking is always client-side via IntersectionObserver.
+
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  /** Pre-computed headings from MDX `getHeadings()`. */
+  headings?: Heading[];
+  /** CSS selector to scan when `headings` is not provided. */
+  selector?: string;
+  /** Minimum heading level to include (1–6). */
+  minLevel?: number;
+  /** Maximum heading level to include (1–6). */
+  maxLevel?: number;
+  /** Optional title above the list. */
+  title?: string;
+  /** Sticky positioning offset (px) — accounts for fixed nav. */
+  stickyOffset?: number;
+  class?: string;
+}
+
+const {
+  headings,
+  selector = "main",
+  minLevel = 2,
+  maxLevel = 3,
+  title = "On this page",
+  stickyOffset = 96,
+  class: className,
+} = Astro.props;
+
+// Filter headings to the requested level range.
+const filtered = (headings ?? []).filter(
+  (h) => h.depth >= minLevel && h.depth <= maxLevel
+);
+---
+
+<aside
+  data-toc="component"
+  data-toc-selector={!headings ? selector : undefined}
+  data-toc-min-level={minLevel}
+  data-toc-max-level={maxLevel}
+  data-toc-server-rendered={headings ? "true" : "false"}
+  style={`--toc-sticky-offset: ${stickyOffset}px;`}
+  class:list={["toc", className]}
+>
+  {title && <p class="toc__title">{title}</p>}
+  <nav aria-label={title}>
+    <ol data-toc-list>
+      {headings && filtered.map((h) => (
+        <li data-toc-item data-toc-level={h.depth}>
+          <a href={`#${h.slug}`} data-toc-link>{h.text}</a>
+        </li>
+      ))}
+    </ol>
+  </nav>
+</aside>
+
+<style is:global>
+  [data-toc="component"] {
+    position: sticky;
+    top: var(--toc-sticky-offset, 6rem);
+    align-self: start;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+  .toc__title {
+    margin: 0 0 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-fg-subtle);
+  }
+  [data-toc="component"] [data-toc-list] {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-left: 1px solid var(--color-stroke);
+  }
+  [data-toc-item] {
+    margin: 0;
+  }
+  [data-toc-link] {
+    display: block;
+    padding: 0.25rem 0.75rem;
+    margin-left: -1px;
+    border-left: 1px solid transparent;
+    color: var(--color-fg-muted);
+    text-decoration: none;
+    transition: color 100ms ease, border-color 100ms ease;
+  }
+  [data-toc-link]:hover {
+    color: var(--color-fg);
+  }
+  [data-toc-link][aria-current="true"] {
+    color: var(--color-fg);
+    border-left-color: var(--color-intent);
+  }
+  [data-toc-item][data-toc-level="3"] [data-toc-link] { padding-left: 1.5rem; }
+  [data-toc-item][data-toc-level="4"] [data-toc-link] { padding-left: 2.25rem; }
+  [data-toc-item][data-toc-level="5"] [data-toc-link] { padding-left: 3rem; }
+  [data-toc-item][data-toc-level="6"] [data-toc-link] { padding-left: 3.75rem; }
+</style>
+
+<script>
+  const slugify = (s: string) =>
+    s
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-");
+
+  const initOne = (root: HTMLElement) => {
+    if (root.dataset.scriptInitialized) return;
+    root.dataset.scriptInitialized = "true";
+
+    const list = root.querySelector<HTMLOListElement>("[data-toc-list]");
+    if (!list) return;
+
+    const minLevel = Number(root.getAttribute("data-toc-min-level")) || 2;
+    const maxLevel = Number(root.getAttribute("data-toc-max-level")) || 3;
+    const serverRendered = root.getAttribute("data-toc-server-rendered") === "true";
+
+    // Resolve which heading elements drive the active state.
+    const selector = root.getAttribute("data-toc-selector") || "main";
+    const container = document.querySelector<HTMLElement>(selector);
+    if (!container) return;
+
+    const levels: string[] = [];
+    for (let l = minLevel; l <= maxLevel; l++) levels.push(`h${l}`);
+    const headings = Array.from(container.querySelectorAll<HTMLHeadingElement>(levels.join(",")));
+
+    // Ensure each heading has an ID — generate one if missing.
+    const usedIds = new Set<string>();
+    headings.forEach((h) => {
+      if (!h.id) {
+        let base = slugify(h.textContent || "");
+        if (!base) return;
+        let id = base;
+        let i = 2;
+        while (document.getElementById(id) || usedIds.has(id)) {
+          id = `${base}-${i++}`;
+        }
+        h.id = id;
+      }
+      usedIds.add(h.id);
+    });
+
+    // Client-side render: build the list now.
+    if (!serverRendered) {
+      const frag = document.createDocumentFragment();
+      headings.forEach((h) => {
+        if (!h.id) return;
+        const li = document.createElement("li");
+        li.setAttribute("data-toc-item", "");
+        li.setAttribute("data-toc-level", String(Number(h.tagName.slice(1))));
+        const a = document.createElement("a");
+        a.setAttribute("data-toc-link", "");
+        a.href = `#${h.id}`;
+        a.textContent = h.textContent || "";
+        li.appendChild(a);
+        frag.appendChild(li);
+      });
+      list.replaceChildren(frag);
+    }
+
+    // Active-section tracking. Build a map of slug → link so we can flip
+    // aria-current as headings cross the viewport.
+    const links = Array.from(list.querySelectorAll<HTMLAnchorElement>("[data-toc-link]"));
+    const linkBySlug = new Map<string, HTMLAnchorElement>();
+    links.forEach((a) => {
+      const hash = a.getAttribute("href")?.slice(1);
+      if (hash) linkBySlug.set(hash, a);
+    });
+
+    let currentSlug: string | null = null;
+    const setCurrent = (slug: string | null) => {
+      if (currentSlug === slug) return;
+      if (currentSlug) linkBySlug.get(currentSlug)?.removeAttribute("aria-current");
+      if (slug) linkBySlug.get(slug)?.setAttribute("aria-current", "true");
+      currentSlug = slug;
+    };
+
+    // Only track headings that have a matching TOC link — ignore stray
+    // headings inside `main` (e.g. a "Keep reading" section) that aren't listed.
+    const onlyHeadings = headings.filter((h) => h.id && linkBySlug.has(h.id));
+    const stickyOffset =
+      parseFloat(getComputedStyle(root).getPropertyValue("--toc-sticky-offset")) || 96;
+
+    // Active = the last heading whose top has scrolled past a single reading
+    // line near the top of the viewport. Using one line (not an Intersection
+    // Observer band) keeps the choice monotonic, so it never flips back and
+    // forth while reading through a long section.
+    const update = () => {
+      if (!onlyHeadings.length) return;
+      const line = Math.max(stickyOffset, window.innerHeight * 0.28);
+
+      let activeId = onlyHeadings[0].id;
+      for (const h of onlyHeadings) {
+        if (h.getBoundingClientRect().top <= line) activeId = h.id;
+        else break;
+      }
+
+      // At the very bottom of the page, force the last heading active so the
+      // final (often short) section can be reached.
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) {
+        activeId = onlyHeadings[onlyHeadings.length - 1].id;
+      }
+
+      setCurrent(activeId);
+    };
+
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        update();
+        ticking = false;
+      });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    update();
+  };
+
+  const initAll = () =>
+    document.querySelectorAll<HTMLElement>('[data-toc="component"]').forEach(initOne);
+
+  initAll();
+  document.addEventListener("astro:page-load", initAll);
+</script>
