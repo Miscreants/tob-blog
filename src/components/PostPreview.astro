@@ -37,7 +37,7 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
     // Drawer over the content below xl.
     "max-xl:top-topbar max-xl:shadow-popover max-xl:fixed max-xl:right-0 max-xl:bottom-0 max-xl:w-[min(var(--spacing-rail),92vw)] max-xl:translate-x-full max-xl:data-[state=open]:translate-x-0",
     // Column that widens in place from xl.
-    "xl:w-rail-collapsed xl:relative xl:data-[state=open]:w-(--preview-w,clamp(20rem,26vw,var(--spacing-rail)))",
+    "xl:w-rail-collapsed xl:relative xl:data-[state=closed]:cursor-pointer xl:data-[state=open]:w-(--preview-w,clamp(20rem,26vw,var(--spacing-rail)))",
     "transition-[width,translate] duration-default-quarter ease-[var(--cubic-default)] motion-reduce:transition-none data-resizing:transition-none",
     className,
   ]}
@@ -141,6 +141,8 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
 </aside>
 
 <script>
+  import { initRailResize } from "../lib/rail-resize";
+
   type Summary = {
     href: string;
     file: string;
@@ -234,6 +236,10 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
     });
 
     toggle.addEventListener("click", () => setOpen(true, { focusPanel: true }));
+    // The whole closed strip opens it, not just the ⇤ button.
+    panel.addEventListener("click", (e) => {
+      if (!isOpen() && wide.matches && !(e.target as HTMLElement).closest("button")) setOpen(true, { focusPanel: true });
+    });
     closeBtn.addEventListener("click", () => setOpen(false));
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && isOpen()) setOpen(false);
@@ -243,63 +249,7 @@ const meta = ["Author", "Published", "Type", "Location"] as const;
       if (!wide.matches) setOpen(false);
     });
 
-    // ---- Resize (xl) ----
-    const handle = panel.querySelector<HTMLElement>("[data-preview-resize]")!;
-    const MIN = 320;
-    const max = () => Math.max(MIN, Math.min(768, Math.round(innerWidth * 0.5)));
-    const clampW = (w: number) => Math.round(Math.min(max(), Math.max(MIN, w)));
-    const setWidth = (w: number | null, save = true) => {
-      if (w === null) panel.style.removeProperty("--preview-w");
-      else panel.style.setProperty("--preview-w", `${clampW(w)}px`);
-      const now = Math.round(panel.getBoundingClientRect().width);
-      handle.setAttribute("aria-valuemin", String(MIN));
-      handle.setAttribute("aria-valuemax", String(max()));
-      handle.setAttribute("aria-valuenow", String(w === null ? now : clampW(w)));
-      if (!save) return;
-      try {
-        if (w === null) localStorage.removeItem("preview-width");
-        else localStorage.setItem("preview-width", String(clampW(w)));
-      } catch {}
-    };
-    try {
-      const saved = Number(localStorage.getItem("preview-width"));
-      if (saved) setWidth(saved, false);
-    } catch {}
-
-    handle.addEventListener("pointerdown", (e) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      handle.setPointerCapture(e.pointerId);
-      panel.setAttribute("data-resizing", "");
-      const right = panel.getBoundingClientRect().right;
-      const move = (ev: PointerEvent) => setWidth(right - ev.clientX, false);
-      const end = (ev: PointerEvent) => {
-        handle.removeEventListener("pointermove", move);
-        panel.removeAttribute("data-resizing");
-        setWidth(right - ev.clientX);
-      };
-      handle.addEventListener("pointermove", move);
-      handle.addEventListener("pointerup", end, { once: true });
-      handle.addEventListener("pointercancel", end, { once: true });
-    });
-    handle.addEventListener("dblclick", () => setWidth(null));
-    // Report the live width when a keyboard user lands on the handle.
-    handle.addEventListener("focus", () => handle.setAttribute("aria-valuenow", String(Math.round(panel.getBoundingClientRect().width))));
-    handle.addEventListener("keydown", (e) => {
-      const current = panel.getBoundingClientRect().width;
-      const step = e.shiftKey ? 64 : 16;
-      const next =
-        e.key === "ArrowLeft" ? current + step
-        : e.key === "ArrowRight" ? current - step
-        : e.key === "Home" ? MIN
-        : e.key === "End" ? max()
-        : null;
-      if (next === null) return;
-      e.preventDefault();
-      panel.setAttribute("data-resizing", "");
-      setWidth(next);
-      requestAnimationFrame(() => panel.removeAttribute("data-resizing"));
-    });
+    initRailResize(panel, panel.querySelector<HTMLElement>("[data-preview-resize]")!, "--preview-w");
 
     copy.addEventListener("click", async () => {
       try {

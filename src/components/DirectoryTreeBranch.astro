@@ -35,17 +35,19 @@ const { row } = Astro.props;
 
 const seg = (on: boolean) => (on ? "bg-intent" : "bg-stroke-strong");
 // The last cell is the row's own: a dash for leaves, a fork for parents. A
-// folder's fork is also its open/shut button.
+// folder's or group's fork is also its open/shut button; a group's label
+// toggles too, and is the keyboard control (its fork is a mouse-only twin).
 const lead = row.cells.slice(0, -1);
 const own = row.cells[row.cells.length - 1];
-const toggleable = row.kind === "folder" && row.children.length > 0;
-const subtreeId = `tree-${row.key.replaceAll("/", "--")}`;
+const toggleable = row.kind !== "root" && row.children.length > 0;
+const subtreeId = `tree-${row.key.replaceAll("/", "--").replace(":", "-")}`;
 ---
 
 <li
   data-tree-row={row.kind}
   data-folder={toggleable ? row.key : undefined}
   data-state={toggleable ? (row.closed ? "shut" : "open") : undefined}
+  data-on-path={toggleable && row.onPath ? "" : undefined}
   class="tree-row"
 >
   <div
@@ -101,6 +103,8 @@ const subtreeId = `tree-${row.key.replaceAll("/", "--")}`;
           aria-expanded={row.closed ? "false" : "true"}
           aria-controls={subtreeId}
           aria-label={`${row.label} subfolders`}
+          tabindex={row.kind === "group" ? -1 : undefined}
+          aria-hidden={row.kind === "group" ? "true" : undefined}
           class="hover:bg-stroke relative h-[1.625rem] w-4 shrink-0 cursor-pointer transition-colors"
         >
           <span aria-hidden="true">
@@ -116,7 +120,15 @@ const subtreeId = `tree-${row.key.replaceAll("/", "--")}`;
     <span class="w-1.5 shrink-0" aria-hidden="true"></span>
     {
       row.kind === "group" ? (
-        <span class="text-label text-fg-subtle flex-1 truncate">{row.label}</span>
+        <button
+          type="button"
+          data-folder-toggle
+          aria-expanded={row.closed ? "false" : "true"}
+          aria-controls={subtreeId}
+          class="text-label text-fg-subtle hover:text-fg flex-1 cursor-pointer truncate text-left transition-colors"
+        >
+          {row.label}
+        </button>
       ) : (
         <a
           href={row.href}

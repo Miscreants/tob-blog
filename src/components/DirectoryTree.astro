@@ -16,8 +16,9 @@ const { current, currentIsPage = true, counts, class: className } = Astro.props;
 
 // The left-hand directory: ~/blog → groups (topics / indexes / about) →
 // folders. Every subfolder is rendered; folders on the selected path start
-// open (as on the board), the rest shut. Each folder's fork toggles it, and
-// "expand all" / "collapse all" set every folder at once. Guide
+// open (as on the board), the rest shut. Each folder's or group's fork
+// toggles it, and "expand all" / "collapse all" set every one at once, so
+// fully collapsed shows just the groups. Guide
 // lines are computed here, one 16×26 cell per depth,
 // following the Tree/Guide component in Figma:
 //   rail  — an ancestor still has children further down
@@ -66,7 +67,7 @@ const selectedKeys = current
   : ["~"];
 const onPath = (n: Node) => selectedKeys.includes(n.key);
 const isSelected = (n: Node) => n.key === selectedKeys[selectedKeys.length - 1];
-// Root and groups are always open; folders start open along the selected path.
+// Root is always open; groups start open, folders open along the selected path.
 const isClosed = (n: Node) => n.kind === "folder" && !onPath(n) && n.children.length > 0;
 
 type Cell = TreeRow["cells"][number];
@@ -168,10 +169,12 @@ const tree = buildRow(root, []);
     } catch {}
     tree.querySelectorAll("[data-folder]").forEach((li) => {
       const s = saved[li.dataset.folder];
-      const open =
-        typeof s === "boolean" ? s : mode === "expanded" ? true : mode === "collapsed" ? false : li.dataset.state === "open";
+      // The path to the current page always opens, whatever was saved.
+      const open = li.hasAttribute("data-on-path")
+        ? true
+        : typeof s === "boolean" ? s : mode === "expanded" ? true : mode === "collapsed" ? false : li.dataset.state === "open";
       li.dataset.state = open ? "open" : "shut";
-      li.querySelector(":scope > div [data-folder-toggle]")?.setAttribute("aria-expanded", String(open));
+      li.querySelectorAll(":scope > div [data-folder-toggle]").forEach((b) => b.setAttribute("aria-expanded", String(open)));
     });
     const btn = tree.querySelector("[data-tree-mode-toggle]");
     if (btn && mode === "collapsed") btn.textContent = "expand all";
@@ -196,7 +199,7 @@ const tree = buildRow(root, []);
   };
   const setFolder = (li: HTMLElement, open: boolean) => {
     li.dataset.state = open ? "open" : "shut";
-    li.querySelector(":scope > div [data-folder-toggle]")?.setAttribute("aria-expanded", String(open));
+    li.querySelectorAll(":scope > div [data-folder-toggle]").forEach((b) => b.setAttribute("aria-expanded", String(open)));
   };
 
   document.querySelectorAll<HTMLElement>("[data-tree]").forEach((tree) => {

@@ -2,7 +2,8 @@
 import TableOfContents from "./TableOfContents.astro";
 import SubscribeForm from "./SubscribeForm.astro";
 import Button from "./Button.astro";
-import { authorHref, initials, type Post } from "../lib/blog";
+import { Icon } from "astro-icon/components";
+import { authorHref, getPosts, initials, isoDate, postHref, relatedPosts, type Post } from "../lib/blog";
 import { site } from "../data/site";
 
 interface Props {
@@ -15,6 +16,9 @@ const { post, headings, class: className } = Astro.props;
 // The article's right rail (xl+): On this page (the starter TOC, restyled to
 // the board's per-item rules), author card(s), share links and subscribe.
 // Below xl it is not rendered; the article column carries subscribe itself.
+//
+// Like the listing preview it can be resized from its left edge and collapsed
+// to the 40px strip; both are remembered.
 const url = new URL(Astro.url.pathname, site.url).href;
 const text = encodeURIComponent(post.data.title);
 const share = [
@@ -22,51 +26,128 @@ const share = [
   { label: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` },
   { label: "Hacker News", href: `https://news.ycombinator.com/submitlink?u=${encodeURIComponent(url)}&t=${text}` },
 ];
+const related = relatedPosts(post, await getPosts());
 ---
 
 <aside
+  id="article-rail"
   aria-label="About this post"
   data-article-rail
-  class:list={["bg-panel border-stroke w-[clamp(20rem,24vw,var(--spacing-rail))] border-l max-xl:hidden", className]}
+  data-state="open"
+  class:list={[
+    "bg-panel border-stroke group/rail relative overflow-clip border-l max-xl:hidden",
+    "w-rail-collapsed data-[state=closed]:cursor-pointer data-[state=open]:w-(--rail-w,clamp(20rem,24vw,var(--spacing-rail)))",
+    "transition-[width] duration-default-quarter ease-[var(--cubic-default)] motion-reduce:transition-none data-resizing:transition-none",
+    className,
+  ]}
 >
-  <div class="sticky top-topbar flex max-h-[calc(100dvh-var(--spacing-topbar))] flex-col gap-3.5 overflow-y-auto px-8 py-10">
-    {headings.length > 0 && <TableOfContents headings={headings} selector="[data-article-body]" title="On this page" stickyOffset={0} class="rail-toc" />}
+  <script is:inline>
+    try {
+      if (localStorage.getItem("article-rail") === "closed") document.currentScript.parentElement.dataset.state = "closed";
+    } catch {}
+  </script>
+  <div
+    role="separator"
+    tabindex="0"
+    aria-orientation="vertical"
+    aria-controls="article-rail"
+    aria-label="Resize sidebar"
+    data-rail-resize
+    class="group/resize absolute inset-y-0 left-0 z-10 hidden w-2 cursor-col-resize touch-none outline-none group-data-[state=open]/rail:block"
+  >
+    <span
+      class="bg-intent absolute inset-y-0 left-0 w-0.5 opacity-0 transition-opacity group-hover/resize:opacity-100 group-focus-visible/resize:opacity-100 group-data-resizing/rail:opacity-100"
+    ></span>
+  </div>
 
-    <h2 class="text-label text-fg-subtle mt-2">{post.data.authors.length > 1 ? "Authors" : "Author"}</h2>
-    <ul class="flex flex-col gap-2">
+  <div class="sticky top-topbar">
+    <!-- Closed strip. -->
+    <div class="hidden flex-col items-center gap-4 py-4 group-data-[state=closed]/rail:flex">
+      <button
+        type="button"
+        data-rail-toggle
+        aria-expanded="false"
+        aria-controls="article-rail-panel"
+        class="border-stroke-strong text-fg-subtle hover:text-fg hover:border-fg-subtle grid size-6 place-items-center border font-mono text-xs transition-colors"
+      >
+        <span aria-hidden="true">⇤</span>
+        <span class="sr-only">Open sidebar</span>
+      </button>
+      <p class="text-label text-fg-subtle [writing-mode:vertical-rl]" aria-hidden="true">About this post</p>
+    </div>
+
+    <!-- Open panel. Fixed width so it never reflows while the rail animates. -->
+    <div
+      id="article-rail-panel"
+      class="relative flex max-h-[calc(100dvh-var(--spacing-topbar))] w-(--rail-w,clamp(20rem,24vw,var(--spacing-rail))) flex-col gap-3.5 overflow-y-auto px-8 py-10 group-data-[state=closed]/rail:hidden"
+    >
+      <button
+        type="button"
+        data-rail-close
+        aria-expanded="true"
+        aria-controls="article-rail-panel"
+        class="border-stroke-strong text-fg-muted hover:text-fg hover:border-fg-subtle absolute top-4 right-4 grid size-7 place-items-center border transition-colors"
+      >
+        <Icon name="lucide:x" class="size-4" aria-hidden="true" />
+        <span class="sr-only">Close sidebar</span>
+      </button>
+      {headings.length > 0 && <TableOfContents headings={headings} selector="[data-article-body]" title="On this page" stickyOffset={0} class="rail-toc" />}
+
+      <h2 class="text-label text-fg-subtle mt-2">{post.data.authors.length > 1 ? "Authors" : "Author"}</h2>
+      <ul class="flex flex-col gap-2">
+        {
+          post.data.authors.map((a) => (
+            <li class="bg-panel-muted border-stroke-strong flex items-center gap-3.5 border p-4">
+              <span class="bg-canvas border-stroke-strong text-mono-md text-fg-muted grid size-12 shrink-0 place-items-center border" aria-hidden="true">
+                {initials(a)}
+              </span>
+              <div class="flex min-w-0 flex-col gap-1">
+                <p class="h6 text-fg truncate">{a}</p>
+                <a href={authorHref(a)} class="text-mono-sm text-intent hover:underline">
+                  All posts by this author<span aria-hidden="true"> →</span>
+                  <span class="sr-only"> ({a})</span>
+                </a>
+              </div>
+            </li>
+          ))
+        }
+      </ul>
+
+      <h2 class="text-label text-fg-subtle mt-4">Share</h2>
+      <ul class="flex flex-wrap gap-2">
+        <li>
+          <Button label="Copy link" variant="secondary" size="sm" withArrow={false} class="h-[2.125rem]" data-share-copy={url} />
+        </li>
+        {
+          share.map((s) => (
+            <li>
+              <Button href={s.href} target="_blank" label={s.label} variant="secondary" size="sm" withArrow={false} class="h-[2.125rem]" />
+            </li>
+          ))
+        }
+      </ul>
+
       {
-        post.data.authors.map((a) => (
-          <li class="bg-panel-muted border-stroke-strong flex items-center gap-3.5 border p-4">
-            <span class="bg-canvas border-stroke-strong text-mono-md text-fg-muted grid size-12 shrink-0 place-items-center border" aria-hidden="true">
-              {initials(a)}
-            </span>
-            <div class="flex min-w-0 flex-col gap-1">
-              <p class="h6 text-fg truncate">{a}</p>
-              <a href={authorHref(a)} class="text-mono-sm text-intent hover:underline">
-                All posts by this author<span aria-hidden="true"> →</span>
-                <span class="sr-only"> ({a})</span>
-              </a>
-            </div>
-          </li>
-        ))
+        related.length > 0 && (
+          <section aria-labelledby="rail-related-heading" class="mt-4 flex flex-col">
+            <h2 id="rail-related-heading" class="text-label text-fg-subtle pb-3">Related</h2>
+            <ul class="border-stroke border-t">
+              {related.map((r) => (
+                <li class="border-stroke hover:bg-panel-muted relative grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 border-b py-3 transition-colors">
+                  <span class="text-mono-xs text-intent pt-0.5">{r.data.type}</span>
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <a href={postHref(r)} class="text-body-xs text-fg hover:text-intent after:absolute after:inset-0">{r.data.title}</a>
+                    <time class="text-mono-xs text-fg-subtle" datetime={isoDate(r.data.date)}>{isoDate(r.data.date)}</time>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
       }
-    </ul>
 
-    <h2 class="text-label text-fg-subtle mt-4">Share</h2>
-    <ul class="flex flex-wrap gap-2">
-      <li>
-        <Button label="Copy link" variant="secondary" size="sm" withArrow={false} class="h-[2.125rem]" data-share-copy={url} />
-      </li>
-      {
-        share.map((s) => (
-          <li>
-            <Button href={s.href} target="_blank" label={s.label} variant="secondary" size="sm" withArrow={false} class="h-[2.125rem]" />
-          </li>
-        ))
-      }
-    </ul>
-
-    <SubscribeForm layout="stacked" />
+      <SubscribeForm layout="stacked" />
+    </div>
   </div>
 </aside>
 
@@ -103,6 +184,32 @@ const share = [
 </style>
 
 <script>
+  import { initRailResize } from "../lib/rail-resize";
+
+  const rail = document.querySelector<HTMLElement>("[data-article-rail]");
+  if (rail && !rail.dataset.ready) {
+    rail.dataset.ready = "true";
+    const toggle = rail.querySelector<HTMLButtonElement>("[data-rail-toggle]")!;
+    const closeBtn = rail.querySelector<HTMLButtonElement>("[data-rail-close]")!;
+    const setOpen = (open: boolean) => {
+      rail.dataset.state = open ? "open" : "closed";
+      toggle.setAttribute("aria-expanded", String(open));
+      (open ? closeBtn : toggle).focus({ preventScroll: true });
+      try {
+        if (open) localStorage.removeItem("article-rail");
+        else localStorage.setItem("article-rail", "closed");
+      } catch {}
+    };
+    toggle.setAttribute("aria-expanded", String(rail.dataset.state === "open"));
+    toggle.addEventListener("click", () => setOpen(true));
+    closeBtn.addEventListener("click", () => setOpen(false));
+    // The whole closed strip opens it, not just the ⇤ button.
+    rail.addEventListener("click", (e) => {
+      if (rail.dataset.state === "closed" && !(e.target as HTMLElement).closest("button")) setOpen(true);
+    });
+    initRailResize(rail, rail.querySelector<HTMLElement>("[data-rail-resize]")!, "--rail-w");
+  }
+
   document.querySelectorAll<HTMLButtonElement>("[data-share-copy]").forEach((btn) => {
     if (btn.dataset.ready) return;
     btn.dataset.ready = "true";

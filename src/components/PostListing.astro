@@ -52,11 +52,12 @@ const cell = "align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-6";
 const td = `${cell} py-6`;
 const th = `${cell} text-label text-fg-subtle py-2.5 text-left font-normal`;
 const columns: { key: SortKey; label: string; class: string }[] = [
-  { key: "type", label: "Type", class: "w-[6rem] md:w-[6.5rem]" },
+  // 2xl+: the meta columns widen so the name column doesn't take all the slack.
+  { key: "type", label: "Type", class: "w-[6rem] md:w-[6.5rem] 2xl:w-[8rem]" },
   { key: "title", label: "Name", class: "" },
-  { key: "location", label: "Location", class: "w-[16rem] @max-5xl:hidden" },
-  { key: "author", label: "Author", class: "w-[12.125rem] @max-3xl:hidden" },
-  { key: "date", label: "Published", class: "w-[7.5rem] @max-lg:hidden" },
+  { key: "location", label: "Location", class: "w-[16rem] 2xl:w-[16rem] @max-5xl:hidden" },
+  { key: "author", label: "Author", class: "w-[12.125rem] 2xl:w-[16rem] @max-3xl:hidden" },
+  { key: "date", label: "Published", class: "w-[7.5rem] 2xl:w-[10rem] @max-lg:hidden" },
 ];
 const sortOption = (key: SortKey, dir: "asc" | "desc") =>
   `${sortLabels[key]} · ${key === "date" ? (dir === "desc" ? "newest" : "oldest") : dir === "asc" ? "A–Z" : "Z–A"}`;
@@ -93,7 +94,7 @@ const sortOption = (key: SortKey, dir: "asc" | "desc") =>
       sort:
       <select
         data-sort-select
-        class="text-mono-sm text-fg hover:text-intent appearance-none bg-transparent pr-4 transition-colors focus-visible:outline-offset-2"
+        class="text-mono-sm text-fg hover:text-intent appearance-none bg-transparent pr-4 transition-colors focus-visible:outline-offset-2 *:bg-panel *:text-fg"
       >
         {
           sortKeys.flatMap((k) =>
@@ -141,7 +142,7 @@ const sortOption = (key: SortKey, dir: "asc" | "desc") =>
               <a href={d.href} class="h5 text-fg hover:text-intent block truncate">
                 {d.name}
               </a>
-              <p class="text-body-2xs text-fg-muted mt-1.5 max-w-[72ch] text-pretty">{d.description}</p>
+              <p class="text-body-2xs text-fg-muted mt-1.5 max-w-[140ch] text-pretty">{d.description}</p>
             </td>
             <td class:list={[td, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]}>{d.location}</td>
             <td class:list={[td, "@max-3xl:hidden"]} />

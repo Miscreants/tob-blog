@@ -492,6 +492,10 @@
   }
   & hr { border: 0; border-top: 1px solid var(--color-stroke-strong); }
   & img { max-width: 100%; height: auto; }
+  /* Transparent diagrams are drawn for a light page: back them in dark mode. */
+  [data-theme="dark"] &, [data-theme="brand"] & {
+    & img.img-transparent { background: #f5f5f5; padding: 1rem; }
+  }
   & table { width: 100%; border-collapse: collapse; @apply text-body-2xs; }
   & th, & td { border: 1px solid var(--color-stroke); padding: 0.5em 0.75em; text-align: left; }
   & th { @apply text-label; color: var(--color-fg-subtle); background: var(--color-panel); }

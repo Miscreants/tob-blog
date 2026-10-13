@@ -1,6 +1,7 @@
 ---
 import { Icon } from "astro-icon/components";
 import ThemeSwitch from "./ThemeSwitch.astro";
+import TobLogo from "./TobLogo.astro";
 import { topLinks } from "../data/site";
 
 interface Props {
@@ -38,7 +39,7 @@ const { rail = false, class: className } = Astro.props;
     </button>
 
     <a href="/" class="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
-      <span class="text-fg text-[0.9375rem] font-semibold">Trail of Bits</span>
+      <TobLogo class="h-8 w-auto shrink-0" />
       <span class="text-mono-md text-fg-subtle" aria-hidden="true">/</span>
       <span class="text-mono-md text-fg-muted">blog</span>
     </a>

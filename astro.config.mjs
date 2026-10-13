@@ -9,6 +9,7 @@ import sitemap from '@astrojs/sitemap';
 
 import { site } from './src/data/site.ts';
 import rehypeCodeFrame from './src/lib/rehype-code-frame.mjs';
+import rehypeTransparentImages from './src/lib/rehype-transparent-images.mjs';
 
 // Single source of truth for the production origin: this config derives `site`
 // from src/data/site.ts rather than repeating the domain. Two copies plus a
@@ -97,10 +98,11 @@ export default defineConfig({
   },
   // Code colors come from the syntax roles in global.css (css-variables theme),
   // so one highlight pass serves both themes. rehypeCodeFrame adds the
-  // language/copy header around each block.
+  // language/copy header around each block; rehypeTransparentImages tags
+  // diagrams on transparent backgrounds for their dark-mode backing.
   markdown: {
     shikiConfig: { theme: 'css-variables' },
-    rehypePlugins: [rehypeCodeFrame],
+    rehypePlugins: [rehypeCodeFrame, rehypeTransparentImages],
   },
   build: {
     // Inline page CSS into <head> instead of emitting render-blocking
