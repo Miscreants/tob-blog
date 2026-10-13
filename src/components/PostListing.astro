@@ -136,11 +136,13 @@ const sortOption = (key: SortKey, dir: "asc" | "desc") =>
     <tbody data-listing-body>
       {
         dirs.map((d) => (
-          <tr class="border-stroke hover:bg-panel border-b transition-colors" data-dir>
+          <tr class="group/dir border-stroke hover:bg-panel relative cursor-pointer border-b transition-colors" data-dir>
             <td class:list={[td, "text-mono-sm text-intent"]}>dir</td>
             <td class={td}>
-              <a href={d.href} class="h5 text-fg hover:text-intent block truncate">
+              {/* The name link stretches over the whole row, so any part of it opens the folder. */}
+              <a href={d.href} class="h5 text-fg group-hover/dir:text-intent block truncate after:absolute after:inset-0">
                 {d.name}
+                {d.name === ".." && <span class="sr-only"> (parent folder)</span>}
               </a>
               <p class="text-body-2xs text-fg-muted mt-1.5 max-w-[140ch] text-pretty">{d.description}</p>
             </td>
@@ -150,7 +152,7 @@ const sortOption = (key: SortKey, dir: "asc" | "desc") =>
             <td class:list={[td, "@max-3xl:hidden"]} />
             <td class:list={[td, "text-mono-sm text-fg-subtle @max-lg:hidden"]}>{d.date && <time datetime={d.date}>{d.date}</time>}</td>
             <td class:list={[td, "@max-md:hidden"]}>
-              <a href={d.href} tabindex="-1" aria-hidden="true" class="border-stroke-strong text-fg-subtle grid size-6 place-items-center border font-mono text-xs">
+              <a href={d.href} tabindex="-1" aria-hidden="true" class="border-stroke-strong text-fg-subtle group-hover/dir:text-fg grid size-6 place-items-center border font-mono text-xs">
                 →
               </a>
             </td>
