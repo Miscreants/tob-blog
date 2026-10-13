@@ -53,13 +53,19 @@ const within = (path: string, folder: string) => path === folder || path.startsW
 // Listings are ordered and dated by publication, not last update.
 export const sortKey = (p: Post) => p.data.date.getTime();
 
-/** Published posts, newest first. Unknown folder paths fail the build. */
+/** Published posts, newest first. Unknown folder paths fail the build, and
+ *  so does tagging a folder that has subfolders: posts live in leaf folders
+ *  only, so a parent's count is always the sum of its children (du-style). */
 export async function getPosts(): Promise<Post[]> {
   const posts = await getCollection("posts", (p) => import.meta.env.DEV || !p.data.draft);
   for (const p of posts) {
     for (const path of [p.data.location, ...p.data.alsoIn]) {
       if (!folders.has(path)) {
         throw new Error(`posts/${p.id}: folder "${path}" is not in src/data/directory.ts`);
+      }
+      const sub = folders.get(path)!.children;
+      if (sub.length) {
+        throw new Error(`posts/${p.id}: "${path}" has subfolders; tag one of ${sub.map((c) => `"${c}"`).join(", ")} instead`);
       }
     }
   }

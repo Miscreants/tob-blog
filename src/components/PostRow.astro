@@ -28,8 +28,8 @@ const td = "align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-6 py-6"
     </a>
     <p class="text-body-2xs text-fg-muted mt-1.5 max-w-[100ch] text-pretty" data-field="description">{post?.description}</p>
   </td>
-  <td class:list={[td, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]} data-field="location">
-    {post && relativeLocation(post.location, path)}
+  <td class:list={[td, "text-mono-sm text-fg-muted @max-5xl:hidden"]}>
+    <span class="path-truncate"><bdi data-field="location">{post && relativeLocation(post.location, path)}</bdi></span>
   </td>
   <td class:list={[td, "text-body-2xs text-fg-muted @max-3xl:hidden"]}>
     <ul class="flex flex-col gap-1" data-field="authors">

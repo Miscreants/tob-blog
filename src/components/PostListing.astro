@@ -144,7 +144,9 @@ const sortOption = (key: SortKey, dir: "asc" | "desc") =>
               </a>
               <p class="text-body-2xs text-fg-muted mt-1.5 max-w-[140ch] text-pretty">{d.description}</p>
             </td>
-            <td class:list={[td, "text-mono-sm text-fg-muted truncate @max-5xl:hidden"]}>{d.location}</td>
+            <td class:list={[td, "text-mono-sm text-fg-muted @max-5xl:hidden"]}>
+              <span class="path-truncate"><bdi>{d.location}</bdi></span>
+            </td>
             <td class:list={[td, "@max-3xl:hidden"]} />
             <td class:list={[td, "text-mono-sm text-fg-subtle @max-lg:hidden"]}>{d.date && <time datetime={d.date}>{d.date}</time>}</td>
             <td class:list={[td, "@max-md:hidden"]}>

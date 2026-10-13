@@ -18,7 +18,7 @@ export interface Folder {
 export interface FolderGroup {
   /** Uppercase heading in the tree. */
   label: string;
-  /** Index groups are cross-cutting lists, marked ↗ in the tree. */
+  /** Index groups are cross-cutting lists, marked @ in the tree (ls -F symlink). */
   kind: "topic" | "index" | "about";
   folders: Folder[];
 }

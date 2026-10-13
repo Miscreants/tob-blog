@@ -3,7 +3,7 @@ title: gosentry brings LibAFL-grade fuzzing to Go's native interface
 description: "We built gosentry, a fuzzing-oriented fork of the Go toolchain that keeps the standard fuzzing workflow while using a stronger stack underneath."
 type: release
 location: fuzzing-testing/fuzzing
-alsoIn: [tools, languages/go, vulnerabilities]
+alsoIn: [tools, languages/go]
 authors: [Kevin Valerio]
 date: 2026-05-12
 featured: true

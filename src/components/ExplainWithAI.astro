@@ -33,7 +33,6 @@ const prompts = [
     text: `Quiz me on ${source}. Ask five questions, one at a time, that check I understood the key ideas. Wait for my answer before giving feedback and moving on.`,
   },
 ];
-const fileSlug = post.id.split("-").slice(0, 2).join("-");
 const chatUrl = (q: string) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`;
 ---
 
@@ -67,7 +66,7 @@ const chatUrl = (q: string) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`
         }
       </div>
       <span class="text-fg-subtle ml-auto self-center truncate pl-3 font-mono text-[0.6875rem] max-sm:hidden" aria-hidden="true">
-        explain-{fileSlug}.prompt
+        explain-{post.id}.prompt
       </span>
     </div>
     {
@@ -81,7 +80,7 @@ const chatUrl = (q: string) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`
           data-chat-url={chatUrl(p.text)}
           class="flex gap-3.5 pt-[1.125rem] pr-[1.375rem] pb-5 pl-5"
         >
-          <span class="text-mono-md text-intent" aria-hidden="true">$</span>
+          <span class="text-mono-md text-intent" aria-hidden="true">&gt;</span>
           <p class="text-mono-md text-fg">{p.text}</p>
         </div>
       ))

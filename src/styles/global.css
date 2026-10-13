@@ -501,6 +501,17 @@
   & th { @apply text-label; color: var(--color-fg-subtle); background: var(--color-panel); }
 }
 
+/* A path that ellipsizes from the left, keeping its last segment
+   ("…/mutation-testing"). Wrap the text in <bdi> so it stays LTR. */
+@utility path-truncate {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
 /* Code frame: 1px strong border on the panel tone, a 31px header with the
    language and a copy button, 18/20 padding around 13/21 mono. */
 @utility code-frame {

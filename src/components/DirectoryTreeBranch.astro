@@ -139,8 +139,7 @@ const subtreeId = `tree-${row.key.replaceAll("/", "--").replace(":", "-")}`;
             row.selected ? "text-intent font-medium" : row.onPath ? "text-fg" : "text-fg-muted hover:text-fg",
           ]}
         >
-          {row.label}
-          {row.index && <span aria-hidden="true"> ↗</span>}
+          {row.label}{row.index && <span class="text-fg-subtle" aria-hidden="true">@</span>}
           {row.count !== undefined && <span class="sr-only">, {row.count} posts</span>}
         </a>
       )
