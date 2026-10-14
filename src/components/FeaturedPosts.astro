@@ -40,8 +40,8 @@ const featured = posts.slice(0, 2);
           <>
             {i === 1 && <div class="bg-stroke max-lg:hidden" aria-hidden="true" />}
             <article class="flex flex-col gap-2.5">
-              <p class="text-mono-sm text-fg-subtle flex flex-wrap gap-x-2.5">
-                <span class="text-intent">{p.data.type}</span>
+              <p class="text-mono-sm text-fg-subtle flex flex-wrap items-center gap-x-2.5">
+                <span class="type-chip" data-type={p.data.type}>{p.data.type}</span>
                 <span>/{p.data.location}</span>
                 <span>
                   · <time datetime={isoDate(p.data.date)}>{isoDate(p.data.date)}</time>
@@ -61,7 +61,7 @@ const featured = posts.slice(0, 2);
                 ))}
               </ul>
               <div class="mt-auto flex items-center gap-6 pt-6">
-                <Button href={postHref(p)} label="Read post ↵" withArrow={false} aria-label={`Read post: ${p.data.title}`} />
+                <Button href={postHref(p)} label="Read post ↵" variant="secondary" withArrow={false} aria-label={`Read post: ${p.data.title}`} />
                 <span class="text-body-2xs text-fg-muted">{p.data.authors.join(", ")}</span>
               </div>
             </article>

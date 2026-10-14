@@ -1,7 +1,7 @@
 ---
 import BlogShell from "../layouts/BlogShell.astro";
 import ListingView from "../components/ListingView.astro";
-import { getPosts, paginate, summarize } from "../lib/blog";
+import { getPosts, paginate, summarize, typeCounts } from "../lib/blog";
 import { site } from "../data/site";
 
 // ~/blog — the blog home (Figma "Directory A · Blog Home").
@@ -19,5 +19,6 @@ const { items, total } = paginate(posts, 1);
     page={1}
     totalPages={total}
     total={posts.length}
+    typeCounts={typeCounts(posts)}
   />
 </BlogShell>

@@ -122,6 +122,21 @@
   --color-syntax-punct: #4a4b4d;
   --color-syntax-type: #7446a3;
 
+  /* Post-type chips (board "Type Chip"). post / guide / log use neutral.
+     The board has no light review/talk; those two are derived to match. */
+  --color-type-review-fg: #2f7a43;
+  --color-type-review-bg: #e9f4ec;
+  --color-type-talk-fg: #2b6cae;
+  --color-type-talk-bg: #e8f0f8;
+  --color-type-release-fg: #0b776a;
+  --color-type-release-bg: #e7f4f2;
+  --color-type-essay-fg: #7f4cca;
+  --color-type-essay-bg: #f2edfa;
+  --color-type-news-fg: #975c11;
+  --color-type-news-bg: #f7f0e8;
+  --color-type-neutral-fg: #4a4b4d;
+  --color-type-neutral-bg: #efefef;
+
   /* ---------- Radius ----------
      The board is square-cornered throughout. */
   --radius-card: 0;
@@ -191,6 +206,18 @@
   --color-syntax-number: #8f5310;
   --color-syntax-punct: #4a4b4d;
   --color-syntax-type: #7446a3;
+  --color-type-review-fg: #2f7a43;
+  --color-type-review-bg: #e9f4ec;
+  --color-type-talk-fg: #2b6cae;
+  --color-type-talk-bg: #e8f0f8;
+  --color-type-release-fg: #0b776a;
+  --color-type-release-bg: #e7f4f2;
+  --color-type-essay-fg: #7f4cca;
+  --color-type-essay-bg: #f2edfa;
+  --color-type-news-fg: #975c11;
+  --color-type-news-bg: #f7f0e8;
+  --color-type-neutral-fg: #4a4b4d;
+  --color-type-neutral-bg: #efefef;
   --pattern-stripe: rgb(0 0 0 / 0.08);
 
   color-scheme: light;
@@ -223,6 +250,18 @@
   --color-syntax-number: #e2b574;
   --color-syntax-punct: #a3a3a3;
   --color-syntax-type: #c4a5e3;
+  --color-type-review-fg: #429b59;
+  --color-type-review-bg: #122118;
+  --color-type-talk-fg: #4b8fd2;
+  --color-type-talk-bg: #14202b;
+  --color-type-release-fg: #289b8e;
+  --color-type-release-bg: #0f2221;
+  --color-type-essay-fg: #9d76d8;
+  --color-type-essay-bg: #1f192b;
+  --color-type-news-fg: #ba7e33;
+  --color-type-news-bg: #261d11;
+  --color-type-neutral-fg: #b4b6bb;
+  --color-type-neutral-bg: #24262b;
   --pattern-stripe: rgb(255 255 255 / 0.1);
   --shadow-popover:
     0 1px 2px rgb(0 0 0 / 0.4),
@@ -510,6 +549,25 @@
   text-overflow: ellipsis;
   direction: rtl;
   text-align: left;
+}
+
+/* Post-type chip: colour comes from data-type, so client-filled rows only
+   set the attribute. Unlisted types (post, guide, log) stay neutral. */
+@utility type-chip {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 0.71875rem;
+  line-height: 1rem;
+  white-space: nowrap;
+  color: var(--color-type-neutral-fg);
+  background: var(--color-type-neutral-bg);
+
+  &[data-type="review"] { color: var(--color-type-review-fg); background: var(--color-type-review-bg); }
+  &[data-type="talk"] { color: var(--color-type-talk-fg); background: var(--color-type-talk-bg); }
+  &[data-type="release"] { color: var(--color-type-release-fg); background: var(--color-type-release-bg); }
+  &[data-type="essay"] { color: var(--color-type-essay-fg); background: var(--color-type-essay-bg); }
+  &[data-type="news"] { color: var(--color-type-news-fg); background: var(--color-type-news-bg); }
 }
 
 /* Code frame: 1px strong border on the panel tone, a 31px header with the

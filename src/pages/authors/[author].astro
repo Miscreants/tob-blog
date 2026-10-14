@@ -2,7 +2,7 @@
 import type { GetStaticPaths } from "astro";
 import BlogShell from "../../layouts/BlogShell.astro";
 import ListingView from "../../components/ListingView.astro";
-import { authorSlug, getPosts, summarize } from "../../lib/blog";
+import { authorSlug, getPosts, summarize, typeCounts } from "../../lib/blog";
 import { site } from "../../data/site";
 
 // "All posts by this author" — the author card's target. Not on the board;
@@ -31,5 +31,6 @@ const count = `${posts.length} post${posts.length === 1 ? "" : "s"}`;
     totalPages={1}
     author={name}
     total={posts.length}
+    typeCounts={typeCounts(posts)}
   />
 </BlogShell>

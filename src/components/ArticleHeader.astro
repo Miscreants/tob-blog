@@ -22,7 +22,7 @@ const { title, description, type, location, alsoIn, authors, date } = post.data;
   <dl class="border-stroke-strong mt-9 flex flex-wrap gap-x-10 gap-y-4 border-y py-4">
     <div class="flex flex-col gap-1.5">
       <dt class="text-label text-fg-subtle">Type</dt>
-      <dd class="text-mono-md text-intent">{type}</dd>
+      <dd><span class="type-chip" data-type={type}>{type}</span></dd>
     </div>
     <div class="flex flex-col gap-1.5">
       <dt class="text-label text-fg-subtle">{authors.length > 1 ? "Authors" : "Author"}</dt>

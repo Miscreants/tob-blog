@@ -134,7 +134,7 @@ const related = relatedPosts(post, await getPosts());
             <ul class="border-stroke border-t">
               {related.map((r) => (
                 <li class="border-stroke hover:bg-panel-muted relative grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 border-b py-3 transition-colors">
-                  <span class="text-mono-xs text-intent pt-0.5">{r.data.type}</span>
+                  <span class="type-chip self-start" data-type={r.data.type}>{r.data.type}</span>
                   <div class="flex min-w-0 flex-col gap-1">
                     <a href={postHref(r)} class="text-body-xs text-fg hover:text-intent after:absolute after:inset-0">{r.data.title}</a>
                     <time class="text-mono-xs text-fg-subtle" datetime={isoDate(r.data.date)}>{isoDate(r.data.date)}</time>

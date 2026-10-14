@@ -84,6 +84,13 @@ export function folderCounts(posts: Post[]): Record<string, number> {
   return counts;
 }
 
+/** Post count per type, for the listing's type tabs ("post 3"). */
+export function typeCounts(posts: Post[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const p of posts) counts[p.data.type] = (counts[p.data.type] ?? 0) + 1;
+  return counts;
+}
+
 /** Ancestors of a path, root first, including the path itself. */
 export function lineage(path: string): FolderNode[] {
   const out: FolderNode[] = [];

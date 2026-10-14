@@ -17,6 +17,7 @@ import {
   postsIn,
   sortKey,
   summarize,
+  typeCounts,
   type Post,
 } from "../lib/blog";
 import { site } from "../data/site";
@@ -111,6 +112,7 @@ if (props.view === "folder") {
     page: props.page,
     totalPages: total,
     total: inFolder.length,
+    typeCounts: typeCounts(inFolder),
   };
 }
 

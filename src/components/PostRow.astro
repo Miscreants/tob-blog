@@ -21,7 +21,7 @@ const td = "align-top first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8 pr-6 py-6"
   data-summary={post && JSON.stringify(post)}
   class="group border-stroke hover:bg-panel data-active:bg-panel-muted data-active:shadow-[inset_2px_0_0_var(--color-intent)] cursor-pointer border-b transition-colors"
 >
-  <td class:list={[td, "text-mono-sm text-intent"]} data-field="type">{post?.type}</td>
+  <td class={td}><span class="type-chip" data-type={post?.type} data-field="type">{post?.type}</span></td>
   <td class={td}>
     <a href={post?.href} data-row-link data-field="title" class="h5 text-fg hover:text-intent block text-pretty">
       {post?.title}

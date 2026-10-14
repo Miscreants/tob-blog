@@ -18,8 +18,10 @@ interface Props {
   totalPages: number;
   /** Posts in this listing across every page. */
   total: number;
+  /** Posts per type across every page, for the type tabs. */
+  typeCounts: Record<string, number>;
 }
-const { path, author, meta, title, lede, featured = [], posts, dirs, page, totalPages, total } = Astro.props;
+const { path, author, meta, title, lede, featured = [], posts, dirs, page, totalPages, total, typeCounts } = Astro.props;
 
 // Everything a listing page renders inside the shell — blog home, folder,
 // author — in the board's order. Routes only resolve data and pass it here.
@@ -27,5 +29,5 @@ const { path, author, meta, title, lede, featured = [], posts, dirs, page, total
 
 <ListingHeader path={path} meta={meta} title={title} lede={lede} />
 {page === 1 && featured.length > 0 && <FeaturedPosts posts={featured} />}
-<PostListing posts={posts} dirs={dirs} path={path} author={author} page={page} totalPages={totalPages} total={total} />
+<PostListing posts={posts} dirs={dirs} path={path} author={author} page={page} totalPages={totalPages} total={total} typeCounts={typeCounts} />
 <SubscribeForm id="subscribe" />

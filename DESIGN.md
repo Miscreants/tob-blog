@@ -10,7 +10,7 @@ The brand contract for the Trail of Bits blog. Values live in `src/styles/global
 
 ## Brand character
 
-The blog is the lab's notebook, not a magazine: posts are files in a directory tree, so every path, date, type and count is a mono label, and navigation reads as `~/blog/fuzzing-testing/fuzzing`. Precision over decoration: surfaces are flat and separated by tone and hairlines, never shadow. Red is used sparingly, only as a location marker (the selected folder, the active row, the post type), so it always means "here".
+The blog is the lab's notebook, not a magazine: posts are files in a directory tree, so every path, date, type and count is a mono label, and navigation reads as `~/blog/fuzzing-testing/fuzzing`. Precision over decoration: surfaces are flat and separated by tone and hairlines, never shadow. Red is used sparingly, only as a location marker (the selected folder, the active row), so it always means "here". Post types are tinted mono chips (`type-chip`): release, essay, news, talk and review each have a hue; everything else is neutral.
 
 ## Decisions
 
@@ -27,7 +27,7 @@ The blog is the lab's notebook, not a magazine: posts are files in a directory t
 
 ## Project rules
 
-- Never use red for decoration. It marks location or type only.
+- Never use red for decoration. It marks location only; post types use the `--color-type-*` chip tokens.
 - Every piece of metadata (paths, dates, types, counts, buttons) is set in mono. Prose and titles never are.
 - Every folder path in content must exist in `src/data/directory.ts`; the build fails otherwise. Add the folder before tagging a post into it.
 - Never hand-write post counts. They are always derived from the posts collection.
